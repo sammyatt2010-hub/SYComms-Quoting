@@ -1367,27 +1367,133 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     _logo_buf   = io.BytesIO(_logo_bytes)
 
     def _add_header(pdf_obj, subtitle="Customer Proposal & Order Documentation"):
-        pdf_obj.set_fill_color(13, 46, 74)
+        # Deep purple background
+        pdf_obj.set_fill_color(31, 20, 80)
         pdf_obj.rect(0, 0, 210, 42, 'F')
-        # Logo on left
-        pdf_obj.image(_logo_buf, x=12, y=7, h=28)
+        # SY Comms circle logo on left
+        pdf_obj.image(_logo_buf, x=10, y=6, h=30)
         _logo_buf.seek(0)
-        # Company name centre
-        pdf_obj.set_font("Helvetica", "B", 18)
+        # Company name right of logo
+        pdf_obj.set_font("Helvetica", "B", 20)
         pdf_obj.set_text_color(255, 255, 255)
-        pdf_obj.set_y(8)
-        pdf_obj.set_x(50)
-        pdf_obj.cell(110, 10, "NOVALINK HARDWARE", ln=False, align="C")
+        pdf_obj.set_y(7)
+        pdf_obj.set_x(48)
+        pdf_obj.cell(120, 10, s("SY·COMMS"), ln=False, align="L")
         pdf_obj.set_font("Helvetica", "", 9)
-        pdf_obj.set_y(20)
-        pdf_obj.set_x(50)
-        pdf_obj.cell(110, 6, subtitle, ln=False, align="C")
-        # Cyan accent bar
-        pdf_obj.set_fill_color(0, 119, 168)
+        pdf_obj.set_y(19)
+        pdf_obj.set_x(48)
+        pdf_obj.cell(120, 6, s(subtitle), ln=False, align="L")
+        # Teal accent bar
+        pdf_obj.set_fill_color(0, 181, 163)
         pdf_obj.rect(0, 42, 210, 2, 'F')
         pdf_obj.set_text_color(0, 0, 0)
-        pdf_obj.set_y(48)  # fixed start just below header band
+        pdf_obj.set_y(48)
 
+    # ── PAGE 1: SY COMMS COMPANY INTRODUCTION ───────────────────────────────
+    pdf.add_page()
+
+    # Full-page gradient cover
+    pdf.set_fill_color(31, 20, 80)
+    pdf.rect(0, 0, 210, 297, 'F')
+
+    # Teal accent stripe at top
+    pdf.set_fill_color(0, 181, 163)
+    pdf.rect(0, 0, 210, 5, 'F')
+
+    # Logo centred - large
+    pdf.image(_logo_buf, x=75, y=25, h=55)
+    _logo_buf.seek(0)
+
+    # Company name
+    pdf.set_font("Helvetica", "B", 32)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(90)
+    pdf.cell(0, 12, "SY" + chr(183) + "COMMS", ln=True, align="C")
+
+    # Tagline
+    pdf.set_font("Helvetica", "", 13)
+    pdf.set_text_color(0, 181, 163)
+    pdf.set_y(106)
+    pdf.cell(0, 8, "Connecting local businesses to success", ln=True, align="C")
+
+    # Divider
+    pdf.set_draw_color(0, 181, 163)
+    pdf.set_line_width(0.6)
+    pdf.line(40, 120, 170, 120)
+
+    # Proposal label
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(126)
+    pdf.cell(0, 8, s(f"CUSTOMER PROPOSAL"), ln=True, align="C")
+    if _comp:
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(0, 181, 163)
+        pdf.set_y(136)
+        pdf.cell(0, 7, s(f"Prepared for: {_comp}"), ln=True, align="C")
+
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(200, 200, 220)
+    pdf.set_y(146)
+    pdf.cell(0, 6, s(f"Date: {date.today().strftime('%d %B %Y')}"), ln=True, align="C")
+
+    # ── About Us section ──────────────────────────────────────────────────────
+    pdf.set_y(165)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(0, 181, 163)
+    pdf.cell(0, 8, "About SY" + chr(183) + "COMMS", ln=True, align="C")
+
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(220, 220, 230)
+    pdf.set_x(30)
+    pdf.multi_cell(150, 5.5,
+        "SY Comms is a locally owned and operated telecoms and IT services company "
+        "serving businesses across the SY & TF postcode areas. We understand the "
+        "unique needs of our community and are committed to delivering solutions that "
+        "work for you. Our experienced local engineers are always on hand to provide "
+        "friendly, fast and personalised service.",
+        align="C"
+    )
+
+    # ── Values section ────────────────────────────────────────────────────────
+    pdf.set_y(215)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(0, 181, 163)
+    pdf.cell(0, 7, "Our Values", ln=True, align="C")
+    pdf.ln(1)
+
+    values = [
+        (chr(9654) + "  Flexible", "12-month rolling contracts — no lengthy commitments"),
+        (chr(9654) + "  Local",    "Shropshire-based engineers serving SY & TF postcodes"),
+        (chr(9654) + "  Rapid",    "Response times within the hour to minimise downtime"),
+        (chr(9654) + "  Complete", "Full-stack: Telecoms, Mobile, Networking, IT & Payments"),
+    ]
+    for title, desc in values:
+        pdf.set_x(30)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(45, 5.5, s(title), ln=False)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(190, 190, 210)
+        pdf.cell(0, 5.5, s(desc), ln=True)
+        pdf.ln(0.5)
+
+    # ── Contact footer ────────────────────────────────────────────────────────
+    pdf.set_fill_color(0, 181, 163)
+    pdf.rect(0, 263, 210, 0.6, 'F')
+
+    pdf.set_y(267)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(200, 200, 220)
+    pdf.cell(0, 5, "01743 667419   |   hello@sycomms.co.uk   |   sycomms.co.uk", ln=True, align="C")
+    pdf.set_y(273)
+    pdf.cell(0, 5, "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG", ln=True, align="C")
+
+    # Teal accent stripe at bottom
+    pdf.set_fill_color(0, 181, 163)
+    pdf.rect(0, 292, 210, 5, 'F')
+
+    # ── PAGE 2 onwards: standard proposal pages ───────────────────────────────
     pdf.add_page()
     _add_header(pdf)
 
