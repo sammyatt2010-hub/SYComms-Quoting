@@ -629,7 +629,7 @@ st.markdown(f"""
   <img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" style="height:56px;border-radius:8px;flex-shrink:0;" alt="SY Comms"/>
   <div>
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;color:#fff;line-height:1.1">
-      <span style="color:#00b5a3">Warevio</span> Technology Group
+      <span style="color:#00b5a3">SY</span>&middot;COMMS
     </div>
     <div style="color:rgba(255,255,255,0.5);font-size:0.88rem;margin-top:0.2rem">SY Comms Quotation Tool &nbsp;·&nbsp; Build, price &amp; generate paperwork</div>
   </div>
@@ -1943,7 +1943,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
         _env_row("Envelope ID:", _envelope_id)
         _env_row("Status:", "COMPLETED", color=(0, 140, 70))
-        _env_row("Subject:", f"Warevio Proposal - {_signer_co[:40]}")
+        _env_row("Subject:", f"SY Comms Proposal - {_signer_co[:40]}")
         _env_row("Originator:", "SY Comms")
         _env_row("Document Pages:", "4   |   Signatures: 3")
         _env_row("Time Zone:", "(UTC+00:00) Dublin, Edinburgh, Lisbon, London")
