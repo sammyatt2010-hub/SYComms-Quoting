@@ -201,6 +201,7 @@ def _default_config():
             "wallboard_sell": 4.99,
             "default_service_uplift_pct": 40,
             "hw_uplift_pct": 50,
+            "commission_pct": 10,
         }
     }
 
@@ -236,6 +237,7 @@ if "uploaded_images" not in st.session_state:
 cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
+commission_pct     = C.get("commission_pct", 10)   # consultant commission % of gross margin
 B   = cfg.get("branding", {})     # shorthand for branding dict
 # Branding helpers — refresh from full config (overrides early load)
 _CO       = B.get("company_name",    _CO)
@@ -682,6 +684,14 @@ with st.sidebar:
     # Convert service discount → effective uplift (base 40%, reduced by discount)
     service_uplift_pct = max(40 - service_discount_pct, 5)
 
+    st.markdown("### 🔒 Deal Adjustments (Internal Only)")
+    termination_cost = st.number_input(
+        "Buyout / Termination Cost (£)",
+        min_value=0.0, value=0.0, step=50.0,
+        key="q_termination",
+        help="Cost to exit the customer's existing contract. Added to the lease spread — not shown to customer."
+    )
+
     st.markdown("### 🏦 Bank Details")
     bank_name  = st.text_input("Bank Name", key="q_bank_name")
     acc_holder = st.text_input("Account Holder", key="q_acc_holder")
@@ -993,6 +1003,9 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 new_hw_uplift  = st.slider("Hardware Sell Margin %",
                     min_value=0, max_value=100, value=int(c.get("hw_uplift_pct", 50)), step=5,
                     help="Controls the hardware sell markup. Set before generating a quote. Not visible to customers.")
+                new_commission = st.slider("Consultant Commission %",
+                    min_value=0, max_value=30, value=int(c.get("commission_pct", 10)), step=1,
+                    help="% of gross deal margin shown as consultant commission in Internal Financials. Internal only.")
 
             if st.button("✅ Apply Cost Changes", type="primary", key="apply_costs"):
                 st.session_state.active_config["constants"].update({
@@ -1000,6 +1013,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     "wallboard_sell":   new_wallboard,
                     "default_service_uplift_pct": new_uplift,
                     "hw_uplift_pct":    new_hw_uplift,
+                    "commission_pct":   new_commission,
                 })
                 st.success("Costs updated!")
 
@@ -1213,18 +1227,22 @@ pat_base   = compute_pat(svc)
 is_spread  = ("Lease" in payment_model)
 
 if is_spread:
-    # Hardware cost spread evenly over contract months
-    hw_monthly_spread = round(hw_sell / lease_term, 2)
+    # Hardware cost + termination buyout spread over contract months
+    hw_monthly_spread = round((hw_sell + termination_cost) / lease_term, 2)
     total_mo   = svc["total_sell"] + hw_monthly_spread
-    # Upfront = installation + BB install only (no hardware)
+    # Upfront = installation + BB install only
     bb_inst    = BROADBAND[bb_provider][bb_package]["install"]
     upfront    = compute_install_cost() + bb_inst
-    pat        = pat_base   # total profit unchanged, timing differs
+    pat        = pat_base   # termination is pass-through (billed to customer in spread)
 else:
     hw_monthly_spread = 0.0
-    upfront    = compute_upfront()
+    upfront    = compute_upfront() + termination_cost   # included in upfront total
     total_mo   = svc["total_sell"]
     pat        = pat_base
+
+# Commission on gross margin (internal only — not customer-facing)
+gross_margin = (hw_sell - hw_buy) + (pat_base - (hw_sell - hw_buy))
+commission   = round(pat_base * (commission_pct / 100), 2)
 
 # Aliases for PDF / legacy references
 kit_cost    = hw_buy
@@ -1307,9 +1325,9 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
             </div>''', unsafe_allow_html=True)
         with fi2:
             st.markdown(f'''<div class="metric-card">
-              <div class="metric-label">HW Buy Cost</div>
-              <div class="metric-value" style="font-size:1.4rem">£{hw_buy:.0f}</div>
-              <div class="metric-sub">Sell: £{hw_sell:.0f}</div>
+              <div class="metric-label">HW Buy → Sell</div>
+              <div class="metric-value" style="font-size:1.3rem">£{hw_buy:.0f} → £{hw_sell:.0f}</div>
+              <div class="metric-sub">{hw_uplift_override}% margin</div>
             </div>''', unsafe_allow_html=True)
         with fi3:
             st.markdown(f'''<div class="metric-card">
@@ -1319,10 +1337,16 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
             </div>''', unsafe_allow_html=True)
         with fi4:
             st.markdown(f'''<div class="metric-card">
-              <div class="metric-label">SGP Est.</div>
-              <div class="metric-value" style="font-size:1.3rem">£{sgp:.0f}</div>
-              <div class="metric-sub">10% of PAT</div>
+              <div class="metric-label">Commission ({commission_pct}%)</div>
+              <div class="metric-value" style="font-size:1.3rem;color:#00b5a3">£{commission:.0f}</div>
+              <div class="metric-sub">On £{pat:.0f} gross margin</div>
             </div>''', unsafe_allow_html=True)
+        if termination_cost > 0:
+            st.markdown(
+                f'<div class="info-box">🔒 Termination / Buyout: <strong>£{termination_cost:.2f}</strong> — '
+                f'{"spread at £" + str(round(termination_cost/lease_term,2)) + "/mo over " + LEASE_TERM_LABELS[lease_term] if is_spread else "included in upfront cost"}</div>',
+                unsafe_allow_html=True
+            )
         if pat_warn:
             st.markdown(f'<div class="warning-box">{pat_warn}</div>', unsafe_allow_html=True)
         if override_bb_sell > 0:
