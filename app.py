@@ -1390,6 +1390,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf_obj.set_y(48)
 
     # ── PAGE 1: SY COMMS COMPANY INTRODUCTION ───────────────────────────────
+    pdf.set_auto_page_break(False)   # disable so cover page content doesn't spill
     pdf.add_page()
 
     # Full-page gradient cover
@@ -1463,10 +1464,10 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(1)
 
     values = [
-        (chr(9654) + "  Flexible", "12-month rolling contracts — no lengthy commitments"),
-        (chr(9654) + "  Local",    "Shropshire-based engineers serving SY & TF postcodes"),
-        (chr(9654) + "  Rapid",    "Response times within the hour to minimise downtime"),
-        (chr(9654) + "  Complete", "Full-stack: Telecoms, Mobile, Networking, IT & Payments"),
+        (">  Flexible", "12-month rolling contracts — no lengthy commitments"),
+        (">  Local",    "Shropshire-based engineers serving SY & TF postcodes"),
+        (">  Rapid",    "Response times within the hour to minimise downtime"),
+        (">  Complete", "Full-stack: Telecoms, Mobile, Networking, IT & Payments"),
     ]
     for title, desc in values:
         pdf.set_x(30)
@@ -1494,6 +1495,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.rect(0, 292, 210, 5, 'F')
 
     # ── PAGE 2 onwards: standard proposal pages ───────────────────────────────
+    pdf.set_auto_page_break(True, margin=15)   # re-enable for content pages
     pdf.add_page()
     _add_header(pdf)
 
