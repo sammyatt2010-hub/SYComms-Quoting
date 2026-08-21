@@ -323,11 +323,11 @@ def _norm(s):
     return "".join(c for c in s.lower() if c.isalnum())
 
 def get_product_image_b64(name):
-    """Return (b64_data, ext) — checks bundled, then session upload, then disk."""
-    # 1. Bundled images (always available, no setup needed)
+    """Return (b64_data, ext) — checks bundled, then session upload, then images/ dir."""
+    # 1. Bundled images (Grandstream phones won't be here — falls through)
     if name in BUNDLED_IMAGES:
         return BUNDLED_IMAGES[name]
-    # 2. Session-state uploaded images (fuzzy match on filename)
+    # 2. Session-state uploaded images (fuzzy match)
     name_norm = _norm(name)
     best, best_score = None, 0
     for key, data in st.session_state.get("uploaded_images", {}).items():
@@ -338,16 +338,34 @@ def get_product_image_b64(name):
     if best and best_score > 0.4:
         b64 = base64.b64encode(best[0]).decode()
         return b64, best[1]
-    # 3. Disk images/ folder (for custom additions in repo)
+    # 3. Explicit PRODUCT_IMAGES dict path
     img_path = PRODUCT_IMAGES.get(name)
     if img_path and Path(img_path).exists():
         try:
-            with open(img_path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            ext = img_path.rsplit(".", 1)[-1]
-            return b64, ext
+            with open(img_path, "rb") as f_:
+                b64 = base64.b64encode(f_.read()).decode()
+            return b64, img_path.rsplit(".", 1)[-1]
         except Exception:
             pass
+    # 4. Auto-scan images/ directory with fuzzy name matching
+    #    Matches any file whose name contains a key word from the product name
+    img_dir = Path("images")
+    if img_dir.exists():
+        name_words = [w.lower() for w in name.replace("-","").replace("(","").replace(")","").split() if len(w) > 2]
+        best_file, best_hits = None, 0
+        for f_ in img_dir.iterdir():
+            if f_.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+                fname_lower = f_.stem.lower()
+                hits = sum(1 for w in name_words if w in fname_lower)
+                if hits > best_hits:
+                    best_file, best_hits = f_, hits
+        if best_file and best_hits >= 1:
+            try:
+                with open(best_file, "rb") as f_:
+                    b64 = base64.b64encode(f_.read()).decode()
+                return b64, best_file.suffix.lstrip(".")
+            except Exception:
+                pass
     return None, None
 
 def product_card_html(name, info, qty=0, show_qty=False, img_height=80):
@@ -1191,7 +1209,8 @@ def compute_upfront():
     bb_inst = BROADBAND[bb_provider][bb_package]["install"]
     return compute_hw_sell() + compute_install_cost() + bb_inst
 
-def compute_service_charges():
+def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
+    """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
     uplift   = service_uplift_pct / 100.0
     bb_cost  = BROADBAND[bb_provider][bb_package]["cost"]
     bb_sell  = bb_cost * (1.0 + uplift)
@@ -1201,20 +1220,27 @@ def compute_service_charges():
         bb_cost2 = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
         bb_sell += bb_cost2 * (1.0 + uplift)
 
-    vc_sell_per_seat = C.get("vc_sell_per_seat", 12.00)  # fixed sell (Professional Bundle)
+    # Voice channels — fixed sell price from pricebook (Professional Bundle)
+    vc_sell_per_seat = C.get("vc_sell_per_seat", 12.00)
     vc_cost_per_seat = C.get("vc_cost_per_seat", 2.95)
     lic_monthly      = total_voice_channels * vc_sell_per_seat
+
+    # Wallboard — computed here to avoid global scope issues
+    wallboard_mo_val = wallboard_users * C.get("wallboard_sell", 99.00)
+
     mobile_sell      = sum(r["sell"] * r["qty"] for r in mobile_rows)
     mobile_cost      = sum(r["cost"] * r["qty"] for r in mobile_rows)
-    total_sell       = bb_sell + lic_monthly + wallboard_mo + mobile_sell
+    total_sell       = bb_sell + lic_monthly + wallboard_mo_val + mobile_sell + sw_sell
 
     return {
         "bb_cost":        bb_cost,
         "bb_sell":        bb_sell,
         "lic_monthly":    lic_monthly,
-        "wallboard_mo":   wallboard_mo,
+        "wallboard_mo":   wallboard_mo_val,
         "mobile_sell":    mobile_sell,
         "mobile_cost":    mobile_cost,
+        "sw_sell":        sw_sell,
+        "sw_cost":        sw_cost,
         "total_sell":     total_sell,
     }
 
@@ -1235,7 +1261,7 @@ poe_needed = compute_poe_needed()
 rec_switch = get_recommended_switch(poe_needed)
 hw_buy     = compute_hw_buy()
 hw_sell    = compute_hw_sell()
-svc        = compute_service_charges()
+svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
 pat_base   = compute_pat(svc)
 
 is_spread  = ("Lease" in payment_model)
