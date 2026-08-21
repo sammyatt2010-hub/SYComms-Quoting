@@ -726,6 +726,19 @@ with st.sidebar:
     sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
     sw_cost_total = sum(qty * cost for _, qty, cost, _ in SW_ADDONS if qty > 0)
 
+    with st.expander("📊 Current Customer Costs", expanded=False):
+        st.caption("Fill in what the customer currently pays — used in the comparison view.")
+        curr_col1, curr_col2 = st.columns(2)
+        with curr_col1:
+            current_bb      = st.number_input("Broadband / Lines (£/mo)", 0.0, step=5.0, key="q_curr_bb")
+            current_system  = st.number_input("Phone System (£/mo)",      0.0, step=5.0, key="q_curr_system")
+            current_calls   = st.number_input("Call Charges (£/mo)",      0.0, step=5.0, key="q_curr_calls")
+        with curr_col2:
+            current_mobile  = st.number_input("Mobile (£/mo)",            0.0, step=5.0, key="q_curr_mobile")
+            current_support = st.number_input("Support / Maintenance (£/mo)", 0.0, step=5.0, key="q_curr_support")
+            current_other   = st.number_input("Other / Misc (£/mo)",      0.0, step=5.0, key="q_curr_other")
+        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other
+
     st.markdown("### 🏦 Bank Details")
     bank_name  = st.text_input("Bank Name", key="q_bank_name")
     acc_holder = st.text_input("Account Holder", key="q_acc_holder")
@@ -737,6 +750,11 @@ with st.sidebar:
 
 
 # Hardcoded values (features/promos removed — must stay defined for PDF/CV references)
+# Current customer cost defaults (0 unless consultant fills in)
+current_bb = current_system = current_calls = 0.0
+current_mobile = current_support = current_other = 0.0
+current_total  = 0.0
+
 bogof_active    = False
 dark_web_mon    = False
 proactive_bb    = False
@@ -1416,7 +1434,9 @@ def s(text):
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
-def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip=''):
+def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip='',
+              curr_total=0.0, curr_bb=0.0, curr_system=0.0, curr_calls=0.0,
+              curr_mobile=0.0, curr_support=0.0, curr_other=0.0):
     pdf = FPDF()
     pdf.set_margins(15, 15, 15)
 
@@ -1635,15 +1655,19 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 9)
 
     if is_spread:
+        curr_hw  = f"£{current_system:.2f}/mo" if current_system > 0 else "-"
+        curr_svc = f"£{(current_bb + current_calls + current_mobile):.2f}/mo" if (current_bb + current_calls + current_mobile) > 0 else "-"
         rows = [
-            ("Hardware (spread over term)", "-", f"£{hw_monthly_spread:.2f}/mo"),
-            ("Monthly Service Charges (BB, Licences, Mobiles)", "-", f"£{svc['total_sell']:.2f}/mo"),
+            ("Hardware (spread over term)", curr_hw,  f"£{hw_monthly_spread:.2f}/mo"),
+            ("Monthly Service Charges (BB, Licences, Mobiles)", curr_svc, f"£{svc['total_sell']:.2f}/mo"),
             ("Installation / Setup (one-off)", "-", f"£{compute_install_cost():.2f}"),
         ]
     else:
+        curr_hw  = f"£{current_system:.2f}/mo" if current_system > 0 else "-"
+        curr_svc = f"£{(current_bb + current_calls + current_mobile):.2f}/mo" if (current_bb + current_calls + current_mobile) > 0 else "-"
         rows = [
-            ("Upfront Hardware (one-off)", "-", f"£{upfront:.2f}"),
-            ("Monthly Service Charges (BB, Licences, Mobiles)", "-", f"£{svc['total_sell']:.2f}/mo"),
+            ("Upfront Hardware (one-off)", curr_hw,  f"£{upfront:.2f}"),
+            ("Monthly Service Charges (BB, Licences, Mobiles)", curr_svc, f"£{svc['total_sell']:.2f}/mo"),
             ("Installation", "-", f"£{compute_install_cost():.2f}"),
         ]
     for i, (desc, curr, new) in enumerate(rows):
@@ -1654,11 +1678,12 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.cell(50, 6, new, border=0, fill=True, ln=True, align="C")
 
     # Total row
+    curr_total_str = f"£{current_total:.2f}/mo" if current_total > 0 else "-"
     pdf.set_fill_color(0, 181, 163)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(90, 7, "  TOTAL MONTHLY (excl. VAT)", fill=True, ln=False)
-    pdf.cell(50, 7, "-", fill=True, ln=False, align="C")
+    pdf.cell(50, 7, curr_total_str, fill=True, ln=False, align="C")
     pdf.cell(50, 7, f"£{total_mo:.2f}/mo" + ("" if is_spread else f" + £{upfront:.2f} upfront"), fill=True, ln=True, align="C")
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
@@ -2648,6 +2673,90 @@ with tab4:
             </div>
             """, unsafe_allow_html=True)
 
+            # ── COST COMPARISON SECTION ───────────────────────────────────────
+            if current_total > 0:
+                st.markdown("---")
+                st.markdown('''
+                <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;
+                     color:#1f1450;margin:1rem 0 0.6rem">📊 Cost Comparison</div>
+                ''', unsafe_allow_html=True)
+
+                saving_mo  = current_total - total_mo
+                saving_yr  = saving_mo * 12
+                saving_pct = (saving_mo / current_total * 100) if current_total > 0 else 0
+
+                # Build comparison rows
+                comp_rows = []
+                if current_bb > 0:
+                    comp_rows.append(("Broadband & Lines", current_bb, svc["bb_sell"]))
+                if current_system > 0:
+                    sys_new = hw_monthly_spread if is_spread else 0
+                    comp_rows.append(("Phone System", current_system, sys_new))
+                if current_calls > 0:
+                    comp_rows.append(("Call Charges / Licences", current_calls, svc["lic_monthly"]))
+                if current_mobile > 0:
+                    comp_rows.append(("Mobile", current_mobile, svc["mobile_sell"]))
+                if current_support > 0:
+                    comp_rows.append(("Support & Maintenance", current_support, 0))
+                if current_other > 0:
+                    comp_rows.append(("Other Costs", current_other, 0))
+
+                # Comparison table HTML
+                rows_html = ""
+                for label, curr_val, new_val in comp_rows:
+                    diff = curr_val - new_val
+                    diff_color = "#1a7a40" if diff >= 0 else "#c0392b"
+                    diff_str   = f"-£{diff:.2f}" if diff >= 0 else f"+£{abs(diff):.2f}"
+                    rows_html += f"""
+                    <tr>
+                      <td style="padding:8px 12px;border-bottom:1px solid #eee">{label}</td>
+                      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#888">£{curr_val:.2f}</td>
+                      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#1f1450;font-weight:600">£{new_val:.2f}</td>
+                      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:{diff_color};font-weight:700">{diff_str}</td>
+                    </tr>"""
+
+                saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
+                saving_col = "#1a7a40" if saving_mo >= 0 else "#c0392b"
+                saving_lbl = "Monthly Saving" if saving_mo >= 0 else "Monthly Increase"
+
+                st.markdown(f"""
+                <table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;
+                              border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+                  <thead>
+                    <tr style="background:#1f1450;color:#fff">
+                      <th style="padding:10px 12px;text-align:left">Category</th>
+                      <th style="padding:10px 12px;text-align:right">Current</th>
+                      <th style="padding:10px 12px;text-align:right">SY Comms</th>
+                      <th style="padding:10px 12px;text-align:right">Difference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows_html}
+                    <tr style="background:#f5f5f5;font-weight:700">
+                      <td style="padding:10px 12px">Total Monthly (excl. VAT)</td>
+                      <td style="padding:10px 12px;text-align:right">£{current_total:.2f}</td>
+                      <td style="padding:10px 12px;text-align:right;color:#1f1450">£{total_mo:.2f}</td>
+                      <td style="padding:10px 12px;text-align:right;color:{saving_col}">{"−" if saving_mo>=0 else "+"}£{abs(saving_mo):.2f}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div style="margin-top:1rem;padding:1rem 1.4rem;background:{saving_bg};
+                     border-radius:10px;border-left:4px solid {saving_col}">
+                  <div style="font-size:0.8rem;color:{saving_col};font-weight:700;text-transform:uppercase;letter-spacing:.06em">{saving_lbl}</div>
+                  <div style="font-size:1.8rem;font-weight:800;color:{saving_col}">£{abs(saving_mo):.2f}<span style="font-size:0.9rem;font-weight:400"> per month</span></div>
+                  <div style="font-size:1rem;color:{saving_col};margin-top:0.2rem">£{abs(saving_yr):.2f} per year &nbsp;·&nbsp; {abs(saving_pct):.0f}% {"saving" if saving_mo>=0 else "increase"}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown('''
+                <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f0f4ff;border-radius:8px;
+                     font-size:0.83rem;color:#555;text-align:center;border:1px dashed #c0cce0">
+                  💡 Fill in the customer's <strong>Current Customer Costs</strong> in the sidebar
+                  to show a cost comparison here.
+                </div>
+                ''', unsafe_allow_html=True)
+
 
 # ── TAB 5: SIGN & SEND ────────────────────────────────────────────────────────
 with tab5:
@@ -2793,6 +2902,9 @@ with tab5:
                     sig_company=comp_name or "",
                     sig_timestamp=_ts,
                     sig_ip=_client_ip,
+                    curr_total=current_total, curr_bb=current_bb,
+                    curr_system=current_system, curr_calls=current_calls,
+                    curr_mobile=current_mobile,
                 )
                 safe = (comp_name or "quote").replace(" ", "_")
                 st.session_state["_signed_pdf_bytes"]    = _pdf_bytes
