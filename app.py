@@ -736,7 +736,16 @@ with st.sidebar:
 
 
 
-# Hardcoded values (features removed for simplicity)
+# Hardcoded values (features/promos removed — must stay defined for PDF/CV references)
+bogof_active    = False
+dark_web_mon    = False
+proactive_bb    = False
+ooh_support     = False
+music_on_hold   = False
+website_promo   = False
+rental_discount = 0.0
+hw_fund         = "None"
+is_recurring    = True
 termination_cost = 0.0  # overridden by sidebar if set
 # Software add-on defaults (overridden by sidebar widgets above)
 sw_studio_qty = sw_callrec_qty = sw_crm_qty = 0
