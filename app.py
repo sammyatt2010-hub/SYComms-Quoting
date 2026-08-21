@@ -2621,8 +2621,9 @@ with tab4:
             comp_rows.append(("Mobile", current_mobile, svc["mobile_sell"]))
         if current_support > 0:
             comp_rows.append(("Support & Maintenance", current_support, 0))
-        if current_other > 0:
-            comp_rows.append(("Other Costs", current_other, 0))
+        # Other costs + software add-ons (SY Comms side shows sw_sell_total)
+        if current_other > 0 or sw_sell_total > 0:
+            comp_rows.append(("Other / Software Add-ons", current_other, sw_sell_total))
 
         # Comparison table — built as a flat string to avoid markdown code-block indentation
         _saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
