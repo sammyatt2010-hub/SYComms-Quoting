@@ -2698,53 +2698,45 @@ with tab4:
                 if current_other > 0:
                     comp_rows.append(("Other Costs", current_other, 0))
 
-                # Comparison table HTML
-                rows_html = ""
-                for label, curr_val, new_val in comp_rows:
-                    diff = curr_val - new_val
-                    diff_color = "#1a7a40" if diff >= 0 else "#c0392b"
-                    diff_str   = f"-£{diff:.2f}" if diff >= 0 else f"+£{abs(diff):.2f}"
-                    rows_html += f"""
-                    <tr>
-                      <td style="padding:8px 12px;border-bottom:1px solid #eee">{label}</td>
-                      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#888">£{curr_val:.2f}</td>
-                      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#1f1450;font-weight:600">£{new_val:.2f}</td>
-                      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:{diff_color};font-weight:700">{diff_str}</td>
-                    </tr>"""
+                # Comparison table — built as a flat string to avoid markdown code-block indentation
+                _saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
+                _saving_col = "#1a7a40" if saving_mo >= 0 else "#c0392b"
+                _saving_lbl = "Monthly Saving" if saving_mo >= 0 else "Monthly Increase"
+                _arrow      = "-" if saving_mo >= 0 else "+"
 
-                saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
-                saving_col = "#1a7a40" if saving_mo >= 0 else "#c0392b"
-                saving_lbl = "Monthly Saving" if saving_mo >= 0 else "Monthly Increase"
+                _tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">'
+                _tbl += '<thead><tr style="background:#1f1450;color:#fff">'
+                _tbl += '<th style="padding:10px 12px;text-align:left">Category</th>'
+                _tbl += '<th style="padding:10px 12px;text-align:right">Current</th>'
+                _tbl += '<th style="padding:10px 12px;text-align:right">SY Comms</th>'
+                _tbl += '<th style="padding:10px 12px;text-align:right">Difference</th>'
+                _tbl += "</tr></thead><tbody>"
 
-                st.markdown(f"""
-                <table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;
-                              border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-                  <thead>
-                    <tr style="background:#1f1450;color:#fff">
-                      <th style="padding:10px 12px;text-align:left">Category</th>
-                      <th style="padding:10px 12px;text-align:right">Current</th>
-                      <th style="padding:10px 12px;text-align:right">SY Comms</th>
-                      <th style="padding:10px 12px;text-align:right">Difference</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows_html}
-                    <tr style="background:#f5f5f5;font-weight:700">
-                      <td style="padding:10px 12px">Total Monthly (excl. VAT)</td>
-                      <td style="padding:10px 12px;text-align:right">£{current_total:.2f}</td>
-                      <td style="padding:10px 12px;text-align:right;color:#1f1450">£{total_mo:.2f}</td>
-                      <td style="padding:10px 12px;text-align:right;color:{saving_col}">{"−" if saving_mo>=0 else "+"}£{abs(saving_mo):.2f}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                for _label, _curr_v, _new_v in comp_rows:
+                    _diff  = _curr_v - _new_v
+                    _dcol  = "#1a7a40" if _diff >= 0 else "#c0392b"
+                    _dstr  = f"-{chr(163)}{_diff:.2f}" if _diff >= 0 else f"+{chr(163)}{abs(_diff):.2f}"
+                    _tbl += f'<tr>'
+                    _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee">{_label}</td>'
+                    _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#888">{chr(163)}{_curr_v:.2f}</td>'
+                    _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#1f1450;font-weight:600">{chr(163)}{_new_v:.2f}</td>'
+                    _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:{_dcol};font-weight:700">{_dstr}</td>'
+                    _tbl += "</tr>"
 
-                <div style="margin-top:1rem;padding:1rem 1.4rem;background:{saving_bg};
-                     border-radius:10px;border-left:4px solid {saving_col}">
-                  <div style="font-size:0.8rem;color:{saving_col};font-weight:700;text-transform:uppercase;letter-spacing:.06em">{saving_lbl}</div>
-                  <div style="font-size:1.8rem;font-weight:800;color:{saving_col}">£{abs(saving_mo):.2f}<span style="font-size:0.9rem;font-weight:400"> per month</span></div>
-                  <div style="font-size:1rem;color:{saving_col};margin-top:0.2rem">£{abs(saving_yr):.2f} per year &nbsp;·&nbsp; {abs(saving_pct):.0f}% {"saving" if saving_mo>=0 else "increase"}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                _tbl += f'<tr style="background:#f5f5f5;font-weight:700">'
+                _tbl += f'<td style="padding:10px 12px">Total Monthly (excl. VAT)</td>'
+                _tbl += f'<td style="padding:10px 12px;text-align:right">{chr(163)}{current_total:.2f}</td>'
+                _tbl += f'<td style="padding:10px 12px;text-align:right;color:#1f1450">{chr(163)}{total_mo:.2f}</td>'
+                _tbl += f'<td style="padding:10px 12px;text-align:right;color:{_saving_col}">{_arrow}{chr(163)}{abs(saving_mo):.2f}</td>'
+                _tbl += "</tr></tbody></table>"
+
+                _tbl += f'<div style="margin-top:1rem;padding:1rem 1.4rem;background:{_saving_bg};border-radius:10px;border-left:4px solid {_saving_col}">'
+                _tbl += f'<div style="font-size:0.8rem;color:{_saving_col};font-weight:700;text-transform:uppercase;letter-spacing:.06em">{_saving_lbl}</div>'
+                _tbl += f'<div style="font-size:1.8rem;font-weight:800;color:{_saving_col}">{chr(163)}{abs(saving_mo):.2f}<span style="font-size:0.9rem;font-weight:400"> per month</span></div>'
+                _tbl += f'<div style="font-size:1rem;color:{_saving_col};margin-top:0.2rem">{chr(163)}{abs(saving_yr):.2f} per year &nbsp;&middot;&nbsp; {abs(saving_pct):.0f}% {"saving" if saving_mo>=0 else "increase"}</div>'
+                _tbl += "</div>"
+
+                st.markdown(_tbl, unsafe_allow_html=True)
             else:
                 st.markdown('''
                 <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f0f4ff;border-radius:8px;
