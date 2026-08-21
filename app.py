@@ -765,9 +765,6 @@ termination_cost = 0.0  # overridden by sidebar if set
 # Software add-on defaults (overridden by sidebar widgets above)
 sw_studio_qty = sw_callrec_qty = sw_crm_qty = 0
 sw_acd_qty = sw_teams_qty = sw_wallboard_qty = 0
-SW_ADDONS      = []
-sw_sell_total  = 0.0
-sw_cost_total  = 0.0
 
 # ─── QUOTE SAVE / LOAD ───────────────────────────────────────────────────────
 with st.expander("💾 Save / Load Quote", expanded=False):
