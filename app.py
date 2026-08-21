@@ -2663,92 +2663,93 @@ with tab4:
         _tbl += "</div>"
 
         st.markdown(_tbl, unsafe_allow_html=True)
-    else:
-        st.markdown('''
-        <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f0f4ff;border-radius:8px;
-             font-size:0.83rem;color:#555;text-align:center;border:1px dashed #c0cce0">
-          💡 Fill in the customer's <strong>Current Customer Costs</strong> in the sidebar
-          to show a cost comparison here.
+    st.markdown('''
+    <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f0f4ff;border-radius:8px;
+         font-size:0.83rem;color:#555;text-align:center;border:1px dashed #c0cce0">
+      💡 Fill in the customer's <strong>Current Customer Costs</strong> in the sidebar
+      to show a cost comparison here.
+    </div>
+    ''', unsafe_allow_html=True)
+
+
+
+    cv_col1, cv_col2 = st.columns([3, 2])
+
+    with cv_col1:
+        st.markdown('<div class="cv-section">🌐 Your Services</div>', unsafe_allow_html=True)
+        svc_lines = [
+            (f"Business Broadband — {bb_provider} {bb_package}", f"£{svc['bb_sell']:.2f}/mo"),
+        ]
+        if second_fttp and second_fttp_pkg:
+            bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
+            svc_lines.append((f"2nd Line — {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
+        if total_voice_channels > 0:
+            svc_lines.append((f"Voice Channel Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
+        if ooh_support:
+            svc_lines.append(("24/7 Out-of-Hours Support", "£25.00/mo"))
+        if dark_web_mon:
+            svc_lines.append(("Dark Web Monitoring", "£10.00/mo (after 3m FOC)"))
+        if proactive_bb:
+            svc_lines.append(("Proactive Broadband Management", "£10.00/mo (after 3m FOC)"))
+        if mobile_rows:
+            mob_total = sum(r["sell"] * r["qty"] for r in mobile_rows)
+            svc_lines.append((f"Mobile SIMs ({sum(r['qty'] for r in mobile_rows)} connections)", f"£{mob_total:.2f}/mo"))
+
+        for label, val in svc_lines:
+            st.markdown(f"""
+            <div class="cv-price-row">
+              <span class="cv-price-label">{label}</span>
+              <span class="cv-price-val">{val}</span>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown('<div class="cv-section">✅ What\'s Included</div>', unsafe_allow_html=True)
+        includes = [
+            "Manufacturer hardware warranty",
+            "Full configuration & setup",
+        ]
+        if credits_months > 0:
+            includes.append(f"£{credits_amount:.2f}/mo introductory credit for {credits_months} months")
+        if cashback_amount > 0:
+            includes.append(f"£{cashback_amount:.2f} settlement contribution")
+
+        for item in includes:
+            st.markdown(f'<div class="cv-include-item">✅ {item}</div>', unsafe_allow_html=True)
+
+    with cv_col2:
+        st.markdown('<div class="cv-section">💳 Your Investment</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="cv-price-row">
+          <span class="cv-price-label">Hardware</span>
+          <span class="cv-price-val">{"Spread over term" if is_spread else "One-off payment"}</span>
         </div>
-        ''', unsafe_allow_html=True)
+        <div class="cv-price-row">
+          <span class="cv-price-label">Network & Services</span>
+          <span class="cv-price-val">Monthly</span>
+        </div>
+        <div class="cv-price-row" style="font-weight:700; border-bottom:2px solid #1f1450;">
+          <span style="color:#1f1450">Total (excl. VAT)</span>
+          <span style="color:#1f1450">£{total_mo:.2f}/mo</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="cv-total-box">
+          <div class="cv-total-label">Agreement Term</div>
+          <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fff">{LEASE_TERM_LABELS[lease_term]}</div>
+          <div class="cv-total-note">Contact us for full pricing details</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f8f9ff;border-radius:8px;font-size:0.82rem;color:#555;text-align:center">
+          All figures exclude VAT.<br>
+          Subject to survey & credit approval.
+        </div>
+        """, unsafe_allow_html=True)
+
 
 
 # ── TAB 5: SIGN & SEND ────────────────────────────────────────────────────────
-
-        cv_col1, cv_col2 = st.columns([3, 2])
-
-        with cv_col1:
-            st.markdown('<div class="cv-section">🌐 Your Services</div>', unsafe_allow_html=True)
-            svc_lines = [
-                (f"Business Broadband — {bb_provider} {bb_package}", f"£{svc['bb_sell']:.2f}/mo"),
-            ]
-            if second_fttp and second_fttp_pkg:
-                bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
-                svc_lines.append((f"2nd Line — {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
-            if total_voice_channels > 0:
-                svc_lines.append((f"Voice Channel Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
-            if ooh_support:
-                svc_lines.append(("24/7 Out-of-Hours Support", "£25.00/mo"))
-            if dark_web_mon:
-                svc_lines.append(("Dark Web Monitoring", "£10.00/mo (after 3m FOC)"))
-            if proactive_bb:
-                svc_lines.append(("Proactive Broadband Management", "£10.00/mo (after 3m FOC)"))
-            if mobile_rows:
-                mob_total = sum(r["sell"] * r["qty"] for r in mobile_rows)
-                svc_lines.append((f"Mobile SIMs ({sum(r['qty'] for r in mobile_rows)} connections)", f"£{mob_total:.2f}/mo"))
-
-            for label, val in svc_lines:
-                st.markdown(f"""
-                <div class="cv-price-row">
-                  <span class="cv-price-label">{label}</span>
-                  <span class="cv-price-val">{val}</span>
-                </div>""", unsafe_allow_html=True)
-
-            st.markdown('<div class="cv-section">✅ What\'s Included</div>', unsafe_allow_html=True)
-            includes = [
-                "Manufacturer hardware warranty",
-                "Full configuration & setup",
-            ]
-            if credits_months > 0:
-                includes.append(f"£{credits_amount:.2f}/mo introductory credit for {credits_months} months")
-            if cashback_amount > 0:
-                includes.append(f"£{cashback_amount:.2f} settlement contribution")
-
-            for item in includes:
-                st.markdown(f'<div class="cv-include-item">✅ {item}</div>', unsafe_allow_html=True)
-
-        with cv_col2:
-            st.markdown('<div class="cv-section">💳 Your Investment</div>', unsafe_allow_html=True)
-            st.markdown(f"""
-            <div class="cv-price-row">
-              <span class="cv-price-label">Hardware</span>
-              <span class="cv-price-val">{"Spread over term" if is_spread else "One-off payment"}</span>
-            </div>
-            <div class="cv-price-row">
-              <span class="cv-price-label">Network & Services</span>
-              <span class="cv-price-val">Monthly</span>
-            </div>
-            <div class="cv-price-row" style="font-weight:700; border-bottom:2px solid #1f1450;">
-              <span style="color:#1f1450">Total (excl. VAT)</span>
-              <span style="color:#1f1450">£{total_mo:.2f}/mo</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.markdown(f"""
-            <div class="cv-total-box">
-              <div class="cv-total-label">Agreement Term</div>
-              <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fff">{LEASE_TERM_LABELS[lease_term]}</div>
-              <div class="cv-total-note">Contact us for full pricing details</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.markdown(f"""
-            <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f8f9ff;border-radius:8px;font-size:0.82rem;color:#555;text-align:center">
-              All figures exclude VAT.<br>
-              Subject to survey & credit approval.
-            </div>
-            """, unsafe_allow_html=True)
-
 
 with tab5:
     st.markdown('<div class="tab-content"></div>', unsafe_allow_html=True)
