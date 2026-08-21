@@ -751,9 +751,6 @@ with st.sidebar:
 
 # Hardcoded values (features/promos removed — must stay defined for PDF/CV references)
 # Current customer cost defaults (0 unless consultant fills in)
-current_bb = current_system = current_calls = 0.0
-current_mobile = current_support = current_other = 0.0
-current_total  = 0.0
 
 bogof_active    = False
 dark_web_mon    = False
