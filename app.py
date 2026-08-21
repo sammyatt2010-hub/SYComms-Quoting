@@ -102,10 +102,10 @@ def _default_config():
         "email": {
             "smtp_host":    "smtp.gmail.com",
             "smtp_port":    587,
-            "username":     "hello@sycomms.co.uk",
-            "password":     "roynonatjcqnepi",
+            "username":     "sammyatt2010@googlemail.com",
+            "password":     "ltvkqbxtjukvrzdm",
             "from_name":    "SY Comms",
-            "reply_to":     "hello@sycomms.co.uk",
+            "reply_to":     "sammyatt2010@googlemail.com",
         },
         "branding": {
             "company_name":    "SY Comms",
@@ -2500,7 +2500,7 @@ with tab3:
         st.download_button(
             label=f"📥 Download Full Proposal Pack — {comp_name}",
             data=pdf_bytes,
-            file_name=f"{_CO_FILE}_{safe_name}_{date.today()}.pdf",
+            file_name=f"SYComms_Proposal_{safe_name}_{date.today()}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
@@ -2901,7 +2901,7 @@ with tab5:
                 )
                 safe = (comp_name or "quote").replace(" ", "_")
                 st.session_state["_signed_pdf_bytes"]    = _pdf_bytes
-                st.session_state["_signed_pdf_filename"] = f"Novalink_{safe}_SIGNED_{date.today()}.pdf"
+                st.session_state["_signed_pdf_filename"] = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
 
         if st.session_state.get("_signed_pdf_bytes"):
             st.download_button(
@@ -2932,7 +2932,7 @@ with tab5:
                     sig_ip=_client_ip,
                 )
                 safe = (comp_name or "quote").replace(" ", "_")
-                fn   = f"Novalink_{safe}_SIGNED_{date.today()}.pdf"
+                fn   = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
                 ok, msg = send_proposal_email(
                     em_cfg, to_email, cc_email, _pdf_bytes, fn, comp_name, total_mo
                 )
