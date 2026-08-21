@@ -2663,7 +2663,8 @@ with tab4:
         _tbl += "</div>"
 
         st.markdown(_tbl, unsafe_allow_html=True)
-    st.markdown('''
+    else:
+        st.markdown('''
     <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f0f4ff;border-radius:8px;
          font-size:0.83rem;color:#555;text-align:center;border:1px dashed #c0cce0">
       💡 Fill in the customer's <strong>Current Customer Costs</strong> in the sidebar
