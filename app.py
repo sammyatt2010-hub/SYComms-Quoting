@@ -196,7 +196,8 @@ def _default_config():
             "wallboard_cost":      5.00,   # Live HTML Wallboard buy cost
             "default_service_uplift_pct": 40,
             "hw_uplift_pct":     200,      # SY Comms use 3x (200% uplift) on hardware
-            "commission_pct":     10,
+            "commission_unit_size": 4000,
+            "commission_per_unit":  1000,
             "install_engineer":  450.00,   # On-site installation
             "install_remote":     50.00,   # Remote installation
         }
@@ -241,7 +242,9 @@ if "uploaded_images" not in st.session_state:
 cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
-commission_pct     = C.get("commission_pct", 10)   # consultant commission % of gross margin
+commission_pct      = C.get("commission_pct", 25)   # fallback %
+commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
+commission_per_unit  = C.get("commission_per_unit", 1000)   # £ per unit
 B   = cfg.get("branding", {})     # shorthand for branding dict
 # Branding helpers — refresh from full config (overrides early load)
 _CO       = B.get("company_name",    _CO)
@@ -1146,9 +1149,9 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 new_hw_uplift  = st.slider("Hardware Sell Margin %",
                     min_value=0, max_value=100, value=int(c.get("hw_uplift_pct", 50)), step=5,
                     help="Controls the hardware sell markup. Set before generating a quote. Not visible to customers.")
-                new_commission = st.slider("Consultant Commission %",
-                    min_value=0, max_value=30, value=int(c.get("commission_pct", 10)), step=1,
-                    help="% of gross deal margin shown as consultant commission in Internal Financials. Internal only.")
+                new_commission = st.slider("Commission per Unit (£)",
+                    min_value=500, max_value=2000, value=int(c.get("commission_per_unit", 1000)), step=50,
+                    help="£ paid per unit of gross profit. 1 unit = £4,000 GP. Internal only — not visible to consultants.")
 
             if st.button("✅ Apply Cost Changes", type="primary", key="apply_costs"):
                 st.session_state.active_config["constants"].update({
@@ -1156,7 +1159,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     "wallboard_sell":   new_wallboard,
                     "default_service_uplift_pct": new_uplift,
                     "hw_uplift_pct":    new_hw_uplift,
-                    "commission_pct":   new_commission,
+                    "commission_per_unit": new_commission,
                 })
                 st.success("Costs updated!")
 
@@ -1312,8 +1315,31 @@ def compute_hw_buy():
     return total
 
 def compute_hw_sell():
-    """Hardware sell price = buy × (1 + hw_uplift_override/100) — set in Admin Panel."""
-    return round(compute_hw_buy() * (1 + hw_uplift_override / 100), 2)
+    """Hardware sell price — uses per-item sell price from catalogue if available,
+    falls back to buy × (1 + hw_uplift_override/100) for items without a sell price."""
+    total = 0.0
+    for name, qty in desktop_quantities.items():
+        info = HANDSETS_DESKTOP[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    for name, qty in cordless_quantities.items():
+        info = HANDSETS_CORDLESS[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    for name, qty in headset_quantities.items():
+        info = HEADSETS[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    for name, qty in other_quantities.items():
+        info = OTHER_HARDWARE[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    # Switch and router use uplift (no item-specific sell price stored)
+    sw = get_recommended_switch(compute_poe_needed())
+    total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
+    if add_router:
+        total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
+    return round(total, 2)
 
 def compute_install_cost():
     if install_type == "Engineer Install":
@@ -1360,17 +1386,39 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
         "total_sell":     total_sell,
     }
 
+def compute_pricebook_pl():
+    """P&L using exact pricebook formula (verified against P & L Calcs sheet).
+    hw_rrp=hw_buy×1.5 | maintenance=0.2×hw_rrp | hw_srrp=hw_sell×1.5
+    sub_total=cos_ex+hw_srrp | rental=(sales_rate/1000)×sub_total
+    disc_turnover=(rental/true_rate)×1000 | gp=disc_turnover-cos_full
+    commission=(gp/4000)×1000
+    """
+    _lr        = next((r for r in LEASE_RATES if r["months"] == lease_term), LEASE_RATES[-1])
+    sales_rate = _lr.get("rate", 20.58)
+    true_rate  = _lr.get("true_rate", sales_rate * 0.8)
+    _hw_buy    = compute_hw_buy()
+    _hw_sell   = compute_hw_sell()
+    hw_rrp     = _hw_buy  * 1.5
+    hw_srrp    = _hw_sell * 1.5
+    maintenance_annual = 0.2 * hw_rrp
+    cos_ex     = maintenance_annual + 200.0 + compute_install_cost() + termination_cost + 400.0
+    sub_total  = cos_ex + hw_srrp
+    rental     = (sales_rate / 1000.0) * sub_total
+    disc_turn  = (rental / true_rate) * 1000.0
+    cos_full   = cos_ex + _hw_buy
+    gp         = disc_turn - cos_full
+    units      = gp / 4000.0
+    return {
+        "gross_profit": round(gp, 2), "comm_units": round(units, 3),
+        "commission": round(units * 1000, 2), "rental": round(rental, 2),
+        "disc_turnover": round(disc_turn, 2), "sub_total": round(sub_total, 2),
+        "hw_srrp": round(hw_srrp, 2), "maintenance_annual": round(maintenance_annual, 2),
+        "cos_full": round(cos_full, 2), "sales_rate": sales_rate, "true_rate": true_rate,
+    }
+
 def compute_pat(svc):
-    """PAT = hardware margin + monthly service margin × term - credits/cashback."""
-    hw_margin      = compute_hw_sell() - compute_hw_buy()
-    bb_cost        = BROADBAND[bb_provider][bb_package]["cost"]
-    svc_margin_pm  = (svc["bb_sell"] - bb_cost)
-    svc_margin_pm += svc["mobile_sell"] - svc["mobile_cost"]
-    svc_margin_pm += svc["lic_monthly"] - (total_voice_channels * C["vc_cost_per_seat"])
-    total_pat = hw_margin + (svc_margin_pm * lease_term)
-    if credits_months > 0: total_pat -= credits_amount * credits_months
-    if cashback_amount > 0: total_pat -= cashback_amount
-    return total_pat
+    """Legacy — returns gross_profit from pricebook P&L formula as PAT proxy."""
+    return compute_pricebook_pl()["gross_profit"]
 
 # ── Compute everything ────────────────────────────────────────────────────────
 poe_needed = compute_poe_needed()
@@ -1379,6 +1427,7 @@ hw_buy     = compute_hw_buy()
 hw_sell    = compute_hw_sell()
 svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
 pat_base   = compute_pat(svc)
+pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
 is_spread  = ("Lease" in payment_model)
 
@@ -1396,9 +1445,26 @@ else:
     total_mo   = svc["total_sell"]
     pat        = pat_base
 
-# Commission on gross margin (internal only — not customer-facing)
-gross_margin = (hw_sell - hw_buy) + (pat_base - (hw_sell - hw_buy))
-commission   = round(pat_base * (commission_pct / 100), 2)
+# ── Consultant rate override — feeds back into deal, updates all docs ─────────
+base_total_mo = total_mo   # minimum calculated rate (floor)
+_c_override   = st.session_state.get("c_rate_override", 0.0)
+if _c_override > base_total_mo:
+    total_mo = _c_override  # override is live — affects proposal, PDF, customer view
+# Reset stale override if base changed above it
+if st.session_state.get("c_rate_override", 0.0) < base_total_mo:
+    st.session_state["c_rate_override"] = 0.0
+
+rate_uplift   = max(0.0, total_mo - base_total_mo)
+extra_margin  = rate_uplift * lease_term
+adjusted_pat  = pat_base + extra_margin
+
+# Commission calculated on full adjusted margin (base + uplift)
+# Units-based commission from pricebook P&L formula
+# adjusted_pat already includes rate uplift from consultant override
+_pl_uplift        = extra_margin   # extra profit from consultant rate increase
+_adjusted_gp      = pl_data["gross_profit"] + _pl_uplift
+commission_units  = _adjusted_gp / pl_data.get("unit_size", 4000)
+commission        = round(commission_units * 1000, 2)
 
 # Aliases for PDF / legacy references
 kit_cost    = hw_buy
@@ -1478,27 +1544,27 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
         fi1, fi2, fi3, fi4 = st.columns(4)
         with fi1:
             st.markdown(f'''<div class="metric-card">
-              <div class="metric-label">Deal PAT</div>
-              <div class="metric-value {pc}">£{pat:.0f}</div>
-              <div class="metric-sub">Over {lease_term} months</div>
+              <div class="metric-label">Gross Profit</div>
+              <div class="metric-value {pc}">£{pl_data["gross_profit"]:.0f}</div>
+              <div class="metric-sub">Rental: £{pl_data["rental"]:.2f}/mo</div>
             </div>''', unsafe_allow_html=True)
         with fi2:
             st.markdown(f'''<div class="metric-card">
               <div class="metric-label">HW Buy → Sell</div>
               <div class="metric-value" style="font-size:1.3rem">£{hw_buy:.0f} → £{hw_sell:.0f}</div>
-              <div class="metric-sub">{hw_uplift_override}% margin</div>
+              <div class="metric-sub">Sell: £{hw_sell:.0f} (pricebook rates)</div>
             </div>''', unsafe_allow_html=True)
         with fi3:
             st.markdown(f'''<div class="metric-card">
-              <div class="metric-label">BB Wholesale</div>
-              <div class="metric-value" style="font-size:1.3rem">£{svc["bb_cost"]:.2f}</div>
-              <div class="metric-sub">vs sell £{svc["bb_sell"]:.2f}</div>
+              <div class="metric-label">Sub Total (SRRP basis)</div>
+              <div class="metric-value" style="font-size:1.3rem">£{pl_data["sub_total"]:.0f}</div>
+              <div class="metric-sub">SRRP £{pl_data["hw_srrp"]:.0f} + COS £{pl_data["cos_full"]:.0f}</div>
             </div>''', unsafe_allow_html=True)
         with fi4:
             st.markdown(f'''<div class="metric-card">
-              <div class="metric-label">Commission ({commission_pct}%)</div>
+              <div class="metric-label">Commission ({commission_units:.2f} units)</div>
               <div class="metric-value" style="font-size:1.3rem;color:#00b5a3">£{commission:.0f}</div>
-              <div class="metric-sub">On £{pat:.0f} gross margin</div>
+              <div class="metric-sub">£{commission_per_unit:.0f}/unit · £{commission_unit_size:.0f} GP = 1 unit</div>
             </div>''', unsafe_allow_html=True)
         if termination_cost > 0:
             st.markdown(
@@ -2975,16 +3041,24 @@ with tab5:
         with c_left:
             target_monthly = st.number_input(
                 "Monthly Charge to Customer (£)",
-                min_value=round(total_mo, 2),
-                value=round(total_mo, 2) if not current_total else round(min(current_total, current_total), 2),
+                min_value=round(base_total_mo, 2),
+                value=round(total_mo, 2),
                 step=1.0,
-                key="c_target_mo",
-                help="Set this to match the customer's current spend to capture maximum value."
+                key="c_target_mo_display",
+                help="Set this to match the customer's current spend. Hit Apply to update the deal everywhere."
             )
-            rate_uplift    = max(0.0, target_monthly - total_mo)
-            extra_margin   = rate_uplift * lease_term
-            adjusted_pat   = pat + extra_margin
-            est_earnings   = round(adjusted_pat * (commission_pct / 100), 2)
+            btn1, btn2 = st.columns(2)
+            with btn1:
+                if st.button("✅ Apply to Deal", type="primary",
+                             use_container_width=True, key="c_apply"):
+                    st.session_state["c_rate_override"] = target_monthly
+                    st.rerun()
+            with btn2:
+                if st.button("↩️ Reset to Base", use_container_width=True,
+                             key="c_reset"):
+                    st.session_state["c_rate_override"] = 0.0
+                    st.rerun()
+            est_earnings = commission  # already adjusted in calculation block
 
         with c_right:
             if rate_uplift > 0:
@@ -3079,8 +3153,7 @@ with tab5:
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
                  letter-spacing:.1em;color:rgba(255,255,255,0.6)">Your Estimated Commission</div>
             <div style="font-size:2.2rem;font-weight:800;color:#fff">£{est_earnings:.2f}</div>
-            <div style="font-size:0.82rem;color:rgba(255,255,255,0.55)">over the full {LEASE_TERM_LABELS[lease_term]} agreement</div>
-          </div>
+          <div style="font-size:0.82rem;color:rgba(255,255,255,0.55)">{commission_units:.2f} units × £{commission_per_unit:.0f} — {LEASE_TERM_LABELS[lease_term]}</div>\n          </div>
           {"<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5);'>Rate Uplift Applied</div><div style='font-size:1.3rem;font-weight:700;color:#7fe8a0'>+£" + f"{rate_uplift:.2f}" + "/mo</div></div>" if rate_uplift > 0 else "<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5)'>Tip</div><div style='font-size:0.88rem;color:rgba(255,255,255,0.7)'>Increase the monthly<br>rate above to earn more</div></div>"}
         </div>
         """, unsafe_allow_html=True)
