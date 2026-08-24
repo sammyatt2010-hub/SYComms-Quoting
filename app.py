@@ -1434,13 +1434,16 @@ pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 is_spread  = ("Lease" in payment_model)
 
 if is_spread:
-    # Hardware cost + termination buyout spread over contract months
-    hw_monthly_spread = round((hw_sell + termination_cost) / lease_term, 2)
+    # Use pricebook lease rental formula:
+    # rental = (sales_lease_rate / 1000) × sub_total
+    # where sub_total = cos_ex_comms + hw_srrp (SRRP = sell × 1.5)
+    # Termination cost is already embedded in cos_ex → rental
+    hw_monthly_spread = pl_data["rental"]
     total_mo   = svc["total_sell"] + hw_monthly_spread
-    # Upfront = installation + BB install only
+    # Upfront = installation + BB install only (hardware is leased, not upfront)
     bb_inst    = BROADBAND[bb_provider][bb_package]["install"]
     upfront    = compute_install_cost() + bb_inst
-    pat        = pat_base   # termination is pass-through (billed to customer in spread)
+    pat        = pat_base
 else:
     hw_monthly_spread = 0.0
     upfront    = compute_upfront() + termination_cost   # included in upfront total
