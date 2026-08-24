@@ -431,7 +431,13 @@ def _build_catalogues(cfg):
     ll  = {i["months"]: i["label"]                             for i in cfg["lease_rates"]}
     bb = {}
     for row in cfg["broadband"]:
-        bb.setdefault(row["provider"], {})[row["package"]] = {"cost": row["cost"], "install": row["install"]}
+        bb.setdefault(row["provider"], {})[row["package"]] = {
+            "cost": row["cost"], "sell": row.get("sell", 0), "install": row["install"]
+        }
+    # "None / Customer Supplied" — zero cost/sell, appears first in selector
+    bb["None / Customer Supplied"] = {
+        "Customer keeps existing broadband": {"cost": 0.0, "sell": 0.0, "install": 0.0}
+    }
     return hd, hc, hs, oh, sw, rt, lr, ltr, ll, bb
 
 HANDSETS_DESKTOP, HANDSETS_CORDLESS, HEADSETS, OTHER_HARDWARE, SWITCHES, ROUTERS, LEASE_RATES, TRUE_LEASE_RATES, LEASE_TERM_LABELS, BROADBAND = _build_catalogues(cfg)
@@ -710,7 +716,8 @@ with st.sidebar:
     num_sites    = st.number_input("Number of Sites", min_value=1, value=1, key="q_num_sites")
 
     st.markdown("### 🌐 Broadband")
-    bb_provider  = st.selectbox("Provider", list(BROADBAND.keys()), key="q_bb_provider")
+    _bb_providers = ["None / Customer Supplied"] + [k for k in BROADBAND.keys() if k != "None / Customer Supplied"]
+    bb_provider  = st.selectbox("Provider", _bb_providers, key="q_bb_provider")
     bb_package   = st.selectbox("Package", list(BROADBAND[bb_provider].keys()), key="q_bb_package")
     bb_care      = st.selectbox("Care Level", ["Standard (FOC)", "Business (+£8/mo)"], key="q_bb_care")
     second_fttp  = st.checkbox("Add 2nd Broadband Line", key="q_second_fttp")
@@ -928,7 +935,8 @@ with col_hw2:
     else:
         switch_names = [s["name"] for s in SWITCHES]
         manual_switch_name = st.selectbox("Select Switch", switch_names)
-    router_type  = st.selectbox("Router", list(ROUTERS.keys()))
+    _router_opts = ["None / Customer Supplied"] + [k for k in ROUTERS.keys()]
+    router_type  = st.selectbox("Router", _router_opts)
     add_router   = st.checkbox("Include router in lease", value=True)
 
     st.markdown("**Mobiles**")
@@ -1311,7 +1319,7 @@ def compute_hw_buy():
         total += OTHER_HARDWARE[name]["buy"] * qty
     poe_n = compute_poe_needed()
     total += get_recommended_switch(poe_n)["buy"]
-    if add_router:
+    if add_router and router_type != "None / Customer Supplied":
         total += ROUTERS[router_type]
     return total
 
@@ -1338,7 +1346,7 @@ def compute_hw_sell():
     # Switch and router use uplift (no item-specific sell price stored)
     sw = get_recommended_switch(compute_poe_needed())
     total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
-    if add_router:
+    if add_router and router_type != "None / Customer Supplied":
         total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
     return round(total, 2)
 
@@ -1356,7 +1364,7 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
     uplift   = service_uplift_pct / 100.0
     bb_cost  = BROADBAND[bb_provider][bb_package]["cost"]
-    bb_sell  = bb_cost * (1.0 + uplift)
+    bb_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
     if bb_care == "Business (+£8/mo)":
         bb_sell += 8.0
     if second_fttp and second_fttp_pkg:
@@ -1897,8 +1905,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             all_equip_pdf.append((addon_name, addon_qty, addon_billing_pdf))
 
     # Network & Connectivity
-    all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1,
-                           f"£{svc['bb_sell']:.2f}/mo"))
+    if svc["bb_sell"] > 0:
+        all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1,
+                               f"£{svc['bb_sell']:.2f}/mo"))
     if second_fttp and second_fttp_pkg:
         bb2 = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
         all_equip_pdf.append((f"Broadband - {bb_provider} {second_fttp_pkg} (2nd line)", 1,
