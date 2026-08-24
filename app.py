@@ -2756,10 +2756,10 @@ with tab4:
         if current_bb > 0:
             comp_rows.append(("Broadband & Lines", current_bb, svc["bb_sell"]))
         if current_system > 0:
-            # Use hw_sell only (no termination) for like-for-like system comparison.
-            # Termination recovery is still in total_mo so the Total row is correct.
-            hw_only_monthly = round(hw_sell / lease_term, 2) if is_spread else 0
-            comp_rows.append(("Phone System", current_system, hw_only_monthly))
+            # Include full hw_monthly_spread (hardware + buyout) so the breakdown
+            # rows visibly add up to the Total Monthly row.
+            sys_new = hw_monthly_spread if is_spread else 0
+            comp_rows.append(("Phone System", current_system, sys_new))
         if current_calls > 0:
             comp_rows.append(("Call Charges / Licences", current_calls, svc["lic_monthly"]))
         if current_mobile > 0:
