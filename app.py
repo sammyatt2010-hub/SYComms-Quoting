@@ -293,11 +293,19 @@ BUNDLED_IMAGES = {
 # Place product images in an "images/" subfolder in the repo.
 # Filenames below — add matching files to unlock real photos.
 PRODUCT_IMAGES = {
-    # ── Switches (matched by switch name as shown in catalogue) ───────────────
+    # ── Switches ─────────────────────────────────────────────────────────────
     "Switch: 5-Port (4x POE)":       "images/switch_5port.jpg",
-    "Switch: 8-Port (8x POE)":       "images/switch_8port.jpg",
-    "Switch: 16-Port (16x POE)":     "images/switch_16port.jpg",
+    "Switch: 8-Port (4x POE)":       "images/switch_8port_4poe.jpg",
+    "Switch: 8-Port (8x POE)":       "images/switch_8port_8poe.jpg",
+    "Switch: 16-Port (8x POE)":      "images/switch_16port_8poe.jpg",
+    "Switch: 16-Port (16x POE)":     "images/switch_16port_16poe.jpg",
     "Switch: 24-Port (24x POE)":     "images/switch_24port.jpg",
+    "Switch: 48-Port (32x POE)":     "images/switch_48port.jpg",
+    # ── Routers ──────────────────────────────────────────────────────────────
+    "Draytek Vigor 2927 (FTTP/SoGEA)":      "images/draytek_vigor_2927.jpg",
+    "Draytek 2927LAC (FTTP/Leased Line)":   "images/draytek_2927lac.jpg",
+    "Zyxel DX Series (FTTP)":               "images/zyxel_dx.jpg",
+    "TP Link NX200 (4G/5G)":                "images/tplink_nx200.jpg",
     # ── Software add-ons ──────────────────────────────────────────────────────
     "SY Comms Studio":               "images/sy_comms_studio.jpg",
     "Call Recording":                "images/call_recording.jpg",
