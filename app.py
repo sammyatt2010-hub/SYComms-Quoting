@@ -2727,6 +2727,32 @@ with tab4:
         for item in includes:
             st.markdown(f'<div class="cv-include-item">✅ {item}</div>', unsafe_allow_html=True)
 
+        # Software add-on images — show if any selected
+        active_addons = [(name, qty) for name, qty, _, _ in SW_ADDONS if qty > 0]
+        if active_addons:
+            st.markdown('<div class="cv-section">💻 Software &amp; Add-ons</div>', unsafe_allow_html=True)
+            addon_cols = st.columns(min(len(active_addons), 4))
+            for idx, (addon_name, addon_qty) in enumerate(active_addons):
+                with addon_cols[idx % 4]:
+                    b64_sw, ext_sw = get_product_image_b64(addon_name)
+                    if b64_sw:
+                        st.markdown(
+                            f'<div style="background:#f8f9ff;border-radius:10px;padding:0.6rem;text-align:center;margin-bottom:0.5rem">'
+                            f'<img src="data:image/{ext_sw};base64,{b64_sw}" style="max-height:70px;max-width:100%;object-fit:contain;border-radius:6px"/>'
+                            f'<div style="font-size:0.75rem;color:#1f1450;font-weight:600;margin-top:0.3rem">{addon_name}</div>'
+                            f'<div style="font-size:0.7rem;color:#888">x{addon_qty}</div></div>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            f'<div style="background:#f0f4ff;border-radius:10px;padding:0.8rem;text-align:center;margin-bottom:0.5rem">'
+                            f'<div style="font-size:1.6rem">💻</div>'
+                            f'<div style="font-size:0.75rem;color:#1f1450;font-weight:600;margin-top:0.3rem">{addon_name}</div>'
+                            f'<div style="font-size:0.7rem;color:#888">x{addon_qty}</div></div>',
+                            unsafe_allow_html=True
+                        )
+
+
     with cv_col2:
         st.markdown('<div class="cv-section">💳 Your Investment</div>', unsafe_allow_html=True)
         st.markdown(f"""
