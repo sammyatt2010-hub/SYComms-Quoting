@@ -2483,12 +2483,18 @@ with tab2:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid #f0f0f0;font-size:0.88rem'><span style='color:#888'>{label}</span><span style='color:#333;font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
 
         st.markdown("#### 📦 Equipment Summary")
-        all_equip = list(desktop_quantities.items()) + list(cordless_quantities.items()) + \
-                    list(headset_quantities.items()) + list(other_quantities.items())
+        all_equip = [(n, q) for n, q in list(desktop_quantities.items()) +
+                     list(cordless_quantities.items()) + list(headset_quantities.items()) +
+                     list(other_quantities.items()) if q > 0]
         if auto_switch:
             all_equip.append((f"Switch: {rec_switch['name']}", 1))
         if add_router:
             all_equip.append((router_type, 1))
+        if total_voice_channels > 0:
+            all_equip.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels))
+        for addon_name, addon_qty, _, _ in SW_ADDONS:
+            if addon_qty > 0:
+                all_equip.append((addon_name, addon_qty))
         for name, qty in all_equip:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:#555'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
