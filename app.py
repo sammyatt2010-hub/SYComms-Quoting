@@ -1057,6 +1057,66 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 st.success("Hardware catalogue updated! Changes are live for this session.")
                 st.rerun()
 
+            st.markdown("---")
+            st.markdown("**🖼️ Product Image Assignment**")
+            st.caption("Assign an image to any product — saved directly in config.json "
+                       "so it's always matched by exact name, no fuzzy logic needed.")
+
+            # Build complete product list from all categories
+            _all_products = (
+                [d["name"] for d in cfg.get("handsets_desktop", []) if d.get("name")] +
+                [d["name"] for d in cfg.get("handsets_cordless", []) if d.get("name")] +
+                [d["name"] for d in cfg.get("headsets", []) if d.get("name")] +
+                [d["name"] for d in cfg.get("other_hardware", []) if d.get("name")] +
+                [f"Switch: {d['name']}" for d in cfg.get("switches", []) if d.get("name")] +
+                [d["name"] for d in cfg.get("routers", []) if d.get("name")] +
+                ["SY Comms Studio", "Call Recording", "CRM AI Per User",
+                 "ACD Light Agent", "Teams Integration", "HTML Wallboard"]
+            )
+
+            img_col1, img_col2 = st.columns([2, 3])
+            with img_col1:
+                selected_product = st.selectbox("Select product", sorted(_all_products),
+                                                key="img_product_select")
+                img_upload = st.file_uploader("Upload image (JPG or PNG)",
+                                              type=["jpg","jpeg","png"],
+                                              key="img_product_upload",
+                                              label_visibility="collapsed")
+                if img_upload and selected_product:
+                    from PIL import Image as _PILImg
+                    _img = _PILImg.open(img_upload).convert("RGB")
+                    _img = _img.resize((400, 300), _PILImg.LANCZOS)
+                    _buf = io.BytesIO()
+                    _img.save(_buf, format="JPEG", quality=85, optimize=True)
+                    _b64 = base64.b64encode(_buf.getvalue()).decode()
+                    if "product_images" not in st.session_state.active_config:
+                        st.session_state.active_config["product_images"] = {}
+                    st.session_state.active_config["product_images"][selected_product] = _b64
+                    st.success(f"✅ Image assigned to '{selected_product}' — download config.json below to make permanent.")
+
+            with img_col2:
+                _assigned = st.session_state.active_config.get("product_images", {})
+                if _assigned:
+                    st.markdown(f"**Currently assigned: {len(_assigned)} product image(s)**")
+                    _img_cols = st.columns(min(len(_assigned), 4))
+                    for _idx, (_pname, _pb64) in enumerate(_assigned.items()):
+                        with _img_cols[_idx % 4]:
+                            st.markdown(
+                                f'<div style="background:#f8f9ff;border-radius:8px;padding:0.4rem;'
+                                f'text-align:center;margin-bottom:0.4rem">'
+                                f'<img src="data:image/jpeg;base64,{_pb64}" '
+                                f'style="max-height:60px;max-width:100%;object-fit:contain;border-radius:4px"/>'
+                                f'<div style="font-size:0.65rem;color:#555;margin-top:0.2rem;'
+                                f'word-break:break-word">{_pname}</div></div>',
+                                unsafe_allow_html=True
+                            )
+                            if st.button("🗑️", key=f"del_img_{_idx}", help=f"Remove image for {_pname}"):
+                                del st.session_state.active_config["product_images"][_pname]
+                                st.rerun()
+                else:
+                    st.info("No product images assigned yet. Upload one on the left.")
+
+
         # ── TAB 3: Broadband & Lease Rates ────────────────────────────────────
         with panel_tabs[2]:
             st.markdown("**Broadband Packages** — edit wholesale costs and install charges")
