@@ -293,6 +293,18 @@ BUNDLED_IMAGES = {
 # Place product images in an "images/" subfolder in the repo.
 # Filenames below — add matching files to unlock real photos.
 PRODUCT_IMAGES = {
+    # ── Switches (matched by switch name as shown in catalogue) ───────────────
+    "Switch: 5-Port (4x POE)":       "images/switch_5port.jpg",
+    "Switch: 8-Port (8x POE)":       "images/switch_8port.jpg",
+    "Switch: 16-Port (16x POE)":     "images/switch_16port.jpg",
+    "Switch: 24-Port (24x POE)":     "images/switch_24port.jpg",
+    # ── Software add-ons ──────────────────────────────────────────────────────
+    "SY Comms Studio":               "images/sy_comms_studio.jpg",
+    "Call Recording":                "images/call_recording.jpg",
+    "CRM AI Per User":               "images/crm_ai.jpg",
+    "ACD Light Agent":               "images/acd_light.jpg",
+    "Teams Integration":             "images/teams_integration.jpg",
+    "HTML Wallboard":                "images/html_wallboard.jpg",
     # ── Grandstream Desktop ───────────────────────────────────────────────────
     "Grandstream GRP2601P":    "images/grp2601p.jpg",
     "Grandstream GRP2602P":    "images/grp2602p.jpg",
@@ -2563,11 +2575,20 @@ with tab4:
         st.markdown('<div class="cv-section">📦 Your New System</div>', unsafe_allow_html=True)
 
         all_selected = (
-            [(n, q, HANDSETS_DESKTOP[n])   for n, q in desktop_quantities.items()]  +
-            [(n, q, HANDSETS_CORDLESS[n])  for n, q in cordless_quantities.items()] +
-            [(n, q, HEADSETS[n])           for n, q in headset_quantities.items()]   +
-            [(n, q, OTHER_HARDWARE[n])     for n, q in other_quantities.items()]
+            [(n, q, HANDSETS_DESKTOP[n])   for n, q in desktop_quantities.items() if q > 0]  +
+            [(n, q, HANDSETS_CORDLESS[n])  for n, q in cordless_quantities.items() if q > 0] +
+            [(n, q, HEADSETS[n])           for n, q in headset_quantities.items()   if q > 0] +
+            [(n, q, OTHER_HARDWARE[n])     for n, q in other_quantities.items()     if q > 0]
         )
+
+        # Add switch as a card
+        sw_name = rec_switch["name"]
+        all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
+
+        # Add software add-ons as cards
+        for addon_name, addon_qty, _, _ in SW_ADDONS:
+            if addon_qty > 0:
+                all_selected.append((addon_name, addon_qty, {"cat": "Software"}))
 
         # Show in rows of 4
         for row_start in range(0, len(all_selected), 4):
@@ -2575,14 +2596,13 @@ with tab4:
             cols = st.columns(4)
             for col, (name, qty, info) in zip(cols, row_items):
                 with col:
-                    bogof_note = ""
-                    
                     b64_cv, ext_cv = get_product_image_b64(name)
                     if b64_cv:
                         img_html = f'<img src="data:image/{ext_cv};base64,{b64_cv}" style="width:100%;height:100px;object-fit:contain;border-radius:8px;">'
                     else:
                         cat = info.get("cat", "Desktop")
-                        icon = PRODUCT_ICONS.get(cat, "📱")
+                        icon_map = {"Desktop":"📱","DECT":"📞","Wi-Fi":"📡","Switch":"🔌","Software":"💻","Headset":"🎧"}
+                        icon = icon_map.get(cat, PRODUCT_ICONS.get(cat, "📱"))
                         img_html = f'<div style="height:100px;background:linear-gradient(135deg,#2d1f6e,#3b2882);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2.8rem">{icon}</div>'
 
                     st.markdown(f"""
@@ -2590,21 +2610,20 @@ with tab4:
                       {img_html}
                       <div class="cv-hw-name">{name}</div>
                       <div class="cv-hw-qty">Qty: {qty}</div>
-                      {bogof_note}
                     </div>
                     """, unsafe_allow_html=True)
 
-        # Auto-included items
+        # Auto-included note (simplified)
         st.markdown(f"""
         <div style="margin-top:0.75rem;padding:0.6rem 1rem;background:#f8f9ff;border-radius:8px;font-size:0.82rem;color:#555">
-          Also included: <strong>{rec_switch['name']}</strong> switch &nbsp;·&nbsp;
-          <strong>{router_type}</strong> &nbsp;·&nbsp;
-          <strong>{total_voice_channels} Voice Channel Licence{'s' if total_voice_channels != 1 else ''}</strong>
+          <strong>{total_voice_channels} Voice Channel Licence{"s" if total_voice_channels != 1 else ""}</strong> included
+          &nbsp;&middot;&nbsp; {LEASE_TERM_LABELS[lease_term]} agreement
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown("")
 
+        # ── Pricing breakdown ──────────────────────────────────────────────────
         # ── Pricing breakdown ──────────────────────────────────────────────────
     # ── COST COMPARISON SECTION ───────────────────────────────────────
     if current_total > 0:
