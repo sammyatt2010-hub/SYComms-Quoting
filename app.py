@@ -233,6 +233,8 @@ if "active_config" not in st.session_state:
     st.session_state.active_config = _load_config()
 if "admin_unlocked" not in st.session_state:
     st.session_state.admin_unlocked = False
+if "consultant_unlocked" not in st.session_state:
+    st.session_state.consultant_unlocked = False
 if "uploaded_images" not in st.session_state:
     st.session_state.uploaded_images = {}
 
@@ -2310,7 +2312,7 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         return False, f"❌ Email failed: {e}"
 
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "✍️ Sign & Send", "📨 Remote Signing"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "📨 Remote Signing"])
 
 # ── TAB 1: PROPOSAL SUMMARY ──────────────────────────────────────────────────
 with tab1:
@@ -2544,18 +2546,17 @@ with tab3:
             st.markdown(f"<div style='font-size:0.88rem;padding:0.25rem 0'>{d}</div>", unsafe_allow_html=True)
 
     with doc_col2:
-        st.markdown("#### 📊 Internal Deal Sheet")
-        internal = [
-            f"Deal PAT: £{pat:.2f}",
-            f"HW Buy Cost: £{hw_buy:.2f}",
-            f"HW Sell Price: £{hw_sell:.2f}",
-            f"Upfront Total: £{upfront:.2f}",
-            f"Broadband Wholesale: £{svc['bb_cost']:.2f}/mo",
-            f"Broadband Sell: £{svc['bb_sell']:.2f}/mo",
-            f"Service Uplift: {service_uplift_pct}%",
-            f"SGP Estimate: £{sgp:.2f}",
+        st.markdown("#### 📋 Deal Summary")
+        summary = [
+            f"Customer: {comp_name or '—'}",
+            f"Agreement Term: {LEASE_TERM_LABELS[lease_term]}",
+            f"Payment Model: {payment_model}",
+            f"Monthly Total: £{total_mo:.2f} + VAT",
+            f"Broadband: {bb_provider} — {bb_package}",
+            f"Voice Channels: {total_voice_channels}",
+            f"Install Type: {install_type}",
         ]
-        for d in internal:
+        for d in summary:
             st.markdown(f"<div style='font-size:0.88rem;padding:0.2rem 0;color:#555'>{d}</div>", unsafe_allow_html=True)
 
     # ── DOWNLOAD BUTTON ──
@@ -2858,9 +2859,147 @@ with tab4:
 
 
 
-# ── TAB 5: SIGN & SEND ────────────────────────────────────────────────────────
 
+# ── TAB 5: CONSULTANT VIEW ──────────────────────────────────────────────────
 with tab5:
+    st.markdown('<div class="tab-content"></div>', unsafe_allow_html=True)
+
+    # ── Password gate ──────────────────────────────────────────────────────
+    if not st.session_state.consultant_unlocked:
+        st.markdown("### 💼 Consultant View")
+        st.caption("Enter the consultant password to access deal pricing tools.")
+        c_col1, c_col2 = st.columns([3, 1])
+        with c_col1:
+            c_pw = st.text_input("", type="password", placeholder="Enter consultant password...",
+                                 label_visibility="collapsed", key="consultant_pw")
+        with c_col2:
+            if st.button("Unlock 💼", type="primary", use_container_width=True, key="c_unlock"):
+                if c_pw == "SYComms2026!!":
+                    st.session_state.consultant_unlocked = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+    else:
+        # ── Locked button ──────────────────────────────────────────────────
+        if st.button("🔒 Lock Consultant View", key="c_lock"):
+            st.session_state.consultant_unlocked = False
+            st.rerun()
+
+        st.markdown("## 💼 Consultant Deal Tools")
+
+        # ── Deal snapshot strip ────────────────────────────────────────────
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);border-radius:12px;
+             padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;
+             justify-content:space-between;align-items:center;color:#fff">
+          <div><div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">CUSTOMER</div>
+               <div style="font-size:1rem;font-weight:700">{comp_name or "—"}</div></div>
+          <div style="text-align:center">
+               <div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">BASE MONTHLY</div>
+               <div style="font-size:1.4rem;font-weight:800;color:#00b5a3">£{total_mo:.2f}</div></div>
+          <div style="text-align:right">
+               <div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">TERM</div>
+               <div style="font-size:1rem;font-weight:700">{LEASE_TERM_LABELS[lease_term]}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Rate override ──────────────────────────────────────────────────
+        st.markdown("### 🎯 Pricing Adjustment")
+        st.caption("Increase the monthly charge to match or beat the customer's current spend. "
+                   "The base rate is the minimum calculated price — you can only go up from here.")
+
+        c_left, c_right = st.columns([3, 2])
+        with c_left:
+            target_monthly = st.number_input(
+                "Monthly Charge to Customer (£)",
+                min_value=round(total_mo, 2),
+                value=round(total_mo, 2) if not current_total else round(min(current_total, current_total), 2),
+                step=1.0,
+                key="c_target_mo",
+                help="Set this to match the customer's current spend to capture maximum value."
+            )
+            rate_uplift    = max(0.0, target_monthly - total_mo)
+            extra_margin   = rate_uplift * lease_term
+            adjusted_pat   = pat + extra_margin
+            est_earnings   = round(adjusted_pat * (commission_pct / 100), 2)
+
+        with c_right:
+            if rate_uplift > 0:
+                st.markdown(f"""
+                <div style="background:#e8f8f0;border-left:4px solid #1a7a40;border-radius:0 8px 8px 0;
+                     padding:1rem 1.2rem;margin-top:1.6rem">
+                  <div style="font-size:0.72rem;color:#1a7a40;font-weight:700;text-transform:uppercase">Rate Increase</div>
+                  <div style="font-size:1.6rem;font-weight:800;color:#1a7a40">+£{rate_uplift:.2f}/mo</div>
+                  <div style="font-size:0.8rem;color:#555;margin-top:0.2rem">+£{extra_margin:.2f} over full term</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div style="background:#f5f5f5;border-left:4px solid #ccc;border-radius:0 8px 8px 0;
+                     padding:1rem 1.2rem;margin-top:1.6rem">
+                  <div style="font-size:0.72rem;color:#888;font-weight:700;text-transform:uppercase">Rate Increase</div>
+                  <div style="font-size:1.2rem;font-weight:700;color:#aaa">At base rate</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ── Earnings estimate ──────────────────────────────────────────────
+        st.markdown("### 💰 Your Estimated Deal Earnings")
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            st.markdown(f"""
+            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+                 padding:1rem;text-align:center">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                   letter-spacing:.06em;color:#888;margin-bottom:0.4rem">Monthly to Customer</div>
+              <div style="font-size:1.8rem;font-weight:800;color:#1f1450">£{target_monthly:.2f}</div>
+              <div style="font-size:0.78rem;color:#aaa">+ VAT</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with e2:
+            st.markdown(f"""
+            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+                 padding:1rem;text-align:center">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                   letter-spacing:.06em;color:#888;margin-bottom:0.4rem">Estimated Earnings</div>
+              <div style="font-size:1.8rem;font-weight:800;color:#00b5a3">£{est_earnings:.0f}</div>
+              <div style="font-size:0.78rem;color:#aaa">over full term</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with e3:
+            if current_total > 0:
+                saving = current_total - target_monthly
+                col = "#1a7a40" if saving >= 0 else "#c0392b"
+                lbl = "Customer Saving" if saving >= 0 else "vs Current"
+                st.markdown(f"""
+                <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+                     padding:1rem;text-align:center">
+                  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                       letter-spacing:.06em;color:#888;margin-bottom:0.4rem">{lbl}</div>
+                  <div style="font-size:1.8rem;font-weight:800;color:{col}">£{abs(saving):.2f}</div>
+                  <div style="font-size:0.78rem;color:#aaa">per month</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div style="background:#f8f9ff;border:1px solid #e0e8f0;border-radius:10px;
+                     padding:1rem;text-align:center">
+                  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                       letter-spacing:.06em;color:#888;margin-bottom:0.4rem">Customer Saving</div>
+                  <div style="font-size:1rem;font-weight:500;color:#aaa">Add current costs<br>in sidebar</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ── Proposal notes ─────────────────────────────────────────────────
+        st.markdown("### 📝 Consultant Notes / Special Conditions")
+        consultant_notes = st.text_area(
+            "", height=100, key="c_notes",
+            placeholder="Add any special conditions, agreed credits, or notes for this deal...",
+            label_visibility="collapsed"
+        )
+
+# ── TAB 6: SIGN & SEND ────────────────────────────────────────────────────────
+
+with tab6:
     st.markdown('<div class="tab-content"></div>', unsafe_allow_html=True)
 
     if not comp_name:
@@ -3072,7 +3211,7 @@ The password you entered when setting up the account won't work - you must use a
             """)
 
 # ── TAB 6: REMOTE SIGNING ─────────────────────────────────────────────────────
-with tab6:
+with tab7:
     st.markdown("### 📨 Send Documents for Remote Signing")
     st.caption("Upload PDFs and send the customer a secure signing link — no need for them to be in the room.")
 
