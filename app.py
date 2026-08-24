@@ -1741,18 +1741,40 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     all_equip_pdf = []
     _pdf_hw_billing = "In Monthly Lease" if is_spread else "Paid Upfront"
-    for name, qty in {**desktop_quantities, **cordless_quantities, **headset_quantities, **other_quantities}.items():
-        all_equip_pdf.append((name, qty, _pdf_hw_billing))
+
+    # Physical hardware (qty > 0 only)
+    for name, qty in {**desktop_quantities, **cordless_quantities,
+                       **headset_quantities, **other_quantities}.items():
+        if qty > 0:
+            all_equip_pdf.append((name, qty, _pdf_hw_billing))
     if auto_switch:
         all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, _pdf_hw_billing))
     if add_router:
         all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
-    all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1, f"£{svc['bb_sell']:.2f}"))
+
+    # Voice Channel Licences
     if total_voice_channels > 0:
-        vc_sell_pdf = round(3.49 * (1 + service_uplift_pct/100) * total_voice_channels, 2)
-        all_equip_pdf.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels, f"£{vc_sell_pdf:.2f}/mo"))
+        vc_billing_pdf = _pdf_hw_billing if is_spread else f"£{svc['lic_monthly']:.2f}/mo"
+        all_equip_pdf.append((f"Voice Channel Licences x{total_voice_channels}",
+                               total_voice_channels, vc_billing_pdf))
+
+    # Software add-ons
+    for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
+        if addon_qty > 0:
+            addon_billing_pdf = _pdf_hw_billing if is_spread else f"£{addon_sell * addon_qty:.2f}/mo"
+            all_equip_pdf.append((addon_name, addon_qty, addon_billing_pdf))
+
+    # Network & Connectivity
+    all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1,
+                           f"£{svc['bb_sell']:.2f}/mo"))
+    if second_fttp and second_fttp_pkg:
+        bb2 = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
+        all_equip_pdf.append((f"Broadband - {bb_provider} {second_fttp_pkg} (2nd line)", 1,
+                               f"£{bb2:.2f}/mo"))
     for r in mobile_rows:
-        all_equip_pdf.append((f"{r['network']} - {r['package']}", r["qty"], f"£{r['sell']*r['qty']:.2f}"))
+        if r["qty"] > 0:
+            all_equip_pdf.append((f"{r['network']} - {r['package']}", r["qty"],
+                                   f"£{r['sell']*r['qty']:.2f}/mo"))
 
     for i, (name, qty, charge) in enumerate(all_equip_pdf):
         bg = (248, 249, 255) if i % 2 == 0 else (255, 255, 255)
