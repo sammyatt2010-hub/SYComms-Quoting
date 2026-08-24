@@ -1317,8 +1317,9 @@ def compute_hw_buy():
         total += HEADSETS[name]["buy"] * qty
     for name, qty in other_quantities.items():
         total += OTHER_HARDWARE[name]["buy"] * qty
-    poe_n = compute_poe_needed()
-    total += get_recommended_switch(poe_n)["buy"]
+    if not _no_switch:
+        poe_n = compute_poe_needed()
+        total += get_recommended_switch(poe_n)["buy"]
     if add_router and router_type != "None / Customer Supplied":
         total += ROUTERS[router_type]
     return total
@@ -1344,8 +1345,9 @@ def compute_hw_sell():
         sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
         total += sell * qty
     # Switch and router use uplift (no item-specific sell price stored)
-    sw = get_recommended_switch(compute_poe_needed())
-    total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
+    if not _no_switch:
+        sw = get_recommended_switch(compute_poe_needed())
+        total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
     if add_router and router_type != "None / Customer Supplied":
         total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
     return round(total, 2)
@@ -1887,7 +1889,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                        **headset_quantities, **other_quantities}.items():
         if qty > 0:
             all_equip_pdf.append((name, qty, _pdf_hw_billing))
-    if auto_switch:
+    if auto_switch and not _no_switch:
         all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, _pdf_hw_billing))
     if add_router:
         all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
