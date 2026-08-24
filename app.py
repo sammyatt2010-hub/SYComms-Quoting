@@ -154,18 +154,18 @@ def _default_config():
             {"name": "Bluetooth Headset",            "buy": 110.00},
         ],
         "switches": [
-            {"name": "5-Port (4x POE)",   "buy": 29.00,  "poe_ports": 4},
-            {"name": "8-Port (4x POE)",   "buy": 34.00,  "poe_ports": 4},
-            {"name": "8-Port (8x POE)",   "buy": 57.00,  "poe_ports": 8},
-            {"name": "16-Port (8x POE)",  "buy": 80.00,  "poe_ports": 8},
-            {"name": "16-Port (16x POE)", "buy": 152.00, "poe_ports": 16},
-            {"name": "24-Port (24x POE)", "buy": 172.00, "poe_ports": 24},
-            {"name": "48-Port (32x POE)", "buy": 344.00, "poe_ports": 32},
+            {"name": "5-Port (4x POE)",   "buy": 29.00,  "poe_ports": 4,  "total_ports": 5},
+            {"name": "8-Port (4x POE)",   "buy": 34.00,  "poe_ports": 4,  "total_ports": 8},
+            {"name": "8-Port (8x POE)",   "buy": 57.00,  "poe_ports": 8,  "total_ports": 8},
+            {"name": "16-Port (8x POE)",  "buy": 80.00,  "poe_ports": 8,  "total_ports": 16},
+            {"name": "16-Port (16x POE)", "buy": 152.00, "poe_ports": 16, "total_ports": 16},
+            {"name": "24-Port (24x POE)", "buy": 172.00, "poe_ports": 24, "total_ports": 24},
+            {"name": "48-Port (32x POE)", "buy": 344.00, "poe_ports": 32, "total_ports": 48},
         ],
         "routers": [
-            {"name": "Technicolour DGA Series (SoGEA)", "buy": 107.50},
-            {"name": "Zyxel DX Series (FTTP)",          "buy": 64.95},
+            {"name": "Draytek Vigor 2927 (FTTP/SoGEA)", "buy": 195.00},
             {"name": "Draytek 2927LAC (FTTP/Leased Line)", "buy": 386.40},
+            {"name": "Zyxel DX Series (FTTP)",          "buy": 64.95},
             {"name": "TP Link NX200 (4G/5G)",           "buy": 210.00},
         ],
         "lease_rates": [
@@ -1217,8 +1217,11 @@ def compute_poe_needed():
 def get_recommended_switch(poe_needed):
     if not auto_switch and manual_switch_name:
         return next((s for s in SWITCHES if s["name"] == manual_switch_name), SWITCHES[0])
+    # Each desk phone needs 1 POE port (for phone) + 1 standard port (for PC)
+    # Total ports needed = poe_needed (phones) + poe_needed (PCs)
+    total_ports_needed = poe_needed * 2
     for sw in SWITCHES:
-        if sw["poe_ports"] >= poe_needed:
+        if sw["poe_ports"] >= poe_needed and sw.get("total_ports", sw["poe_ports"]) >= total_ports_needed:
             return sw
     return SWITCHES[-1]
 
@@ -2585,6 +2588,10 @@ with tab4:
         sw_name = rec_switch["name"]
         all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
 
+        # Add router as a card if included
+        if add_router:
+            all_selected.append((router_type, 1, {"cat": "Router"}))
+
         # Add software add-ons as cards
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
@@ -2601,7 +2608,7 @@ with tab4:
                         img_html = f'<img src="data:image/{ext_cv};base64,{b64_cv}" style="width:100%;height:100px;object-fit:contain;border-radius:8px;">'
                     else:
                         cat = info.get("cat", "Desktop")
-                        icon_map = {"Desktop":"📱","DECT":"📞","Wi-Fi":"📡","Switch":"🔌","Software":"💻","Headset":"🎧"}
+                        icon_map = {"Desktop":"📱","DECT":"📞","Wi-Fi":"📡","Switch":"🔌","Router":"🌐","Software":"💻","Headset":"🎧"}
                         icon = icon_map.get(cat, PRODUCT_ICONS.get(cat, "📱"))
                         img_html = f'<div style="height:100px;background:linear-gradient(135deg,#2d1f6e,#3b2882);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2.8rem">{icon}</div>'
 
