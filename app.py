@@ -1344,6 +1344,9 @@ kit_cost    = hw_buy
 lease_mo    = hw_monthly_spread  # used in PDF as "Hardware Monthly" when spread
 rec_upfront = upfront
 
+# Pure connectivity cost — broadband + mobile only (for Commercial Summary card)
+pure_connectivity = round(svc["bb_sell"] + svc["mobile_sell"], 2)
+
 # SGP / sales comms
 # SGP / sales comms
 sgp          = pat * 0.10
@@ -1687,7 +1690,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         curr_svc = f"£{(current_bb + current_calls + current_mobile):.2f}/mo" if (current_bb + current_calls + current_mobile) > 0 else "-"
         rows = [
             ("Hardware (spread over term)", curr_hw,  f"£{hw_monthly_spread:.2f}/mo"),
-            ("Monthly Service Charges (BB, Licences, Mobiles)", curr_svc, f"£{svc['total_sell']:.2f}/mo"),
+            ("Network & Connectivity (BB, Mobile)", curr_svc, f"£{pure_connectivity:.2f}/mo"),
             ("Installation / Setup (one-off)", "-", f"£{compute_install_cost():.2f}"),
         ]
     else:
@@ -1695,7 +1698,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         curr_svc = f"£{(current_bb + current_calls + current_mobile):.2f}/mo" if (current_bb + current_calls + current_mobile) > 0 else "-"
         rows = [
             ("Upfront Hardware (one-off)", curr_hw,  f"£{upfront:.2f}"),
-            ("Monthly Service Charges (BB, Licences, Mobiles)", curr_svc, f"£{svc['total_sell']:.2f}/mo"),
+            ("Network & Connectivity (BB, Mobile)", curr_svc, f"£{pure_connectivity:.2f}/mo"),
             ("Installation", "-", f"£{compute_install_cost():.2f}"),
         ]
     for i, (desc, curr, new) in enumerate(rows):
@@ -2320,10 +2323,16 @@ with tab1:
         if add_router:
             all_hw_items.append((router_type, 1, _hw_billing))
 
-        # Software add-ons (system-related — ACD, Wallboard, Studio, CRM, Teams etc.)
+        # Voice Channel Licences — part of the system package
+        if total_voice_channels > 0:
+            vc_billing = _hw_billing if is_spread else f"£{svc['lic_monthly']:.2f}/mo"
+            all_hw_items.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels, vc_billing))
+
+        # Software add-ons — label matches payment model (lease hides individual prices)
         for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
             if addon_qty > 0:
-                all_hw_items.append((addon_name, addon_qty, f"£{addon_sell * addon_qty:.2f}/mo"))
+                addon_billing = _hw_billing if is_spread else f"£{addon_sell * addon_qty:.2f}/mo"
+                all_hw_items.append((addon_name, addon_qty, addon_billing))
 
         if all_hw_items:
             hw_df = pd.DataFrame(all_hw_items, columns=["Description", "Qty", "Billing"])
@@ -2339,8 +2348,7 @@ with tab1:
         if second_fttp and second_fttp_pkg:
             bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
             net_items.append((f"{bb_provider} — {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
-        if total_voice_channels > 0:
-            net_items.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
+        # Voice Channels now shown in System section above
         for row in mobile_rows:
             if row["qty"] > 0:
                 net_items.append((f"{row['net']} — {row['pkg']} x{row['qty']}", row["qty"], f"£{row['sell'] * row['qty']:.2f}/mo"))
@@ -2374,8 +2382,8 @@ with tab1:
         {_hw_card}
         {_spread_note}
         <div class="metric-card" style="text-align:left; margin-bottom:1rem">
-          <div class="metric-label">Monthly Service Charges</div>
-          <div style="font-size:1.4rem; font-weight:700">£{svc["total_sell"]:.2f} + VAT</div>
+          <div class="metric-label">Network & Connectivity</div>
+          <div style="font-size:1.4rem; font-weight:700">£{pure_connectivity:.2f} + VAT</div>
         </div>
         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
              letter-spacing:0.1em;color:#aaaaaa;margin-bottom:0.4rem;padding-left:0.2rem">
