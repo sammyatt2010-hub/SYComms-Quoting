@@ -242,6 +242,7 @@ if "uploaded_images" not in st.session_state:
 cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
+_no_switch = False  # default — overridden by sidebar switch radio button
 commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
 commission_per_unit  = C.get("commission_per_unit", 1000)   # £ per unit
