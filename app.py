@@ -2300,53 +2300,54 @@ with tab1:
     prop_col1, prop_col2 = st.columns(2)
 
     with prop_col1:
-        st.markdown("#### System Hardware")
+        st.markdown("#### 🖥️ System, Software & Hardware")
 
         all_hw_items = []
         _hw_billing = "In Monthly Lease" if is_spread else "Paid Upfront"
-        for name, qty in desktop_quantities.items():
-            all_hw_items.append((name, qty, _hw_billing))
-        for name, qty in cordless_quantities.items():
-            all_hw_items.append((name, qty, _hw_billing))
-        for name, qty in headset_quantities.items():
-            all_hw_items.append((name, qty, _hw_billing))
-        for name, qty in other_quantities.items():
-            all_hw_items.append((name, qty, _hw_billing))
+        _sw_billing = "Monthly Add-on"
 
-        # Switch
+        # Physical hardware
+        for name, qty in desktop_quantities.items():
+            if qty > 0: all_hw_items.append((name, qty, _hw_billing))
+        for name, qty in cordless_quantities.items():
+            if qty > 0: all_hw_items.append((name, qty, _hw_billing))
+        for name, qty in headset_quantities.items():
+            if qty > 0: all_hw_items.append((name, qty, _hw_billing))
+        for name, qty in other_quantities.items():
+            if qty > 0: all_hw_items.append((name, qty, _hw_billing))
         if auto_switch:
             all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
-        # Router
         if add_router:
             all_hw_items.append((router_type, 1, _hw_billing))
+
+        # Software add-ons (system-related — ACD, Wallboard, Studio, CRM, Teams etc.)
+        for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
+            if addon_qty > 0:
+                all_hw_items.append((addon_name, addon_qty, f"£{addon_sell * addon_qty:.2f}/mo"))
 
         if all_hw_items:
             hw_df = pd.DataFrame(all_hw_items, columns=["Description", "Qty", "Billing"])
             st.dataframe(hw_df, use_container_width=True, hide_index=True)
         else:
-            st.info("No hardware selected yet.")
+            st.info("No hardware or software selected yet.")
 
-        st.markdown("#### Network & Connectivity")
+        st.markdown("#### 🌐 Network & Connectivity")
+        st.caption("Ongoing monthly service charges")
         net_items = [
             (f"{bb_provider} — {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo"),
         ]
         if second_fttp and second_fttp_pkg:
-            bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] / (1 - service_uplift_pct/100)
+            bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
             net_items.append((f"{bb_provider} — {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
         if total_voice_channels > 0:
-            vc_sell_net = round(3.49 * (1 + service_uplift_pct/100) * total_voice_channels, 2)
-            net_items.append((f"Voice Channel Licences ({user_licences} handset + {softphone_licences} softphone)", total_voice_channels, f"£{vc_sell_net:.2f}/mo"))
-        if wallboard_users > 0:
-            net_items.append(("Live Wallboard User", wallboard_users, f"£{wallboard_users * C['wallboard_sell']:.2f}/mo"))
-        if ooh_support:
-            net_items.append(("24/7 OOH Support", 1, "£25.00/mo"))
-        if dark_web_mon:
-            net_items.append(("Dark Web Monitoring", 1, "£10.00/mo (after 3m)"))
-        if proactive_bb:
-            net_items.append(("Proactive BB Management", 1, "£10.00/mo (after 3m)"))
+            net_items.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
+        for row in mobile_rows:
+            if row["qty"] > 0:
+                net_items.append((f"{row['net']} — {row['pkg']} x{row['qty']}", row["qty"], f"£{row['sell'] * row['qty']:.2f}/mo"))
 
         net_df = pd.DataFrame(net_items, columns=["Service", "Qty", "Charge"])
         st.dataframe(net_df, use_container_width=True, hide_index=True)
+
 
     with prop_col2:
         st.markdown("#### Commercial Summary")
