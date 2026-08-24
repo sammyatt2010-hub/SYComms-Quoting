@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "version": "1.0",
+    "password_hash": "8ec5801f3496dba430dda5374f7d758ed882bf83bb0434dde794a9bd3f281d85"
+  },
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username": "sammyatt2010@googlemail.com",
+    "password": "ltvkqbxtjukvrzdm",
+    "from_name": "SY Comms",
+    "reply_to": "sammyatt2010@googlemail.com"
+  },
+  "branding": {
+    "company_name": "SY Comms",
+    "company_legal": "SY Comms Ltd",
+    "company_tagline": "SY Comms Quotation Tool",
+    "login_caption": "Authorised SY Comms users only.",
+    "pdf_footer": "SY Comms | All figures exclude VAT | This document is confidential",
+    "customer_pkg_label": "Your SY Comms Package",
+    "proposal_filename_prefix": "SYComms_Proposal"
+  },
+  "handsets_desktop": [
+    {
+      "name": "Grandstream GRP2612W",
+      "buy": 42.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Grandstream GRP2615",
+      "buy": 95.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Grandstream GRP2650",
+      "buy": 98.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Grandstream GXV3350",
+      "buy": 130.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Grandstream GXV3470",
+      "buy": 223.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Grandstream GXV3480",
+      "buy": 243.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Yealink T88 Pro",
+      "buy": 239.0,
+      "poe": true,
+      "cat": "Desktop"
+    },
+    {
+      "name": "Grandstream WP836 (Wi-Fi)",
+      "buy": 88.0,
+      "poe": false,
+      "cat": "Desktop"
+    }
+  ],
+  "handsets_cordless": [
+    {
+      "name": "Grandstream DP720",
+      "buy": 35.0,
+      "bogof": false,
+      "cat": "DECT"
+    },
+    {
+      "name": "Grandstream DP735 (Rugged)",
+      "buy": 59.0,
+      "bogof": false,
+      "cat": "DECT"
+    },
+    {
+      "name": "Grandstream Dect Base Station",
+      "buy": 34.0,
+      "bogof": false,
+      "cat": "DECT"
+    },
+    {
+      "name": "Grandstream DP760 Repeater",
+      "buy": 70.0,
+      "bogof": false,
+      "cat": "DECT"
+    }
+  ],
+  "headsets": [
+    {
+      "name": "Poly Blackwire 3210 (Mono, Wired)",
+      "buy": 19.54
+    },
+    {
+      "name": "Poly Blackwire 3220 (Stereo, Wired)",
+      "buy": 29.31
+    },
+    {
+      "name": "Yealink WH62 (Mono, Wireless)",
+      "buy": 97.39
+    },
+    {
+      "name": "Yealink WH62 (Stereo, Wireless)",
+      "buy": 115.99
+    }
+  ],
+  "other_hardware": [
+    {
+      "name": "GWN7660 WiFi AP (WiFi6)",
+      "buy": 58.0
+    },
+    {
+      "name": "GWN7664E Outdoor WiFi AP",
+      "buy": 95.0
+    },
+    {
+      "name": "GWN7604 Compact Switch",
+      "buy": 44.0
+    },
+    {
+      "name": "Grandstream 4 Port ATA",
+      "buy": 80.0
+    },
+    {
+      "name": "Grandstream 8 Port ATA",
+      "buy": 117.0
+    },
+    {
+      "name": "Grandstream 24 Port ATA",
+      "buy": 300.0
+    },
+    {
+      "name": "Door Entry System",
+      "buy": 55.0
+    },
+    {
+      "name": "Intercom System",
+      "buy": 90.0
+    },
+    {
+      "name": "PBX Unit",
+      "buy": 150.0
+    },
+    {
+      "name": "Loud Speaker",
+      "buy": 140.0
+    },
+    {
+      "name": "CAT5 Socket & Cabling (ea)",
+      "buy": 65.0
+    },
+    {
+      "name": "Broadband Router",
+      "buy": 65.0
+    },
+    {
+      "name": "Bluetooth Headset",
+      "buy": 110.0
+    }
+  ],
+  "switches": [
+    {
+      "name": "5-Port (4x POE)",
+      "buy": 29.0,
+      "poe_ports": 4
+    },
+    {
+      "name": "8-Port (4x POE)",
+      "buy": 34.0,
+      "poe_ports": 4
+    },
+    {
+      "name": "8-Port (8x POE)",
+      "buy": 57.0,
+      "poe_ports": 8
+    },
+    {
+      "name": "16-Port (8x POE)",
+      "buy": 80.0,
+      "poe_ports": 8
+    },
+    {
+      "name": "16-Port (16x POE)",
+      "buy": 152.0,
+      "poe_ports": 16
+    },
+    {
+      "name": "24-Port (24x POE)",
+      "buy": 172.0,
+      "poe_ports": 24
+    },
+    {
+      "name": "48-Port (32x POE)",
+      "buy": 344.0,
+      "poe_ports": 32
+    }
+  ],
+  "routers": [
+    {
+      "name": "Technicolour DGA Series (SoGEA)",
+      "buy": 107.5
+    },
+    {
+      "name": "Zyxel DX Series (FTTP)",
+      "buy": 64.95
+    },
+    {
+      "name": "Draytek 2927LAC (FTTP/Leased Line)",
+      "buy": 386.4
+    },
+    {
+      "name": "TP Link NX200 (4G/5G)",
+      "buy": 210.0
+    }
+  ],
+  "lease_rates": [
+    {
+      "months": 24,
+      "label": "2 Year (1+23)",
+      "rate": 46.94
+    },
+    {
+      "months": 36,
+      "label": "3 Year (1+35)",
+      "rate": 35.32
+    },
+    {
+      "months": 48,
+      "label": "4 Year (1+47)",
+      "rate": 27.62
+    },
+    {
+      "months": 60,
+      "label": "5 Year (1+59)",
+      "rate": 23.31
+    },
+    {
+      "months": 72,
+      "label": "6 Year (1+71)",
+      "rate": 19.11
+    },
+    {
+      "months": 84,
+      "label": "7 Year (1+83)",
+      "rate": 18.25
+    }
+  ],
+  "broadband": [
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 40/10 Unlimited",
+      "cost": 22.45,
+      "sell": 35.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 80/20 Unlimited",
+      "cost": 29.0,
+      "sell": 35.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 115/20 Unlimited",
+      "cost": 25.2,
+      "sell": 35.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 160/30 Unlimited",
+      "cost": 26.48,
+      "sell": 36.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 220/30 Unlimited",
+      "cost": 26.72,
+      "sell": 37.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 330/50 Unlimited",
+      "cost": 34.66,
+      "sell": 39.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 550/75 Unlimited",
+      "cost": 34.66,
+      "sell": 45.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "FTTP 1000/115 Unlimited",
+      "cost": 38.61,
+      "sell": 55.0,
+      "install": 100.0
+    },
+    {
+      "provider": "SY Comms",
+      "package": "SOGEA 40/10 Unlimited",
+      "cost": 27.49,
+      "sell": 30.0,
+      "install": 122.5
+    },
+    {
+      "provider": "SY Comms",
+      "package": "SOGEA 80/20 Unlimited",
+      "cost": 28.12,
+      "sell": 32.0,
+      "install": 122.5
+    },
+    {
+      "provider": "SY Comms",
+      "package": "Leased Line / Ethernet",
+      "cost": 200.0,
+      "sell": 350.0,
+      "install": 0.0
+    }
+  ],
+  "constants": {
+    "vc_cost_per_seat": 2.95,
+    "vc_sell_per_seat": 12.0,
+    "wallboard_sell": 99.0,
+    "wallboard_cost": 5.0,
+    "default_service_uplift_pct": 40,
+    "hw_uplift_pct": 200,
+    "commission_pct": 10,
+    "install_engineer": 450.0,
+    "install_remote": 50.0
+  }
+}
