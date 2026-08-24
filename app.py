@@ -2942,52 +2942,86 @@ with tab5:
                 </div>
                 """, unsafe_allow_html=True)
 
-        # ── Earnings estimate ──────────────────────────────────────────────
-        st.markdown("### 💰 Your Estimated Deal Earnings")
-        e1, e2, e3 = st.columns(3)
-        with e1:
-            st.markdown(f"""
-            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
-                 padding:1rem;text-align:center">
-              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                   letter-spacing:.06em;color:#888;margin-bottom:0.4rem">Monthly to Customer</div>
-              <div style="font-size:1.8rem;font-weight:800;color:#1f1450">£{target_monthly:.2f}</div>
-              <div style="font-size:0.78rem;color:#aaa">+ VAT</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with e2:
-            st.markdown(f"""
-            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
-                 padding:1rem;text-align:center">
-              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                   letter-spacing:.06em;color:#888;margin-bottom:0.4rem">Estimated Earnings</div>
-              <div style="font-size:1.8rem;font-weight:800;color:#00b5a3">£{est_earnings:.0f}</div>
-              <div style="font-size:0.78rem;color:#aaa">over full term</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with e3:
+        # ── Key Numbers ────────────────────────────────────────────────────
+        st.markdown("### 📊 Deal at a Glance")
+
+        # Row 1 — Spend comparison
+        r1a, r1b, r1c = st.columns(3)
+        with r1a:
             if current_total > 0:
-                saving = current_total - target_monthly
-                col = "#1a7a40" if saving >= 0 else "#c0392b"
-                lbl = "Customer Saving" if saving >= 0 else "vs Current"
                 st.markdown(f"""
-                <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
-                     padding:1rem;text-align:center">
+                <div style="background:#fff;border:2px solid #e0e8f0;border-radius:12px;
+                     padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.06em;color:#888;margin-bottom:0.4rem">{lbl}</div>
-                  <div style="font-size:1.8rem;font-weight:800;color:{col}">£{abs(saving):.2f}</div>
-                  <div style="font-size:0.78rem;color:#aaa">per month</div>
+                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Customer Currently Pays</div>
+                  <div style="font-size:2rem;font-weight:800;color:#c0392b">£{current_total:.2f}</div>
+                  <div style="font-size:0.78rem;color:#aaa">per month + VAT</div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.markdown(f"""
-                <div style="background:#f8f9ff;border:1px solid #e0e8f0;border-radius:10px;
-                     padding:1rem;text-align:center">
+                st.markdown("""
+                <div style="background:#f8f9ff;border:2px dashed #d0d8e8;border-radius:12px;
+                     padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.06em;color:#888;margin-bottom:0.4rem">Customer Saving</div>
-                  <div style="font-size:1rem;font-weight:500;color:#aaa">Add current costs<br>in sidebar</div>
+                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Customer Currently Pays</div>
+                  <div style="font-size:1rem;color:#aaa">Fill in current<br>costs in sidebar</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+        with r1b:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);
+                 border-radius:12px;padding:1.2rem;text-align:center;border:2px solid #00b5a3">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                   letter-spacing:.08em;color:rgba(255,255,255,0.6);margin-bottom:0.5rem">New Monthly with SY Comms</div>
+              <div style="font-size:2rem;font-weight:800;color:#00b5a3">£{target_monthly:.2f}</div>
+              <div style="font-size:0.78rem;color:rgba(255,255,255,0.5)">per month + VAT</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with r1c:
+            if current_total > 0:
+                saving    = current_total - target_monthly
+                s_col     = "#1a7a40" if saving >= 0 else "#c0392b"
+                s_bg      = "#e8f8f0" if saving >= 0 else "#fdf0f0"
+                s_lbl     = "Customer Saves" if saving >= 0 else "Customer Pays More"
+                s_prefix  = "-" if saving >= 0 else "+"
+                st.markdown(f"""
+                <div style="background:{s_bg};border:2px solid {s_col};
+                     border-radius:12px;padding:1.2rem;text-align:center">
+                  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                       letter-spacing:.08em;color:{s_col};margin-bottom:0.5rem">{s_lbl}</div>
+                  <div style="font-size:2rem;font-weight:800;color:{s_col}">{s_prefix}£{abs(saving):.2f}</div>
+                  <div style="font-size:0.78rem;color:{s_col}">per month  &middot;  {s_prefix}£{abs(saving*12):.0f}/yr</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background:#f8f9ff;border:2px dashed #d0d8e8;border-radius:12px;
+                     padding:1.2rem;text-align:center">
+                  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Customer Saving</div>
+                  <div style="font-size:1rem;color:#aaa">Add current<br>costs to calculate</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("")
+
+        # Row 2 — Commission (full width, prominent)
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#0d4a2a,#1a7a40);border-radius:12px;
+             padding:1.4rem 2rem;margin-top:0.5rem;display:flex;
+             justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
+                 letter-spacing:.1em;color:rgba(255,255,255,0.6)">Your Estimated Commission</div>
+            <div style="font-size:2.2rem;font-weight:800;color:#fff">£{est_earnings:.2f}</div>
+            <div style="font-size:0.82rem;color:rgba(255,255,255,0.55)">over the full {LEASE_TERM_LABELS[lease_term]} agreement</div>
+          </div>
+          {"<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5);'>Rate Uplift Applied</div><div style='font-size:1.3rem;font-weight:700;color:#7fe8a0'>+£" + f"{rate_uplift:.2f}" + "/mo</div></div>" if rate_uplift > 0 else "<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5)'>Tip</div><div style='font-size:0.88rem;color:rgba(255,255,255,0.7)'>Increase the monthly<br>rate above to earn more</div></div>"}
+        </div>
+        """, unsafe_allow_html=True)
+
 
         # ── Proposal notes ─────────────────────────────────────────────────
         st.markdown("### 📝 Consultant Notes / Special Conditions")
