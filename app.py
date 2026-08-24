@@ -1880,11 +1880,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 9)
     pdf.set_x(pdf.l_margin)
     if is_spread:
+        # Note: hw_monthly_spread includes termination cost if applicable — do not
+        # expose the raw hw_sell figure as the maths would not reconcile for the customer
         pdf.multi_cell(pdf.epw, 5,
-            f"Hardware costs of £{hw_sell:.2f} + VAT are spread over the {LEASE_TERM_LABELS[lease_term]} contract "
-            f"at £{hw_monthly_spread:.2f} + VAT per month. "
+            f"Your system investment of £{hw_monthly_spread:.2f} + VAT per month covers all hardware, "
+            f"configuration and associated setup costs, spread over the {LEASE_TERM_LABELS[lease_term]} agreement. "
             f"Total monthly payment of £{total_mo:.2f} + VAT will be collected by Direct Debit, "
-            f"covering both hardware and all service charges."
+            f"covering your complete telephony solution and all service charges."
         )
     else:
         pdf.multi_cell(pdf.epw, 5,
