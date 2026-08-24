@@ -1714,12 +1714,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 9)
 
     all_equip_pdf = []
+    _pdf_hw_billing = "In Monthly Lease" if is_spread else "Paid Upfront"
     for name, qty in {**desktop_quantities, **cordless_quantities, **headset_quantities, **other_quantities}.items():
-        all_equip_pdf.append((name, qty, "Paid Upfront"))
+        all_equip_pdf.append((name, qty, _pdf_hw_billing))
     if auto_switch:
-        all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, "Paid Upfront"))
+        all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, _pdf_hw_billing))
     if add_router:
-        all_equip_pdf.append((router_type, 1, "Paid Upfront"))
+        all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
     all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1, f"£{svc['bb_sell']:.2f}"))
     if total_voice_channels > 0:
         vc_sell_pdf = round(3.49 * (1 + service_uplift_pct/100) * total_voice_channels, 2)
@@ -2279,21 +2280,22 @@ with tab1:
         st.markdown("#### System Hardware")
 
         all_hw_items = []
+        _hw_billing = "In Monthly Lease" if is_spread else "Paid Upfront"
         for name, qty in desktop_quantities.items():
-            all_hw_items.append((name, qty, "Included in Package"))
+            all_hw_items.append((name, qty, _hw_billing))
         for name, qty in cordless_quantities.items():
-            all_hw_items.append((name, qty, "Included in Package"))
+            all_hw_items.append((name, qty, _hw_billing))
         for name, qty in headset_quantities.items():
-            all_hw_items.append((name, qty, "Included in Lease"))
+            all_hw_items.append((name, qty, _hw_billing))
         for name, qty in other_quantities.items():
-            all_hw_items.append((name, qty, "Included in Package"))
+            all_hw_items.append((name, qty, _hw_billing))
 
         # Switch
         if auto_switch:
-            all_hw_items.append((f"Switch: {rec_switch['name']}", 1, "Included in Package"))
+            all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
         # Router
         if add_router:
-            all_hw_items.append((router_type, 1, "Included in Package"))
+            all_hw_items.append((router_type, 1, _hw_billing))
 
         if all_hw_items:
             hw_df = pd.DataFrame(all_hw_items, columns=["Description", "Qty", "Billing"])
