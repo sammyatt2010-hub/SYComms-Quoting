@@ -426,14 +426,15 @@ def _build_catalogues(cfg):
     oh = {i["name"]: {"buy": i["buy"]}                         for i in cfg["other_hardware"]}
     sw = cfg["switches"]
     rt = {i["name"]: i["buy"]                                  for i in cfg["routers"]}
-    lr = {i["months"]: i["rate"]                               for i in cfg["lease_rates"]}
-    ll = {i["months"]: i["label"]                              for i in cfg["lease_rates"]}
+    lr  = {i["months"]: i["rate"]                              for i in cfg["lease_rates"]}
+    ltr = {i["months"]: i.get("true_rate", i["rate"]*0.8)     for i in cfg["lease_rates"]}
+    ll  = {i["months"]: i["label"]                             for i in cfg["lease_rates"]}
     bb = {}
     for row in cfg["broadband"]:
         bb.setdefault(row["provider"], {})[row["package"]] = {"cost": row["cost"], "install": row["install"]}
-    return hd, hc, hs, oh, sw, rt, lr, ll, bb
+    return hd, hc, hs, oh, sw, rt, lr, ltr, ll, bb
 
-HANDSETS_DESKTOP, HANDSETS_CORDLESS, HEADSETS, OTHER_HARDWARE, SWITCHES, ROUTERS, LEASE_RATES, LEASE_TERM_LABELS, BROADBAND = _build_catalogues(cfg)
+HANDSETS_DESKTOP, HANDSETS_CORDLESS, HEADSETS, OTHER_HARDWARE, SWITCHES, ROUTERS, LEASE_RATES, TRUE_LEASE_RATES, LEASE_TERM_LABELS, BROADBAND = _build_catalogues(cfg)
 
 MOBILE_NETWORKS = {
     "EE": {
@@ -1393,9 +1394,10 @@ def compute_pricebook_pl():
     disc_turnover=(rental/true_rate)×1000 | gp=disc_turnover-cos_full
     commission=(gp/4000)×1000
     """
-    _lr        = next((r for r in LEASE_RATES if r["months"] == lease_term), LEASE_RATES[-1])
-    sales_rate = _lr.get("rate", 20.58)
-    true_rate  = _lr.get("true_rate", sales_rate * 0.8)
+    # LEASE_RATES is {months: sales_rate}, TRUE_LEASE_RATES is {months: true_rate}
+    _fallback_lr = {36: (39.45, 31.56), 60: (26.26, 21.01), 84: (20.58, 16.46), 24: (46.94, 37.5)}
+    sales_rate = LEASE_RATES.get(lease_term, _fallback_lr.get(lease_term, (20.58, 16.46))[0])
+    true_rate  = TRUE_LEASE_RATES.get(lease_term, _fallback_lr.get(lease_term, (20.58, 16.46))[1])
     _hw_buy    = compute_hw_buy()
     _hw_sell   = compute_hw_sell()
     hw_rrp     = _hw_buy  * 1.5
