@@ -972,9 +972,11 @@ softphone_licences   = standalone_softphones
 total_voice_channels = user_licences + softphone_licences
 
 st.info(
-    f"🎙️ **Voice Channels (Auto): {total_voice_channels}** "
-    f"({user_licences} handset-linked + {softphone_licences} standalone softphone)"
+    f"🎙️ **Voice Channels: {total_voice_channels}** "
+    f"({user_licences} desk phone{"s" if user_licences != 1 else ""} + {softphone_licences} softphone/mobile app)"
 )
+if total_voice_channels >= 5:
+    st.warning("⚠️ 5+ users: a **PBX Unit** is required — add it from Other Hardware below.")
 
 with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
