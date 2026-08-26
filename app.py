@@ -1923,7 +1923,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             all_equip_pdf.append((name, qty, _pdf_hw_billing))
     if auto_switch and not _no_switch:
         all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, _pdf_hw_billing))
-    if add_router:
+    if add_router and router_type != "None / Customer Supplied":
         all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
 
     # Voice Channel Licences
@@ -2811,7 +2811,7 @@ with tab2:
                      list(other_quantities.items()) if q > 0]
         if auto_switch:
             all_equip.append((f"Switch: {rec_switch['name']}", 1))
-        if add_router:
+        if add_router and router_type != "None / Customer Supplied":
             all_equip.append((router_type, 1))
         if total_voice_channels > 0:
             all_equip.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels))
@@ -2934,7 +2934,7 @@ with tab4:
         all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
 
         # Add router as a card if included
-        if add_router:
+        if add_router and router_type != "None / Customer Supplied":
             all_selected.append((router_type, 1, {"cat": "Router"}))
 
         # Add software add-ons as cards
