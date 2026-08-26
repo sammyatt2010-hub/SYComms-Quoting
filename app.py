@@ -2648,7 +2648,7 @@ with tab2:
             "Installation":    install_type,
             "No. of Sites":    str(num_sites),
         }
-        if bb_sell > 0:
+        if svc["bb_sell"] > 0:
             config_fields["Broadband"] = f"{bb_provider} — {bb_package}"
         if is_spread:
             config_fields["Hardware Rental"] = f"£{hw_monthly_spread:.2f}/mo (lease)"
