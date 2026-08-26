@@ -707,8 +707,8 @@ with st.sidebar:
     num_employees   = st.number_input("No. of Employees", min_value=1, value=5, step=1, key="q_employees")
 
     st.markdown("### 📋 Deal Configuration")
-    # Always recurring — hardware sold upfront, services monthly
-    deal_type  = "Recurring (Monthly)"
+    # Deal type derived from payment model selection below
+    # (set after payment_model widget is rendered)
     lease_term = st.selectbox("Service Agreement Term", list(LEASE_TERM_LABELS.keys()),
                               format_func=lambda x: LEASE_TERM_LABELS[x], index=5, key="q_lease_term")
     install_type = st.selectbox("Installation Type", ["Engineer Install", "Remote Install", "Self Install"], key="q_install_type")
@@ -1473,6 +1473,7 @@ else:
 
 # ── Consultant rate override — feeds back into deal, updates all docs ─────────
 base_total_mo = total_mo   # minimum calculated rate (floor)
+deal_type = "Hardware Lease (spread over term)" if is_spread else "Upfront Purchase"
 _c_override   = st.session_state.get("c_rate_override", 0.0)
 if _c_override > base_total_mo:
     total_mo = _c_override  # override is live — affects proposal, PDF, customer view
@@ -2641,18 +2642,21 @@ with tab2:
     with of_col2:
         st.markdown("#### 📋 Deal & System Configuration")
         config_fields = {
-            "Deal Type": deal_type,
-            "Contract Term": LEASE_TERM_LABELS[lease_term],
-            "Agreement Type": f'{"Hardware Spread + " if is_spread else "Upfront Hardware + "}Monthly Services',
-            "Installation Type": install_type,
-            "No. of Sites": str(num_sites),
-            "Broadband": f"{bb_provider} — {bb_package}",
-            "Care Level": bb_care,
-            "Upfront Hardware": f"£{upfront:.2f} (one-off)",
-            "Monthly Services": f"£{svc['total_sell']:.2f} + VAT",
-            "Total Monthly": f"£{total_mo:.2f} + VAT",
-            "Monthly Services": f"£{total_mo:.2f} + VAT",
+            "Deal Type":       deal_type,
+            "Contract Term":   LEASE_TERM_LABELS[lease_term],
+            "Payment Profile": f"1+{lease_term-1}",
+            "Installation":    install_type,
+            "No. of Sites":    str(num_sites),
         }
+        if bb_sell > 0:
+            config_fields["Broadband"] = f"{bb_provider} — {bb_package}"
+        if is_spread:
+            config_fields["Hardware Rental"] = f"£{hw_monthly_spread:.2f}/mo (lease)"
+            config_fields["Setup / Install"]  = f"£{upfront:.2f} (one-off)"
+        else:
+            config_fields["Upfront Hardware"] = f"£{upfront:.2f} (one-off)"
+        config_fields["Monthly Services"] = f"£{svc['total_sell']:.2f} + VAT"
+        config_fields["Total Monthly"]    = f"£{total_mo:.2f} + VAT"
         if credits_months > 0:
             config_fields["Introductory Credit"] = f"£{credits_amount:.2f}/mo × {credits_months} months"
         if cashback_amount > 0:
