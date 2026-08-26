@@ -3140,19 +3140,20 @@ with tab4:
         st.markdown('<div class="cv-section">💳 Your Investment</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="cv-price-row">
-          <span class="cv-price-label">Hardware</span>
-          <span class="cv-price-val">{"Spread over term" if is_spread else "One-off payment"}</span>
+          <span class="cv-price-label">{"Hardware Lease (monthly rental)" if is_spread else "Hardware (one-off)"}</span>
+          <span class="cv-price-val" style="color:#1f1450;font-weight:700">
+            {"£" + f"{hw_monthly_spread:.2f}" + "/mo" if is_spread else "£" + f"{upfront:.2f}"}
+          </span>
         </div>
         <div class="cv-price-row">
-          <span class="cv-price-label">Network & Services</span>
-          <span class="cv-price-val">Monthly</span>
+          <span class="cv-price-label">Network &amp; Services</span>
+          <span class="cv-price-val" style="color:#1f1450;font-weight:700">£{svc["total_sell"]:.2f}/mo</span>
         </div>
-        <div class="cv-price-row" style="font-weight:700; border-bottom:2px solid #1f1450;">
+        <div class="cv-price-row" style="font-weight:700;border-top:2px solid #1f1450;margin-top:4px;padding-top:8px">
           <span style="color:#1f1450">Total (excl. VAT)</span>
-          <span style="color:#1f1450">£{total_mo:.2f}/mo</span>
+          <span style="color:#1f1450;font-size:1.1rem">£{total_mo:.2f}/mo</span>
         </div>
         """, unsafe_allow_html=True)
-
         st.markdown(f"""
         <div class="cv-total-box">
           <div class="cv-total-label">Agreement Term</div>
