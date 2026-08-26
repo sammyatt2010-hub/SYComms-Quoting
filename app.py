@@ -2684,9 +2684,12 @@ with tab1:
 
         _spread_note = f"""
         <div class="metric-card" style="text-align:left; margin-bottom:1rem">
-          <div class="metric-label">Hardware Payment</div>
-          <div style="font-size:1.1rem; font-weight:600; color:#00b5a3">
-            Included in monthly — spread over {LEASE_TERM_LABELS[lease_term]}
+          <div class="metric-label">Hardware Lease Rental</div>
+          <div style="font-size:1.4rem; font-weight:700; color:#00b5a3">
+            £{hw_monthly_spread:.2f}/mo
+          </div>
+          <div style="font-size:0.78rem;color:#888;margin-top:0.2rem">
+            Spread over {LEASE_TERM_LABELS[lease_term]}
           </div>
         </div>""" if is_spread else ""
 
@@ -2698,8 +2701,9 @@ with tab1:
         {_hw_card}
         {_spread_note}
         <div class="metric-card" style="text-align:left; margin-bottom:1rem">
-          <div class="metric-label">Network & Connectivity</div>
-          <div style="font-size:1.4rem; font-weight:700">£{pure_connectivity:.2f} + VAT</div>
+          <div class="metric-label">Network & Services</div>
+          <div style="font-size:1.4rem; font-weight:700">£{svc["total_sell"]:.2f} + VAT</div>
+          <div style="font-size:0.78rem;color:#888;margin-top:0.2rem">Licences, broadband, software &amp; mobiles</div>
         </div>
         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
              letter-spacing:0.1em;color:#aaaaaa;margin-bottom:0.4rem;padding-left:0.2rem">
