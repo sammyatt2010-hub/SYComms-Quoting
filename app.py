@@ -1457,13 +1457,11 @@ is_spread  = ("Lease" in payment_model)
 if is_spread:
     # Use pricebook lease rental formula:
     # rental = (sales_lease_rate / 1000) × sub_total
-    # where sub_total = cos_ex_comms + hw_srrp (SRRP = sell × 1.5)
-    # Termination cost is already embedded in cos_ex → rental
+    # Install cost is already embedded in cos_ex which drives the rental
+    # Customer pays NOTHING upfront in lease mode — rental covers everything
     hw_monthly_spread = pl_data["rental"]
     total_mo   = svc["total_sell"] + hw_monthly_spread
-    # Upfront = installation + BB install only (hardware is leased, not upfront)
-    bb_inst    = BROADBAND[bb_provider][bb_package]["install"]
-    upfront    = compute_install_cost() + bb_inst
+    upfront    = 0.0   # no upfront in lease — install baked into rental
     pat        = pat_base
 else:
     hw_monthly_spread = 0.0
@@ -1845,7 +1843,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         rows = [
             ("Hardware (spread over term)", curr_hw,  f"£{hw_monthly_spread:.2f}/mo"),
             ("Network & Connectivity (BB, Mobile)", curr_svc, f"£{pure_connectivity:.2f}/mo"),
-            ("Installation / Setup (one-off)", "-", f"£{compute_install_cost():.2f}"),
+            ("Installation / Setup", "-", "Included in lease rental"),
         ]
     else:
         curr_hw  = f"£{current_system:.2f}/mo" if current_system > 0 else "-"
@@ -2652,7 +2650,7 @@ with tab2:
             config_fields["Broadband"] = f"{bb_provider} — {bb_package}"
         if is_spread:
             config_fields["Hardware Rental"] = f"£{hw_monthly_spread:.2f}/mo (lease)"
-            config_fields["Setup / Install"]  = f"£{upfront:.2f} (one-off)"
+            config_fields["Note"] = "Install & setup included in lease rental"
         else:
             config_fields["Upfront Hardware"] = f"£{upfront:.2f} (one-off)"
         config_fields["Monthly Services"] = f"£{svc['total_sell']:.2f} + VAT"
