@@ -976,7 +976,11 @@ st.info(
     f"({user_licences} desk phone{"s" if user_licences != 1 else ""} + {softphone_licences} softphone/mobile app)"
 )
 if total_voice_channels >= 5:
-    st.warning("⚠️ 5+ users: a **PBX Unit** is required — add it from Other Hardware below.")
+    _pbx_qty = sum(q for n, q in other_quantities.items() if "PBX" in n.upper() or "pbx" in n.lower())
+    if _pbx_qty == 0:
+        st.warning("⚠️ 5+ users: a **PBX Unit** is required — add one from the Other Hardware section above.")
+    else:
+        st.success(f"✅ PBX Unit included (×{_pbx_qty})")
 
 with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
