@@ -236,6 +236,8 @@ if "admin_unlocked" not in st.session_state:
     st.session_state.admin_unlocked = False
 if "consultant_unlocked" not in st.session_state:
     st.session_state.consultant_unlocked = False
+if "c_desired_rental" not in st.session_state:
+    st.session_state.c_desired_rental = 0.0
 if "uploaded_images" not in st.session_state:
     st.session_state.uploaded_images = {}
 
@@ -1481,27 +1483,35 @@ else:
     total_mo   = svc["total_sell"]
     pat        = pat_base
 
-# ── Consultant rate override — feeds back into deal, updates all docs ─────────
-base_total_mo = total_mo   # minimum calculated rate (floor)
+# ── Consultant desired rental — adjusts lease amount and commission ───────────
 deal_type = "Hardware Lease (spread over term)" if is_spread else "Upfront Purchase"
-_c_override   = st.session_state.get("c_rate_override", 0.0)
-if _c_override > base_total_mo:
-    total_mo = _c_override  # override is live — affects proposal, PDF, customer view
-# Reset stale override if base changed above it
-if st.session_state.get("c_rate_override", 0.0) < base_total_mo:
-    st.session_state["c_rate_override"] = 0.0
+base_rental   = pl_data["rental"]      # the calculated lease rental (floor/reference)
+true_rate     = pl_data["true_rate"]
 
-rate_uplift   = max(0.0, total_mo - base_total_mo)
-extra_margin  = rate_uplift * lease_term
-adjusted_pat  = pat_base + extra_margin
+# Read consultant's desired rental from session state (default = calculated rental)
+_desired_rental = st.session_state.get("c_desired_rental", 0.0)
+if _desired_rental <= 0:
+    _desired_rental = base_rental      # default to calculated if not set
 
-# Commission calculated on full adjusted margin (base + uplift)
-# Units-based commission from pricebook P&L formula
-# adjusted_pat already includes rate uplift from consultant override
-_pl_uplift        = extra_margin   # extra profit from consultant rate increase
-_adjusted_gp      = pl_data["gross_profit"] + _pl_uplift
-commission_units  = _adjusted_gp / pl_data.get("unit_size", 4000)
-commission        = round(commission_units * 1000, 2)
+# Recalculate GP and commission from desired rental
+# Formula: disc_turnover = (desired_rental / true_rate) × 1000
+# GP = disc_turnover - cos_full
+_desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
+_adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
+commission_units       = _adjusted_gp / 4000
+commission             = round(commission_units * 1000, 2)
+
+# Rental adjustment (vs calculated) — can be positive (premium) or negative (discount)
+rental_adjustment = _desired_rental - base_rental
+
+# In lease mode, use desired_rental as the actual hw_monthly_spread
+if is_spread:
+    hw_monthly_spread = _desired_rental
+    total_mo          = svc["total_sell"] + hw_monthly_spread
+
+base_total_mo = total_mo
+rate_uplift   = rental_adjustment  # for display purposes
+adjusted_pat  = _adjusted_gp
 
 # Aliases for PDF / legacy references
 kit_cost    = hw_buy
@@ -3200,55 +3210,52 @@ with tab5:
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Rate override ──────────────────────────────────────────────────
-        st.markdown("### 🎯 Pricing Adjustment")
-        st.caption("Increase the monthly charge to match or beat the customer's current spend. "
-                   "The base rate is the minimum calculated price — you can only go up from here.")
+        # ── Desired Rental adjustment ─────────────────────────────────
+        st.markdown("### 🎯 Lease Rental Adjustment")
+        st.caption("Adjust the hardware lease rental. "
+                   "Increasing earns more commission. Decreasing discounts the deal (reduces commission). "
+                   "Commission is calculated only on the lease amount, not total monthly.")
 
         c_left, c_right = st.columns([3, 2])
         with c_left:
-            target_monthly = st.number_input(
-                "Monthly Charge to Customer (£)",
-                min_value=round(base_total_mo, 2),
-                value=round(total_mo, 2),
+            desired_rental_input = st.number_input(
+                "Desired Lease Rental (£/mo)",
+                min_value=0.01,
+                value=round(base_rental if st.session_state.get("c_desired_rental", 0) <= 0
+                            else st.session_state["c_desired_rental"], 2),
                 step=1.0,
-                key="c_target_mo_display",
-                help="Set this to match the customer's current spend. Hit Apply to update the deal everywhere."
+                key="c_desired_rental_input",
+                help=f"Calculated rental: £{base_rental:.2f}. "
+                     "Increase to earn more commission, decrease to offer the customer a discount."
             )
             btn1, btn2 = st.columns(2)
             with btn1:
-                if st.button("✅ Apply to Deal", type="primary",
+                if st.button("✅ Apply Rental", type="primary",
                              use_container_width=True, key="c_apply"):
-                    st.session_state["c_rate_override"] = target_monthly
+                    st.session_state["c_desired_rental"] = desired_rental_input
                     st.rerun()
             with btn2:
-                if st.button("↩️ Reset to Base", use_container_width=True,
-                             key="c_reset"):
-                    st.session_state["c_rate_override"] = 0.0
+                if st.button("↩️ Reset to Calculated", use_container_width=True, key="c_reset"):
+                    st.session_state["c_desired_rental"] = 0.0
                     st.rerun()
-            est_earnings = commission  # already adjusted in calculation block
+            est_earnings = commission
 
         with c_right:
-            if rate_uplift > 0:
-                st.markdown(f"""
-                <div style="background:#e8f8f0;border-left:4px solid #1a7a40;border-radius:0 8px 8px 0;
-                     padding:1rem 1.2rem;margin-top:1.6rem">
-                  <div style="font-size:0.72rem;color:#1a7a40;font-weight:700;text-transform:uppercase">Rate Increase</div>
-                  <div style="font-size:1.6rem;font-weight:800;color:#1a7a40">+£{rate_uplift:.2f}/mo</div>
-                  <div style="font-size:0.8rem;color:#555;margin-top:0.2rem">+£{extra_margin:.2f} over full term</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div style="background:#f5f5f5;border-left:4px solid #ccc;border-radius:0 8px 8px 0;
-                     padding:1rem 1.2rem;margin-top:1.6rem">
-                  <div style="font-size:0.72rem;color:#888;font-weight:700;text-transform:uppercase">Rate Increase</div>
-                  <div style="font-size:1.2rem;font-weight:700;color:#aaa">At base rate</div>
-                </div>
-                """, unsafe_allow_html=True)
+            _adj_colour = "#1a7a40" if rental_adjustment >= 0 else "#c0392b"
+            _adj_bg     = "#e8f8f0" if rental_adjustment >= 0 else "#fdf0f0"
+            _adj_label  = "Premium vs Calculated" if rental_adjustment >= 0 else "Discount vs Calculated"
+            _adj_prefix = "+" if rental_adjustment >= 0 else ""
+            st.markdown(f"""
+            <div style="background:{_adj_bg};border-left:4px solid {_adj_colour};
+                 border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
+              <div style="font-size:0.72rem;color:{_adj_colour};font-weight:700;text-transform:uppercase">{_adj_label}</div>
+              <div style="font-size:1.6rem;font-weight:800;color:{_adj_colour}">{_adj_prefix}£{rental_adjustment:.2f}/mo</div>
+              <div style="font-size:0.8rem;color:#555;margin-top:0.2rem">
+                Calculated: £{base_rental:.2f}/mo &nbsp;·&nbsp; Desired: £{_desired_rental:.2f}/mo
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # ── Key Numbers ────────────────────────────────────────────────────
-        st.markdown("### 📊 Deal at a Glance")
 
         # Row 1 — Spend comparison
         r1a, r1b, r1c = st.columns(3)
@@ -3344,15 +3351,17 @@ with tab5:
                     <td style="font-weight:600;text-align:right">No (Lease)</td></tr>
                 <tr><td style="color:#888;padding:3px 0">Term</td>
                     <td style="font-weight:600;text-align:right">1+{lease_term-1}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Rental</td>
+                <tr><td style="color:#888;padding:3px 0">Rental (Calculated)</td>
                     <td style="font-weight:600;text-align:right;color:#1f1450">£{pl_data["rental"]:.2f}</td></tr>
                 <tr><td style="color:#888;padding:3px 0">Adjustment</td>
-                    <td style="font-weight:600;text-align:right;color:{"#1a7a40" if rate_uplift==0 else "#c0392b"}">£{rate_uplift:.2f}</td></tr>
+                    <td style="font-weight:600;text-align:right;color:{"#1a7a40" if rental_adjustment>=0 else "#c0392b"}">{"+" if rental_adjustment>=0 else ""}£{rental_adjustment:.2f}</td></tr>
                 <tr><td style="color:#888;padding:3px 0">Units</td>
                     <td style="font-weight:600;text-align:right;color:#00b5a3">{commission_units:.2f}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Desired Rental</td>
+                    <td style="font-weight:600;text-align:right;color:#1f1450">£{_desired_rental:.2f}</td></tr>
                 <tr style="border-top:1px solid #eee">
-                    <td style="color:#888;padding:3px 0">Desired Rental</td>
-                    <td style="font-weight:600;text-align:right">£{total_mo:.2f}</td></tr>
+                    <td style="color:#888;padding:3px 0">Adjustment Required</td>
+                    <td style="font-weight:600;text-align:right">£{abs(rental_adjustment):.2f}</td></tr>
               </table>
             </div>
             """, unsafe_allow_html=True)
