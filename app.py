@@ -925,6 +925,18 @@ with col_hw2:
         if qty > 0:
             other_quantities[name] = qty
 
+    # Auto-add Broadband Router when BB is selected (mirrors pricebook formula:
+    # Equipment Costs D24 = System Proposal H13 = Main Broadband qty)
+    _bb_auto_router = (
+        bb_provider != "None / Customer Supplied" and
+        "Broadband Router" in OTHER_HARDWARE and
+        "Broadband Router" not in other_quantities
+    )
+    if _bb_auto_router:
+        other_quantities["Broadband Router"] = 1
+        st.caption("ℹ️ Broadband Router auto-included in lease (remove from Other Hardware if not needed)")
+
+
     st.markdown("**Licences**")
     # Voice channel licences auto-link to handset count (mirrors Excel SYSTEM BUILDER I16 logic)
     # Cost: £3.49/seat/month wholesale (sell: ~£4.89) — one licence required per physical phone
@@ -2495,40 +2507,35 @@ with tab1:
             if qty > 0: all_hw_items.append((name, qty, _hw_billing))
         for name, qty in other_quantities.items():
             if qty > 0: all_hw_items.append((name, qty, _hw_billing))
-        if auto_switch:
+        if auto_switch and not _no_switch:
             all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
-        if add_router:
+        if add_router and router_type != "None / Customer Supplied":
             all_hw_items.append((router_type, 1, _hw_billing))
-
-        # Voice Channel Licences — part of the system package
-        if total_voice_channels > 0:
-            vc_billing = _hw_billing if is_spread else f"£{svc['lic_monthly']:.2f}/mo"
-            all_hw_items.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels, vc_billing))
-
-        # Software add-ons — label matches payment model (lease hides individual prices)
-        for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
-            if addon_qty > 0:
-                addon_billing = _hw_billing if is_spread else f"£{addon_sell * addon_qty:.2f}/mo"
-                all_hw_items.append((addon_name, addon_qty, addon_billing))
 
         if all_hw_items:
             hw_df = pd.DataFrame(all_hw_items, columns=["Description", "Qty", "Billing"])
             st.dataframe(hw_df, use_container_width=True, hide_index=True)
         else:
-            st.info("No hardware or software selected yet.")
+            st.info("No hardware selected yet.")
 
         st.markdown("#### 🌐 Network & Connectivity")
         st.caption("Ongoing monthly service charges")
-        net_items = [
-            (f"{bb_provider} — {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo"),
-        ]
+        net_items = []
+        if svc["bb_sell"] > 0:
+            net_items.append((f"{bb_provider} — {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo"))
+        # Voice Channel Licences — always show with monthly amount
+        if total_voice_channels > 0:
+            net_items.append((f"Hosted User Licences x{total_voice_channels} (Professional Bundle)",
+                              total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
+        # SW Add-ons — monthly amounts
+        for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
+            if addon_qty > 0:
+                net_items.append((addon_name, addon_qty, f"£{addon_sell * addon_qty:.2f}/mo"))
+        # 2nd line BB
         if second_fttp and second_fttp_pkg:
             bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
             net_items.append((f"{bb_provider} — {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
-        # Voice Channels now shown in System section above
-        for row in mobile_rows:
-            if row["qty"] > 0:
-                net_items.append((f"{row['net']} — {row['pkg']} x{row['qty']}", row["qty"], f"£{row['sell'] * row['qty']:.2f}/mo"))
+        # Mobile rows
 
         net_df = pd.DataFrame(net_items, columns=["Service", "Qty", "Charge"])
         st.dataframe(net_df, use_container_width=True, hide_index=True)
