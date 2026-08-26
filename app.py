@@ -243,6 +243,10 @@ cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
 _no_switch = False  # default — overridden by sidebar switch radio button
+# Current customer cost defaults (overridden by sidebar)
+current_calls = current_lines = current_bb = current_system = 0.0
+current_support = current_hosted = current_onhold = current_other = 0.0
+current_mobile = current_total = 0.0
 commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
 commission_per_unit  = C.get("commission_per_unit", 1000)   # £ per unit
@@ -2835,23 +2839,33 @@ with tab4:
         saving_pct = (saving_mo / current_total * 100) if current_total > 0 else 0
 
         # Build comparison rows
+        # Build comparison using pricebook category structure
+        # SY Comms side matches: Call Charges | Hosted Licences | Software | BB | Equipment Rental
         comp_rows = []
-        if current_bb > 0:
-            comp_rows.append(("Broadband & Lines", current_bb, svc["bb_sell"]))
-        if current_system > 0:
-            # Include full hw_monthly_spread (hardware + buyout) so the breakdown
-            # rows visibly add up to the Total Monthly row.
-            sys_new = hw_monthly_spread if is_spread else 0
-            comp_rows.append(("Phone System", current_system, sys_new))
         if current_calls > 0:
-            comp_rows.append(("Call Charges / Licences", current_calls, svc["lic_monthly"]))
-        if current_mobile > 0:
-            comp_rows.append(("Mobile", current_mobile, svc["mobile_sell"]))
+            comp_rows.append(("Call Charges", current_calls, 0.0))  # calls included in licence
+        if current_lines > 0:
+            comp_rows.append(("Line Rental & Associated", current_lines, 0.0))
+        if current_bb > 0:
+            comp_rows.append(("Broadband Charges", current_bb, svc["bb_sell"]))
+        if current_system > 0:
+            sys_new = hw_monthly_spread if is_spread else 0
+            comp_rows.append(("Equipment Rental", current_system, sys_new))
         if current_support > 0:
-            comp_rows.append(("Support & Maintenance", current_support, 0))
-        # Other costs + software add-ons (SY Comms side shows sw_sell_total)
+            comp_rows.append(("Maintenance & Support", current_support, 0.0))
+        if current_hosted > 0:
+            comp_rows.append(("Hosted System / User Licences", current_hosted, svc["lic_monthly"]))
+        else:
+            # Always show our hosted licences if we have them
+            if svc["lic_monthly"] > 0:
+                comp_rows.append(("Hosted User Licences", 0.0, svc["lic_monthly"]))
+        if current_onhold > 0:
+            comp_rows.append(("On Hold Marketing", current_onhold, 0.0))
+        # Software add-ons
         if current_other > 0 or sw_sell_total > 0:
-            comp_rows.append(("Other / Software Add-ons", current_other, sw_sell_total))
+            comp_rows.append(("Software Charges / Other", current_other, sw_sell_total))
+        elif sw_sell_total > 0:
+            comp_rows.append(("Software Charges", 0.0, sw_sell_total))
 
         # Comparison table — built as a flat string to avoid markdown code-block indentation
         _saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
@@ -3176,6 +3190,58 @@ with tab5:
         """, unsafe_allow_html=True)
 
 
+        # ── Sales Calcs (pricebook-style) ─────────────────────────────────
+        st.markdown("### 📐 Sales Calcs")
+        _cash_price_load = 1.10   # pricebook: Cash Price Load % = 1.10
+        _cash_price      = round(pl_data["sub_total"] * _cash_price_load, 2)
+        _cash_gp         = _cash_price - pl_data["cos_full"]
+        _cash_units      = round(_cash_gp / 4000, 2)
+
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            st.markdown(f"""
+            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+                 padding:1rem;font-size:0.85rem">
+              <table style="width:100%;border-collapse:collapse">
+                <tr><td style="color:#888;padding:3px 0">Cash Sale?</td>
+                    <td style="font-weight:600;text-align:right">No (Lease)</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Term</td>
+                    <td style="font-weight:600;text-align:right">1+{lease_term-1}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Rental</td>
+                    <td style="font-weight:600;text-align:right;color:#1f1450">£{pl_data["rental"]:.2f}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Adjustment</td>
+                    <td style="font-weight:600;text-align:right;color:{"#1a7a40" if rate_uplift==0 else "#c0392b"}">£{rate_uplift:.2f}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Units</td>
+                    <td style="font-weight:600;text-align:right;color:#00b5a3">{commission_units:.2f}</td></tr>
+                <tr style="border-top:1px solid #eee">
+                    <td style="color:#888;padding:3px 0">Desired Rental</td>
+                    <td style="font-weight:600;text-align:right">£{total_mo:.2f}</td></tr>
+              </table>
+            </div>
+            """, unsafe_allow_html=True)
+        with sc2:
+            st.markdown(f"""
+            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+                 padding:1rem;font-size:0.85rem">
+              <table style="width:100%;border-collapse:collapse">
+                <tr><td style="color:#888;padding:3px 0">Cash Adjustment</td>
+                    <td style="font-weight:600;text-align:right">£0.00</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Cash Price</td>
+                    <td style="font-weight:600;text-align:right">£{_cash_price:.2f}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Cash Units</td>
+                    <td style="font-weight:600;text-align:right">{_cash_units:.2f}</td></tr>
+                <tr style="border-top:1px solid #eee">
+                    <td style="color:#888;padding:3px 0">Other Costs</td>
+                    <td style="font-weight:600;text-align:right">£{termination_cost:.2f}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Sub Total</td>
+                    <td style="font-weight:600;text-align:right">£{pl_data["sub_total"]:.2f}</td></tr>
+                <tr><td style="color:#888;padding:3px 0">Gross Profit</td>
+                    <td style="font-weight:600;text-align:right;color:#1a7a40">£{pl_data["gross_profit"]:.2f}</td></tr>
+              </table>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("")
         # ── Proposal notes ─────────────────────────────────────────────────
         st.markdown("### 📝 Consultant Notes / Special Conditions")
         consultant_notes = st.text_area(
