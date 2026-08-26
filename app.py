@@ -3286,14 +3286,14 @@ with tab5:
                  border-radius:12px;padding:1.2rem;text-align:center;border:2px solid #00b5a3">
               <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
                    letter-spacing:.08em;color:rgba(255,255,255,0.6);margin-bottom:0.5rem">New Monthly with SY Comms</div>
-              <div style="font-size:2rem;font-weight:800;color:#00b5a3">£{target_monthly:.2f}</div>
+              <div style="font-size:2rem;font-weight:800;color:#00b5a3">£{total_mo:.2f}</div>
               <div style="font-size:0.78rem;color:rgba(255,255,255,0.5)">per month + VAT</div>
             </div>
             """, unsafe_allow_html=True)
 
         with r1c:
             if current_total > 0:
-                saving    = current_total - target_monthly
+                saving    = current_total - total_mo
                 s_col     = "#1a7a40" if saving >= 0 else "#c0392b"
                 s_bg      = "#e8f8f0" if saving >= 0 else "#fdf0f0"
                 s_lbl     = "Customer Saves" if saving >= 0 else "Customer Pays More"
