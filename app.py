@@ -2119,7 +2119,99 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 5, "Date: ___________________________", ln=True)
     pdf.ln(4)
 
-    # -- PAGE 4: BANK DETAILS & CHECKLIST --
+    # -- PAGE 4: LEASE AGREEMENT / QUOTATION SUMMARY --
+    pdf.add_page()
+    _add_header(pdf, "Equipment Lease Agreement")
+
+    # ── Quotation Includes ────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 7, "Quotation Includes", ln=True)
+    pdf.ln(1)
+
+    def _qi_row(label, value, bold_val=False):
+        pdf.set_fill_color(248, 249, 255)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(120, 6, f"  {label}", fill=True, ln=False)
+        pdf.set_font("Helvetica", "B" if bold_val else "", 9)
+        pdf.cell(0, 6, str(value), fill=True, ln=True, align="R")
+
+    _settle_str = f"£{termination_cost:.2f}" if termination_cost > 0 else "£0.00"
+    _qi_row("Settlements", _settle_str)
+    _qi_row("Programmed equipment for self installation", "Yes")
+    _qi_row("Full equipment and software listed", "Yes")
+    _qi_row("Project management", "Yes")
+    _qi_row("Includes 1 year on-site warranty", "Yes")
+    pdf.ln(6)
+
+    # ── Equipment Rental Terms ────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 7, "Equipment Rental Terms", ln=True)
+    pdf.ln(1)
+
+    pdf.set_fill_color(31, 20, 80)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(60, 8, "  Monthly rental period of", fill=True, ln=False)
+    pdf.set_fill_color(0, 181, 163)
+    pdf.cell(35, 8, f"  £{pl_data['rental']:.2f}", fill=True, ln=False)
+    pdf.set_fill_color(31, 20, 80)
+    pdf.cell(0, 8, "  plus VAT at the prevailing rate", fill=True, ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(5)
+
+    # ── Separate billing note ─────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, 4.5,
+        f"Monthly services (hosted licences, broadband, calls) of £{svc['total_sell']:.2f} + VAT "
+        f"will be billed separately by {_CO} Ltd under a separate agreement. "
+        f"Total monthly commitment: £{total_mo:.2f} + VAT. "
+        f"*Fair usage policy applies, subject to terms and conditions.",
+        align="J"
+    )
+    pdf.ln(6)
+
+    # ── Customer confirmation text ────────────────────────────────────────────
+    pdf.set_fill_color(248, 249, 255)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, 4.5,
+        f"I confirm that the above figures are representative of our current average expenditure "
+        f"and I understand that I will be billed in line with {_CO} Ltd's current Terms and Conditions. "
+        f"I understand that I will be billed separately for the system rental by a 3rd party funder "
+        f"and lines, calls, maintenance and broadband by {_CO} Ltd under a separate agreement. "
+        f"*Fair usage policy applies, subject to terms and conditions.",
+        align="J"
+    )
+    pdf.ln(8)
+
+    # ── Signature section ─────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(95, 5, f"For {s(_comp or 'Company Name')}:", ln=False)
+    pdf.cell(0, 5, f"For {_CO}:", ln=True)
+    pdf.ln(3)
+
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(95, 5, f"Company Name: {s(_comp or '')}", ln=False)
+    pdf.cell(0, 5, "Company Name: SY Comms Ltd", ln=True)
+
+    if sig_bytes:
+        try:
+            _sig_buf2 = io.BytesIO(sig_bytes); _sig_buf2.seek(0)
+            pdf.image(_sig_buf2, x=pdf.l_margin, y=pdf.get_y(), h=14)
+        except Exception:
+            pdf.cell(95, 14, "Signed: ________________", ln=False)
+    else:
+        pdf.cell(95, 14, "Signed: ________________", ln=False)
+    pdf.cell(0, 14, "Signed: ________________", ln=True)
+
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(95, 5, f"Name: {s(sig_name or '')}", ln=False)
+    pdf.cell(0, 5, "Name & Position: ___________________________", ln=True)
+    pdf.cell(95, 5, f"Date: {date.today().strftime('%d/%m/%Y')}", ln=False)
+    pdf.cell(0, 5, "Date: ______________________________", ln=True)
+
+    # -- PAGE 5: BANK DETAILS & CHECKLIST --
     pdf.add_page()
     _add_header(pdf, "Direct Debit Mandate & Customer Checklist")
 
@@ -2185,6 +2277,36 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "I", 7)
     pdf.set_text_color(150, 150, 150)
     pdf.cell(0, 5, _CO_FOOT, align="C")
+
+
+    # ── TERMS & CONDITIONS PAGE ──────────────────────────────────────
+    pdf.add_page()
+    _add_header(pdf, "Terms & Conditions - Network Services")
+
+    _tc_sections = [
+        ("1. DEFINITIONS", "Contract means these terms and the Order. Charges are payable under clause 10. Initial Term means 12 months from Start Date. Extended Term means any 12-month renewal per clause 3. We/us means SY Comms Ltd, Shrewsbury SY2 6LG. You means the customer in the Order."),
+        ("3. DURATION & AUTOMATIC RENEWAL", "This contract automatically extends for 12 months at the end of the Minimum Term and each Extended Term unless 90 days written notice is given. You may add Services at any time."),
+        ("4. SERVICES", "We provide Services with reasonable skill and care. We do not warrant uninterrupted or error-free service. Service Failures must be reported via our Helpdesk."),
+        ("6. USE OF SERVICES", "Services are for business use only and must comply with our Acceptable Use Policy. You must not use Services to breach any law, compromise network security, or degrade service to other customers."),
+        ("10. CHARGES AND PAYMENT", "All Charges exclude VAT. Invoices due within 14 days. Late payment fee £25 after 7 days. DD cancellation fee £50. Annual price increase up to 5% with 30 days notice. Rental invoiced in advance; calls in arrears. Port/activation: £25+VAT per CLI. Engineer callout: min £250+VAT. Remote changes: £35+VAT. Call recording: included 12 months then £20/month+VAT."),
+        ("12. LIABILITY", "No liability for loss of profits, business opportunity, goodwill or indirect loss. Total liability capped at Charges paid in prior 12 months. Nothing limits liability for death or fraud."),
+        ("13. CANCELLATION", "90 days notice required. Cancellation during term incurs Cancellation Charge. Introductory credits repayable on early exit. Subsidised early termination charges repayable pro-rata."),
+        ("15. TERMINATION FEES", "On termination all invoices become immediately due; Equipment must be returned. Cancellation fee: £299+VAT per CLI. Port-away: £15+VAT per number. Account closure: £250+VAT. We may terminate for non-payment (7+ days), unremedied breach, or insolvency."),
+        ("16. CONFIDENTIALITY", "Each party protects the other's confidential information with reasonable care for 3 years."),
+        ("20. GENERAL", "This Contract is the whole agreement between us, governed by English law. We may vary terms on notice. You may not assign without our prior written consent. Subject to the exclusive jurisdiction of the English courts."),
+    ]
+    for _sec_title, _sec_text in _tc_sections:
+        pdf.ln(2)
+        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(0, 5, f"  {_sec_title}", fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 7)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 3.8, s(_sec_text), align="J")
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "I", 6.5); pdf.set_text_color(128, 128, 128)
+    pdf.multi_cell(pdf.epw, 3.5, "This is a summary. Full Terms & Conditions at www.sycomms.co.uk. By signing the Order Form you agree to be bound by the full Terms & Conditions.", align="C")
+    pdf.set_text_color(0, 0, 0)
 
     # ── AUDIT CERTIFICATE PAGE — DocuSign-style ─────────────────────────────
     if sig_bytes and sig_timestamp:
@@ -3645,4 +3767,80 @@ with tab7:
                   Once signed, all parties automatically receive the completed documents by email.
                 </div>""", unsafe_allow_html=True)
             else:
-                st.error(f"Could not create signing session: {result}")
+                st.error(f"Could not create signing session: {result}")    # ── TERMS & CONDITIONS PAGE ──────────────────────────────────────────────
+    pdf.add_page()
+    _add_header(pdf, "Terms & Conditions - Network Services")
+
+    pdf.set_font("Helvetica", "", 7)
+    pdf.set_x(pdf.l_margin)
+
+    tc_sections = [
+        ("1. DEFINITIONS", (
+            '"Contract" means these terms and conditions and the Order. "Charges" are the charges payable under clause 10. '
+            '"Initial Term" means 12 months from Start Date. "Extended Term" means any 12-month renewal per clause 3. '
+            '"we/us" means SY Comms Ltd, Shrewsbury SY2 6LG. "you" means the customer in the Order.'
+        )),
+        ("3. DURATION & AUTOMATIC RENEWAL", (
+            "This contract automatically extends for 12 months at the end of the Minimum Term and each Extended Term unless "
+            "90 days written notice is given by either party. You may add Services at any time under a new Contract."
+        )),
+        ("4. SERVICES", (
+            "We will provide Services with reasonable skill and care. We do not warrant uninterrupted or error-free service. "
+            "Service Failures must be reported via our Helpdesk and we will use reasonable endeavours to restore service."
+        )),
+        ("6. YOUR USE OF THE SERVICES", (
+            "Services are for business use only and must comply with our Acceptable Use Policy. You must not use Services "
+            "to breach any law, compromise network security, or degrade service to other customers."
+        )),
+        ("10. CHARGES AND PAYMENT", (
+            "All Charges exclude VAT. Invoices due within 14 days. Late payment fee: £25 (7+ days overdue). "
+            "DD cancellation fee: £50. Annual price adjustment up to 5% with 30 days notice. "
+            "Rental invoiced monthly in advance; calls monthly in arrears. "
+            "Number port/activation: £25+VAT per CLI. Engineer callout: minimum £250+VAT. "
+            "Remote system changes: £35+VAT (£75/hr beyond 1 hour). "
+            "Call recording included for 12 months, then £20/month+VAT."
+        )),
+        ("12. LIABILITY", (
+            "We have no liability for loss of profits, business opportunity, goodwill or indirect/consequential loss. "
+            "Our total liability shall not exceed Charges paid in the 12 months prior to the claim. "
+            "Nothing limits liability for death, personal injury or fraud."
+        )),
+        ("13. CANCELLATION", (
+            "90 days written notice required to cancel. Cancellation during Initial or Extended Term incurs the Cancellation "
+            "Charge. Introductory credits must be repaid on early exit. Early termination charges subsidised by SY Comms "
+            "on behalf of the Customer are repayable pro-rata in the event of early termination."
+        )),
+        ("15. TERMINATION - FEES", (
+            "On termination: all outstanding invoices become immediately due; Equipment must be returned. "
+            "Cancellation fee: £299+VAT per CLI. Port-away fee: £15+VAT per number. Account closure fee: £250+VAT. "
+            "We may terminate immediately for non-payment (7+ days overdue), unremedied breach, or insolvency."
+        )),
+        ("16. CONFIDENTIALITY", (
+            "Each party protects the other's confidential information with reasonable care for 3 years post-termination."
+        )),
+        ("20. GENERAL", (
+            "This Contract constitutes the whole agreement between us, governed by English law and subject to the exclusive "
+            "jurisdiction of the English courts. We may vary these terms on notice. "
+            "You may not assign without our prior written consent."
+        )),
+    ]
+
+    for section_title, section_text in tc_sections:
+        pdf.ln(2)
+        pdf.set_fill_color(31, 20, 80)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(0, 5, f"  {section_title}", fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 3.8, s(section_text), align="J")
+
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "I", 6.5)
+    pdf.set_text_color(128, 128, 128)
+    pdf.multi_cell(pdf.epw, 3.5,
+        "This is a summary of the key Terms & Conditions. The full Terms & Conditions are available at "
+        "www.sycomms.co.uk and form part of this Contract. By signing the Order Form you agree to be "
+        "bound by the full Terms & Conditions.", align="C")
+    pdf.set_text_color(0, 0, 0)
