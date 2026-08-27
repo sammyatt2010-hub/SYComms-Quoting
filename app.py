@@ -152,6 +152,7 @@ def _default_config():
             {"name": "CAT5 Socket & Cabling (ea)",   "buy": 65.00},
             {"name": "Broadband Router",             "buy": 65.00},
             {"name": "Bluetooth Headset",            "buy": 110.00},
+            {"name": "Conference Unit (GAC250)",       "buy": 130.00, "sell": 390.00},
             {"name": "HIK Vision Turret 8MP",          "buy": 125.00, "sell": 427.50},
             {"name": "HIK Vision Dome 8MP",            "buy": 125.00, "sell": 400.00},
             {"name": "HIK Vision 24TB NVR",            "buy": 750.00, "sell": 1875.00},
@@ -909,7 +910,7 @@ col_hw1, col_hw2 = st.columns([3, 2])
 
 # ─── SYSTEM HARDWARE BUILDER ─────────────────────────────────────────────────
 with col_hw1:
-    st.markdown("**🖥️ Desktop & Conference Handsets**")
+    st.markdown("**🖥️ System Desk Phones**")
     desktop_quantities = {}
     desk_cols = st.columns(3)
     for i, (name, info) in enumerate(HANDSETS_DESKTOP.items()):
@@ -948,15 +949,7 @@ with col_hw1:
 
 with col_hw2:
     # ── PBX & CCTV — prominent quick-select ───────────────────────────────────
-    st.markdown("**🔧 System Add-ons**")
-    _sys_col1, _sys_col2 = st.columns(2)
-    with _sys_col1:
-        door_qty = st.number_input("Door Entry System", min_value=0, value=0, step=1,
-                                    key="oth_Door Entry System")
-    with _sys_col2:
-        pass  # reserved
-
-    st.markdown("**📹 CCTV & Security**")
+    st.markdown("**📹 CCTV, Security & Access**")
     _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
     with _cctv_col1:
         cctv_turret_qty = st.number_input("HIK Vision Turret 8MP", min_value=0, value=0, step=1,
@@ -971,6 +964,8 @@ with col_hw2:
         cctv_spk_qty  = st.number_input("Loud Speaker", min_value=0, value=0, step=1,
                                          key="oth_Loud Speaker")
     with _cctv_col3:
+        door_qty      = st.number_input("Door Entry System", min_value=0, value=0, step=1,
+                                         key="oth_Door Entry System")
         cctv_mon_qty  = st.number_input("Monitor", min_value=0, value=0, step=1, key="cctv_monitor")
 
     with st.expander("🎧 Headsets", expanded=False):
@@ -984,7 +979,7 @@ with col_hw2:
         other_quantities = {}
         for name, info in OTHER_HARDWARE.items():
             # Skip items already shown above as quick-select
-            if name in ("PBX Unit", "Door Entry System", "Intercom System", "Loud Speaker"):
+            if name in ("PBX Unit", "Intercom System", "Loud Speaker"):
                 continue
             qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
             if qty > 0:
@@ -1137,7 +1132,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
         # ── TAB 2: Hardware Catalogue ──────────────────────────────────────────
         with panel_tabs[1]:
-            st.markdown("**Desktop & Conference Handsets** — edit buy prices, add or remove rows")
+            st.markdown("**System Desk Phones** — edit buy prices, add or remove rows")
             desk_df = pd.DataFrame(cfg["handsets_desktop"])
             edited_desk = st.data_editor(desk_df, num_rows="dynamic", use_container_width=True, key="de_desktop",
                 column_config={"poe": st.column_config.CheckboxColumn("PoE"),
