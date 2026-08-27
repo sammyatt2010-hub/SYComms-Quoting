@@ -256,6 +256,7 @@ cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
 _no_switch = False  # default — overridden by sidebar switch radio button
+cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
 mobile_rows = []   # default — overridden by sidebar
 # Current customer cost defaults (overridden by sidebar)
 current_calls = current_lines = current_bb = current_system = 0.0
@@ -762,7 +763,7 @@ with st.sidebar:
         help="Cost to exit the customer's existing contract. Added to the lease spread — not shown to customer."
     )
 
-    st.markdown("### 💻 Software Add-ons (per user/month)")
+    st.markdown("### 💻 Software Add-ons")
     st.caption("Optional Telepo features — added to monthly total")
     sw_col1, sw_col2 = st.columns(2)
     with sw_col1:
@@ -940,8 +941,12 @@ with col_hw2:
     st.markdown("**📹 CCTV & Security**")
     _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
     with _cctv_col1:
-        cctv_cam_qty  = st.number_input("IP Cameras", min_value=0, value=0, step=1, key="cctv_cameras")
-        cctv_nvr_qty  = st.number_input("NVR / DVR Unit", min_value=0, value=0, step=1, key="cctv_nvr")
+        cctv_turret_qty = st.number_input("HIK Vision Turret 8MP", min_value=0, value=0, step=1,
+                                           key="cctv_turret", help="buy £125 / sell £427.50")
+        cctv_dome_qty   = st.number_input("HIK Vision Dome 8MP",   min_value=0, value=0, step=1,
+                                           key="cctv_dome",   help="buy £125 / sell £400.00")
+        cctv_nvr_qty    = st.number_input("HIK Vision 24TB NVR",   min_value=0, value=0, step=1,
+                                           key="cctv_nvr",    help="buy £750 / sell £1,875")
     with _cctv_col2:
         cctv_int_qty  = st.number_input("Intercom System", min_value=0, value=0, step=1,
                                          key="oth_Intercom System")
@@ -972,6 +977,10 @@ with col_hw2:
     if door_qty > 0:    other_quantities["Door Entry System"] = door_qty
     if cctv_int_qty > 0: other_quantities["Intercom System"] = cctv_int_qty
     if cctv_spk_qty > 0: other_quantities["Loud Speaker"] = cctv_spk_qty
+    # CCTV cameras — merge into other_quantities with pricebook pricing
+    if cctv_turret_qty > 0: other_quantities["HIK Vision Turret 8MP"] = cctv_turret_qty
+    if cctv_dome_qty   > 0: other_quantities["HIK Vision Dome 8MP"]   = cctv_dome_qty
+    if cctv_nvr_qty    > 0: other_quantities["HIK Vision 24TB NVR"]   = cctv_nvr_qty
 
     # Auto-add Broadband Router when BB is selected
     _bb_auto_router = (
