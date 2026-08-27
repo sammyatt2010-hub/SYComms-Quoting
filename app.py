@@ -923,30 +923,36 @@ with col_hw1:
             if qty > 0:
                 desktop_quantities[name] = qty
 
-    with st.expander("📞 Cordless Handsets", expanded=False):
-        cordless_quantities = {}
-        cord_cols = st.columns(3)
-        for i, (name, info) in enumerate(HANDSETS_CORDLESS.items()):
-            with cord_cols[i % 3]:
-                st.markdown(product_card_html(name, info), unsafe_allow_html=True)
-                qty = st.number_input(
-                    name, min_value=0, value=0, step=1, key=f"cord_{name}",
-                    label_visibility="collapsed"
-                )
-                if qty > 0:
-                    cordless_quantities[name] = qty
+    # PBX fills the empty column after the last phone card
+    _desk_count = len(HANDSETS_DESKTOP)
+    _pbx_col_idx = _desk_count % 3  # which column position PBX lands in
+    with desk_cols[_pbx_col_idx]:
+        st.markdown('<div style="background:#f0f4ff;border-radius:10px;padding:0.6rem;text-align:center;margin-bottom:0.3rem"><div style="font-size:1.8rem">📦</div><div style="font-size:0.72rem;font-weight:600;color:#1f1450">PBX Unit</div><div style="font-size:0.65rem;color:#888">5+ users</div></div>', unsafe_allow_html=True)
+        pbx_qty = st.number_input("PBX Unit", min_value=0, value=0, step=1,
+                                   key="oth_PBX Unit", label_visibility="collapsed")
+
+    st.markdown("**📞 Cordless Handsets**")
+    cordless_quantities = {}
+    cord_cols = st.columns(3)
+    for i, (name, info) in enumerate(HANDSETS_CORDLESS.items()):
+        with cord_cols[i % 3]:
+            st.markdown(product_card_html(name, info), unsafe_allow_html=True)
+            qty = st.number_input(
+                name, min_value=0, value=0, step=1, key=f"cord_{name}",
+                label_visibility="collapsed"
+            )
+            if qty > 0:
+                cordless_quantities[name] = qty
 
 with col_hw2:
     # ── PBX & CCTV — prominent quick-select ───────────────────────────────────
     st.markdown("**🔧 System Add-ons**")
     _sys_col1, _sys_col2 = st.columns(2)
     with _sys_col1:
-        pbx_qty = st.number_input("PBX Unit (5+ users)", min_value=0, value=0, step=1,
-                                   key="oth_PBX Unit",
-                                   help="Required for 5+ users — auto-added when applicable")
-    with _sys_col2:
         door_qty = st.number_input("Door Entry System", min_value=0, value=0, step=1,
                                     key="oth_Door Entry System")
+    with _sys_col2:
+        pass  # reserved
 
     st.markdown("**📹 CCTV & Security**")
     _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
