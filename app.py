@@ -928,18 +928,10 @@ with col_hw1:
     _pbx_col_idx = _desk_count % 3  # which column position PBX lands in
     _pbx_col_idx = _desk_count % 3
     with desk_cols[_pbx_col_idx]:
-        _pbx_b64, _pbx_ext = get_product_image_b64("PBX Unit")
-        if _pbx_b64:
-            _pbx_img = f'<img src="data:image/{_pbx_ext};base64,{_pbx_b64}" style="width:100%;height:80px;object-fit:contain;border-radius:8px;">'
-        else:
-            _pbx_img = '<div style="font-size:1.8rem;text-align:center">📦</div>'
-        st.markdown(f'<div style="background:#f0f4ff;border-radius:10px;padding:0.6rem;text-align:center;margin-bottom:0.3rem">'
-                    f'{_pbx_img}'
-                    f'<div style="font-size:0.72rem;font-weight:600;color:#1f1450;margin-top:0.3rem">PBX Unit</div>'
-                    f'<div style="font-size:0.65rem;color:#888">5+ users</div></div>', unsafe_allow_html=True)
+        st.markdown(product_card_html("PBX Unit", {"buy": 150.0, "sell": 500.0, "cat": "Other"}),
+                    unsafe_allow_html=True)
         pbx_qty = st.number_input("PBX Unit", min_value=0, value=0, step=1,
                                    key="oth_PBX Unit", label_visibility="collapsed")
-    st.markdown("**📞 Cordless Handsets**")
     cordless_quantities = {}
     cord_cols = st.columns(3)
     for i, (name, info) in enumerate(HANDSETS_CORDLESS.items()):
