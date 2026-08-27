@@ -2963,7 +2963,7 @@ with tab4:
     </div>
     """, unsafe_allow_html=True)
 
-    if not (desktop_quantities or cordless_quantities or headset_quantities or other_quantities):
+    if not (desktop_quantities or cordless_quantities or headset_quantities or other_quantities or standalone_softphones > 0):
         st.info("👈 Select hardware from the builder above to populate this view.")
     else:
         # ── Selected Hardware ──────────────────────────────────────────────────
@@ -2988,6 +2988,15 @@ with tab4:
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
                 all_selected.append((addon_name, addon_qty, {"cat": "Software"}))
+
+
+        # Add Mobile App / Softphone users as a card
+        if standalone_softphones > 0:
+            all_selected.append((
+                "Mobile App / Softphone Users",
+                standalone_softphones,
+                {"cat": "Mobile"}
+            ))
 
         # Show in rows of 4
         for row_start in range(0, len(all_selected), 4):
