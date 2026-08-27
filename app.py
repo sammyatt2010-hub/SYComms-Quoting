@@ -245,6 +245,7 @@ cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
 _no_switch = False  # default — overridden by sidebar switch radio button
+mobile_rows = []   # default — overridden by sidebar
 # Current customer cost defaults (overridden by sidebar)
 current_calls = current_lines = current_bb = current_system = 0.0
 current_support = current_hosted = current_onhold = current_other = 0.0
@@ -883,8 +884,9 @@ st.markdown('<div class="section-header">📦 Hardware Builder</div>', unsafe_al
 
 col_hw1, col_hw2 = st.columns([3, 2])
 
+# ─── SYSTEM HARDWARE BUILDER ─────────────────────────────────────────────────
 with col_hw1:
-    st.markdown("**Desktop & Conference Handsets**")
+    st.markdown("**🖥️ Desktop & Conference Handsets**")
     desktop_quantities = {}
     desk_cols = st.columns(3)
     for i, (name, info) in enumerate(HANDSETS_DESKTOP.items()):
@@ -898,37 +900,68 @@ with col_hw1:
             if qty > 0:
                 desktop_quantities[name] = qty
 
-    st.markdown("**Cordless Handsets**")
-    cordless_quantities = {}
-    cord_cols = st.columns(3)
-    for i, (name, info) in enumerate(HANDSETS_CORDLESS.items()):
-        with cord_cols[i % 3]:
-            st.markdown(product_card_html(name, info), unsafe_allow_html=True)
-            qty = st.number_input(
-                name,
-                min_value=0, value=0, step=1, key=f"cord_{name}",
-                label_visibility="collapsed"
-            )
-            if qty > 0:
-                cordless_quantities[name] = qty
+    with st.expander("📞 Cordless Handsets", expanded=False):
+        cordless_quantities = {}
+        cord_cols = st.columns(3)
+        for i, (name, info) in enumerate(HANDSETS_CORDLESS.items()):
+            with cord_cols[i % 3]:
+                st.markdown(product_card_html(name, info), unsafe_allow_html=True)
+                qty = st.number_input(
+                    name, min_value=0, value=0, step=1, key=f"cord_{name}",
+                    label_visibility="collapsed"
+                )
+                if qty > 0:
+                    cordless_quantities[name] = qty
 
 with col_hw2:
-    st.markdown("**Headsets**")
-    headset_quantities = {}
-    for name, info in HEADSETS.items():
-        qty = st.number_input(name, min_value=0, value=0, step=1, key=f"hs_{name}")
-        if qty > 0:
-            headset_quantities[name] = qty
+    # ── PBX & CCTV — prominent quick-select ───────────────────────────────────
+    st.markdown("**🔧 System Add-ons**")
+    _sys_col1, _sys_col2 = st.columns(2)
+    with _sys_col1:
+        pbx_qty = st.number_input("PBX Unit (5+ users)", min_value=0, value=0, step=1,
+                                   key="oth_PBX Unit",
+                                   help="Required for 5+ users — auto-added when applicable")
+    with _sys_col2:
+        door_qty = st.number_input("Door Entry System", min_value=0, value=0, step=1,
+                                    key="oth_Door Entry System")
 
-    st.markdown("**Other Hardware**")
-    other_quantities = {}
-    for name, info in OTHER_HARDWARE.items():
-        qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
-        if qty > 0:
-            other_quantities[name] = qty
+    st.markdown("**📹 CCTV & Security**")
+    _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
+    with _cctv_col1:
+        cctv_cam_qty  = st.number_input("IP Cameras", min_value=0, value=0, step=1, key="cctv_cameras")
+        cctv_nvr_qty  = st.number_input("NVR / DVR Unit", min_value=0, value=0, step=1, key="cctv_nvr")
+    with _cctv_col2:
+        cctv_int_qty  = st.number_input("Intercom System", min_value=0, value=0, step=1,
+                                         key="oth_Intercom System")
+        cctv_spk_qty  = st.number_input("Loud Speaker", min_value=0, value=0, step=1,
+                                         key="oth_Loud Speaker")
+    with _cctv_col3:
+        cctv_mon_qty  = st.number_input("Monitor", min_value=0, value=0, step=1, key="cctv_monitor")
 
-    # Auto-add Broadband Router when BB is selected (mirrors pricebook formula:
-    # Equipment Costs D24 = System Proposal H13 = Main Broadband qty)
+    with st.expander("🎧 Headsets", expanded=False):
+        headset_quantities = {}
+        for name, info in HEADSETS.items():
+            qty = st.number_input(name, min_value=0, value=0, step=1, key=f"hs_{name}")
+            if qty > 0:
+                headset_quantities[name] = qty
+
+    with st.expander("📦 Other Hardware (ATA, WiFi, Routers)", expanded=False):
+        other_quantities = {}
+        for name, info in OTHER_HARDWARE.items():
+            # Skip items already shown above as quick-select
+            if name in ("PBX Unit", "Door Entry System", "Intercom System", "Loud Speaker"):
+                continue
+            qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
+            if qty > 0:
+                other_quantities[name] = qty
+
+    # Merge quick-select system add-ons into other_quantities
+    if pbx_qty > 0:     other_quantities["PBX Unit"] = pbx_qty
+    if door_qty > 0:    other_quantities["Door Entry System"] = door_qty
+    if cctv_int_qty > 0: other_quantities["Intercom System"] = cctv_int_qty
+    if cctv_spk_qty > 0: other_quantities["Loud Speaker"] = cctv_spk_qty
+
+    # Auto-add Broadband Router when BB is selected
     _bb_auto_router = (
         bb_provider != "None / Customer Supplied" and
         "Broadband Router" in OTHER_HARDWARE and
@@ -936,41 +969,54 @@ with col_hw2:
     )
     if _bb_auto_router:
         other_quantities["Broadband Router"] = 1
-        st.caption("ℹ️ Broadband Router auto-included in lease (remove from Other Hardware if not needed)")
+
+    # Auto-add PBX Unit when total users >= 5 (pricebook rule)
+    # total_voice_channels computed after this block — use desk phone count as proxy
+    _desk_total = sum(desktop_quantities.values())
+    _soft_total = st.session_state.get("standalone_softphones_key", 0)
+    _total_users_preview = _desk_total + _soft_total
+    if _total_users_preview >= 5 and "PBX Unit" not in other_quantities:
+        other_quantities["PBX Unit"] = 1
+        st.info("🔧 PBX Unit auto-added (required for 5+ users)")
 
 
-    st.markdown("**Licences**")
-    # Voice channel licences auto-link to handset count (mirrors Excel SYSTEM BUILDER I16 logic)
-    # Cost: £3.49/seat/month wholesale (sell: ~£4.89) — one licence required per physical phone
-    # Calculated AFTER hardware inputs are collected; placeholder stored here, computed below
-    standalone_softphones = st.number_input("Standalone Softphone Licences (no physical phone)", min_value=0, value=0, step=1,
-                                             help="Licences not tied to a handset — e.g. desktop-only users")
-    wallboard_users   = st.number_input("Live Wallboard Users", min_value=0, value=0, step=1)
+    st.markdown("**🎙️ Licences**")
+    standalone_softphones = st.number_input(
+        "📱 Mobile App / Softphone-Only Users",
+        min_value=0, value=0, step=1,
+        help="Users with no desk phone — mobile app or PC softphone. Each adds one hosted user licence.",
+        key="standalone_softphones_key"
+    )
+    wallboard_users = 0
 
-    st.markdown("**Networking**")
-    auto_switch  = st.checkbox("Auto-select recommended switch", value=True)
-    if auto_switch:
-        manual_switch_name = None
+    st.markdown("**🌐 Networking**")
+    _switch_mode = st.radio("Switch", ["Auto-select", "Manual select", "None / Customer Supplied"],
+                            horizontal=True, key="switch_mode")
+    if _switch_mode == "None / Customer Supplied":
+        auto_switch = False; manual_switch_name = None; _no_switch = True
+    elif _switch_mode == "Auto-select":
+        auto_switch = True; manual_switch_name = None; _no_switch = False
     else:
+        auto_switch = False
         switch_names = [s["name"] for s in SWITCHES]
-        manual_switch_name = st.selectbox("Select Switch", switch_names)
+        manual_switch_name = st.selectbox("Select Switch", switch_names, key="manual_sw")
+        _no_switch = False
     _router_opts = ["None / Customer Supplied"] + [k for k in ROUTERS.keys()]
     router_type  = st.selectbox("Router", _router_opts)
     add_router   = st.checkbox("Include router in lease", value=True)
 
-    st.markdown("**Mobiles**")
-    mobile_rows = []
-    mob_col1, mob_col2, mob_col3 = st.columns([2, 2, 1])
-    for net, pkgs in MOBILE_NETWORKS.items():
-        for pkg, pricing in pkgs.items():
-            qty = st.number_input(
-                f"{net} — {pkg}",
-                min_value=0, value=0, step=1, key=f"mob_{net}_{pkg}"
-            )
-            if qty > 0:
-                mobile_rows.append({"network": net, "package": pkg, "qty": qty, **pricing})
+    with st.expander("📱 Mobiles", expanded=False):
+        mobile_rows = []
+        for net, pkgs in MOBILE_NETWORKS.items():
+            for pkg, pricing in pkgs.items():
+                qty = st.number_input(
+                    f"{net} — {pkg}",
+                    min_value=0, value=0, step=1, key=f"mob_{net}_{pkg}"
+                )
+                if qty > 0:
+                    mobile_rows.append({"network": net, "package": pkg, "qty": qty, **pricing})
 
-    additional_wired_ports = st.number_input("Additional wired network ports needed", min_value=0, value=0)
+    additional_wired_ports = st.number_input("Additional wired network ports", min_value=0, value=0)
 
 # ─── MANAGER OVERRIDE SECTION ────────────────────────────────────────────────
 
