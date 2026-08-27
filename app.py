@@ -1000,11 +1000,17 @@ with col_hw2:
     if cctv_dome_qty   > 0: other_quantities["HIK Vision Dome 8MP"]   = cctv_dome_qty
     if cctv_nvr_qty    > 0: other_quantities["HIK Vision 24TB NVR"]   = cctv_nvr_qty
 
-    # Auto-add Broadband Router when BB is selected
+    # Auto-add Broadband Router when BB is selected.
+    # Key insight: the "Other Hardware" expander widgets only appear in session_state
+    # once the expander is opened. So get("oth_Broadband Router", 1) returns 1 (not 0)
+    # when the user has never opened the expander — meaning auto-add should fire.
+    # If the user opened the expander and explicitly set it to 0, it returns 0 — skip auto-add.
+    _router_user_val = st.session_state.get("oth_Broadband Router", 1)
     _bb_auto_router = (
         bb_provider != "None / Customer Supplied" and
         "Broadband Router" in OTHER_HARDWARE and
-        "Broadband Router" not in other_quantities
+        "Broadband Router" not in other_quantities and
+        _router_user_val != 0   # 0 = user explicitly cleared it
     )
     if _bb_auto_router:
         other_quantities["Broadband Router"] = 1
