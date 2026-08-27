@@ -224,6 +224,14 @@ def _load_config():
             if "constants" in defaults:
                 for k, v in defaults["constants"].items():
                     cfg.setdefault("constants", {}).setdefault(k, v)
+            # Merge new hardware items from defaults into existing lists
+            # (so newly added catalogue items appear even with old config.json)
+            for hw_key in ("handsets_desktop", "handsets_cordless", "headsets", "other_hardware", "routers"):
+                if hw_key in defaults and hw_key in cfg:
+                    existing_names = {d["name"] for d in cfg[hw_key] if "name" in d}
+                    for item in defaults[hw_key]:
+                        if item.get("name") and item["name"] not in existing_names:
+                            cfg[hw_key].append(item)
             return cfg
         except Exception:
             pass
