@@ -932,6 +932,8 @@ with col_hw1:
                     unsafe_allow_html=True)
         pbx_qty = st.number_input("PBX Unit", min_value=0, value=0, step=1,
                                    key="oth_PBX Unit", label_visibility="collapsed")
+
+    st.markdown("**📞 Cordless Handsets**")
     cordless_quantities = {}
     cord_cols = st.columns(3)
     for i, (name, info) in enumerate(HANDSETS_CORDLESS.items()):
