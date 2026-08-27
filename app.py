@@ -979,7 +979,7 @@ with col_hw2:
         other_quantities = {}
         for name, info in OTHER_HARDWARE.items():
             # Skip items already shown above as quick-select
-            if name in ("PBX Unit", "Intercom System", "Loud Speaker"):
+            if name in ("PBX Unit", "Door Entry System", "Intercom System", "Loud Speaker"):
                 continue
             qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
             if qty > 0:
