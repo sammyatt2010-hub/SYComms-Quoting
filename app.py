@@ -152,6 +152,9 @@ def _default_config():
             {"name": "CAT5 Socket & Cabling (ea)",   "buy": 65.00},
             {"name": "Broadband Router",             "buy": 65.00},
             {"name": "Bluetooth Headset",            "buy": 110.00},
+            {"name": "HIK Vision Turret 8MP",          "buy": 125.00, "sell": 427.50},
+            {"name": "HIK Vision Dome 8MP",            "buy": 125.00, "sell": 400.00},
+            {"name": "HIK Vision 24TB NVR",            "buy": 750.00, "sell": 1875.00},
         ],
         "switches": [
             {"name": "5-Port (4x POE)",   "buy": 29.00,  "poe_ports": 4,  "total_ports": 5},
@@ -432,7 +435,7 @@ def _build_catalogues(cfg):
     hd = {i["name"]: {k:v for k,v in i.items() if k!="name"} for i in cfg["handsets_desktop"]}
     hc = {i["name"]: {k:v for k,v in i.items() if k!="name"} for i in cfg["handsets_cordless"]}
     hs = {i["name"]: {"buy": i["buy"]}                         for i in cfg["headsets"]}
-    oh = {i["name"]: {"buy": i["buy"]}                         for i in cfg["other_hardware"]}
+    oh = {i["name"]: {"buy": i["buy"], "sell": i.get("sell", i["buy"]*3)} for i in cfg["other_hardware"]}
     sw = cfg["switches"]
     rt = {i["name"]: i["buy"]                                  for i in cfg["routers"]}
     lr  = {i["months"]: i["rate"]                              for i in cfg["lease_rates"]}
