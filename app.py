@@ -320,6 +320,7 @@ PRODUCT_IMAGES = {
     "Zyxel DX Series (FTTP)":               "images/zyxel_dx.jpg",
     "TP Link NX200 (4G/5G)":                "images/tplink_nx200.jpg",
     # ── Software add-ons ──────────────────────────────────────────────────────
+    "Mobile App / Softphone Users":  "images/mobile_app.jpg",
     "SY Comms Studio":               "images/sy_comms_studio.jpg",
     "Call Recording":                "images/call_recording.jpg",
     "CRM AI Per User":               "images/crm_ai.jpg",
