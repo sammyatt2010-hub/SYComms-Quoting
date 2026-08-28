@@ -1533,6 +1533,8 @@ def compute_hw_sell():
                 if _rn in ROUTERS: total += ROUTERS[_rn] * (1 + hw_uplift_override / 100) * _rq
         elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
             total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
+            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
+    return round(total, 2)
 
 def compute_install_cost():
     if install_type == "Engineer Install":
