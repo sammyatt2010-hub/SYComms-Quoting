@@ -2492,6 +2492,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     # ── EXCEPTIONAL COMMERCIAL ARRANGEMENT (only when settlement > 0) ──
     if termination_cost > 0:
+        # Read rep details from session state (defined in sidebar, not passed as params)
+        rep_name     = st.session_state.get("q_rep_name",     "")
+        rep_position = st.session_state.get("q_rep_position", "")
         pdf.add_page()
         _add_header(pdf, "Exceptional Commercial Arrangement")
         pdf.set_font("Helvetica", "B", 11)
