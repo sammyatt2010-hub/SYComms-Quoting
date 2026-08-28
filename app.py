@@ -1072,21 +1072,32 @@ with col_hw2:
                                 st.session_state.get("router_mode", _default_router_mode)
                             ) if st.session_state.get("router_mode") else
                             ["Auto-select","Manual select","None / Customer Supplied"].index(_default_router_mode))
-    _default_router = list(ROUTERS.keys())[0]   # Draytek Vigor 2927 (first in list)
+    _default_router = list(ROUTERS.keys())[0]   # Draytek Vigor 2927
+    router_quantities = {}
     if _router_mode == "None / Customer Supplied":
         router_type = "None / Customer Supplied"
         add_router  = False
     elif _router_mode == "Auto-select":
-        # When BB is SY Comms → Draytek; when no BB → no router
         if bb_provider != "None / Customer Supplied":
             router_type = _default_router
+            router_quantities = {_default_router: 1}
             add_router  = True
         else:
             router_type = "None / Customer Supplied"
             add_router  = False
-    else:  # Manual select
-        router_type = st.selectbox("Select Router", list(ROUTERS.keys()), key="manual_router")
-        add_router  = True
+    else:  # Manual select — qty grid like switches
+        add_router = False
+        router_type = "None / Customer Supplied"
+        st.caption("Set quantities for each router needed:")
+        _rt_cols = st.columns(2)
+        for _ri, (_rname, _rbuy) in enumerate(ROUTERS.items()):
+            with _rt_cols[_ri % 2]:
+                _rq = st.number_input(_rname, min_value=0, value=0, step=1,
+                                      key=f"rt_qty_{_rname}", label_visibility="visible")
+                if _rq > 0:
+                    router_quantities[_rname] = _rq
+                    add_router = True
+                    router_type = _rname  # use last selected for legacy references
 
     with st.expander("📱 Mobiles", expanded=False):
         mobile_rows = []
@@ -1480,8 +1491,11 @@ def compute_hw_buy():
             poe_n = compute_poe_needed()
             total += get_recommended_switch(poe_n)["buy"]
     if add_router:
-        total += ROUTERS[router_type]
-    return total
+        if router_quantities:
+            for _rn, _rq in router_quantities.items():
+                if _rn in ROUTERS: total += ROUTERS[_rn] * _rq
+        elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
+            total += ROUTERS[router_type]
 
 def compute_hw_sell():
     """Hardware sell price — uses per-item sell price from catalogue if available,
@@ -1513,8 +1527,11 @@ def compute_hw_sell():
             sw = get_recommended_switch(compute_poe_needed())
             total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
     if add_router:
-        total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
-    return round(total, 2)
+        if router_quantities:
+            for _rn, _rq in router_quantities.items():
+                if _rn in ROUTERS: total += ROUTERS[_rn] * (1 + hw_uplift_override / 100) * _rq
+        elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
+            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
 
 def compute_install_cost():
     if install_type == "Engineer Install":
@@ -2063,7 +2080,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     if auto_switch and not _no_switch:
         all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, _pdf_hw_billing))
     if add_router:
-        all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
+        if router_quantities:
+            for _rn, _rq in router_quantities.items():
+                all_equip_pdf.append((_rn, _rq, _pdf_hw_billing))
+        elif router_type not in ("None / Customer Supplied", ""):
+            all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
 
     # Voice Channel Licences
     if total_voice_channels > 0:
