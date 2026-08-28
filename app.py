@@ -1496,6 +1496,7 @@ def compute_hw_buy():
                 if _rn in ROUTERS: total += ROUTERS[_rn] * _rq
         elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
             total += ROUTERS[router_type]
+    return total
 
 def compute_hw_sell():
     """Hardware sell price — uses per-item sell price from catalogue if available,
