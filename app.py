@@ -1330,8 +1330,10 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
             c = cfg["constants"]
             cc1, cc2 = st.columns(2)
             with cc1:
-                new_vc_cost    = st.number_input("Voice Channel Cost £/seat/mo (wholesale)", value=float(c.get("vc_cost_per_seat", 3.49)), step=0.10)
-                new_wallboard  = st.number_input("Wallboard Sell £/user/mo",           value=float(c.get("wallboard_sell", 4.99)),     step=0.50)
+                new_vc_cost    = st.number_input("Voice Channel Cost £/seat/mo (wholesale)", value=float(c.get("vc_cost_per_seat", 2.95)), step=0.10)
+                new_vc_sell    = st.number_input("Voice Channel Sell £/seat/mo (to customer)", value=float(c.get("vc_sell_per_seat", 12.00)), step=0.50,
+                                                  help="Professional Bundle sell rate per hosted user per month")
+                new_wallboard  = st.number_input("Wallboard Sell £/user/mo",           value=float(c.get("wallboard_sell", 99.00)),    step=0.50)
                 new_uplift     = st.number_input("Default Service Uplift %",           value=float(c.get("default_service_uplift_pct", 40)), min_value=0.0, max_value=100.0, step=1.0)
             with cc2:
                 new_hw_uplift  = st.slider("Hardware Sell Margin %",
@@ -1343,7 +1345,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
             if st.button("✅ Apply Cost Changes", type="primary", key="apply_costs"):
                 st.session_state.active_config["constants"].update({
-                    "vc_cost_per_seat": new_vc_cost,
+                    "vc_cost_per_seat":  new_vc_cost,
+                    "vc_sell_per_seat":  new_vc_sell,
                     "wallboard_sell":   new_wallboard,
                     "default_service_uplift_pct": new_uplift,
                     "hw_uplift_pct":    new_hw_uplift,
@@ -2786,7 +2789,7 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         return False, f"❌ Email failed: {e}"
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "📨 Remote Signing"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "📊 Feasibility", "✍️ Sign & Send", "📨 Remote Signing"])
 
 # ── TAB 1: PROPOSAL SUMMARY ──────────────────────────────────────────────────
 with tab1:
@@ -3543,6 +3546,51 @@ with tab5:
         """, unsafe_allow_html=True)
 
 
+        # ── Adjustable Monthly Charges ────────────────────────────────────────
+        st.markdown("### 📋 Monthly Charge Breakdown")
+        st.caption("Adjust any line to price-match or offer a discount. Commission recalculates automatically.")
+
+        _vc_default   = round(svc["lic_monthly"], 2)
+        _sw_default   = round(svc.get("sw_sell", 0), 2)
+        _bb_default   = round(svc["bb_sell"], 2)
+        _rent_default = round(pl_data["rental"], 2)
+
+        _ch_col1, _ch_col2 = st.columns(2)
+        with _ch_col1:
+            adj_call_charges  = st.number_input("Est. Call Charges (£/mo)",     0.0, step=5.0, value=0.0, key="adj_calls")
+            adj_user_lic      = st.number_input("Hosted User Licences (£/mo)",  0.0, step=1.0, value=_vc_default, key="adj_vc")
+            adj_software      = st.number_input("Software Charges (£/mo)",       0.0, step=5.0, value=_sw_default, key="adj_sw")
+            adj_broadband     = st.number_input("Broadband Charges (£/mo)",      0.0, step=1.0, value=_bb_default, key="adj_bb")
+        with _ch_col2:
+            adj_rental        = st.number_input("Equipment Rental (£/mo)",       0.0, step=1.0, value=_rent_default, key="adj_rent")
+            adj_leased_line   = st.number_input("Leased Line Charges (£/mo)",    0.0, step=5.0, value=0.0, key="adj_ll")
+            adj_other1        = st.number_input("Other Charges (£/mo)",          0.0, step=5.0, value=0.0, key="adj_oth1")
+            adj_other2        = st.number_input("Other Charges 2 (£/mo)",        0.0, step=5.0, value=0.0, key="adj_oth2")
+
+        adj_total_mo = (adj_call_charges + adj_user_lic + adj_software + adj_broadband +
+                        adj_rental + adj_leased_line + adj_other1 + adj_other2)
+
+        # Recalculate GP and commission from adjusted rental
+        _adj_disc_turn  = (adj_rental / pl_data["true_rate"]) * 1000 if pl_data["true_rate"] > 0 else 0
+        _adj_gp         = _adj_disc_turn - pl_data["cos_full"]
+        _adj_units      = _adj_gp / 4000
+        _adj_commission = round(_adj_units * 1000, 2)
+
+        # Show summary row
+        _tot_col = "#1a7a40" if adj_total_mo <= (svc["total_sell"] + pl_data["rental"]) else "#c0392b"
+        st.markdown(f"""
+        <div style="background:#1f1450;border-radius:10px;padding:0.8rem 1.2rem;margin-top:0.5rem;
+             display:flex;justify-content:space-between;align-items:center;color:#fff">
+          <div><span style="font-size:0.8rem;color:rgba(255,255,255,0.6)">ADJUSTED TOTAL</span>
+               <div style="font-size:1.6rem;font-weight:800;color:#00b5a3">£{adj_total_mo:.2f}/mo</div></div>
+          <div style="text-align:right">
+               <span style="font-size:0.8rem;color:rgba(255,255,255,0.6)">COMMISSION ON ADJ. RENTAL</span>
+               <div style="font-size:1.4rem;font-weight:700;color:#7fe8a0">£{_adj_commission:.2f}
+               <span style="font-size:0.8rem;font-weight:400"> ({_adj_units:.2f} units)</span></div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
         # ── Sales Calcs (pricebook-style) ─────────────────────────────────
         st.markdown("### 📐 Sales Calcs")
         _cash_price_load = 1.10   # pricebook: Cash Price Load % = 1.10
@@ -3608,6 +3656,55 @@ with tab5:
 # ── TAB 6: SIGN & SEND ────────────────────────────────────────────────────────
 
 with tab6:
+    st.markdown('## 📊 Feasibility Calculator')
+    st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
+
+    _new_rental    = pl_data['rental']
+    _lease_total   = _new_rental * lease_term
+    _max_settlement = round(_lease_total * 0.70, 2)
+    _settlement_ok  = termination_cost <= _max_settlement
+
+    feas_col1, feas_col2 = st.columns(2)
+    with feas_col1:
+        st.markdown(f"""
+        <div style='background:#fff;border:1px solid #e0e8f0;border-radius:12px;padding:1.2rem'>
+          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>New Monthly Rental</div>
+          <div style='font-size:2rem;font-weight:800;color:#1f1450'>£{_new_rental:.2f}</div>
+          <div style='font-size:0.8rem;color:#aaa'>per month over {LEASE_TERM_LABELS[lease_term]}</div>
+          <hr style='margin:0.8rem 0'>
+          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Total Lease Value</div>
+          <div style='font-size:1.3rem;font-weight:700;color:#1f1450'>£{_lease_total:.2f}</div>
+          <div style='font-size:0.8rem;color:#aaa'>({lease_term} months × £{_new_rental:.2f})</div>
+          <hr style='margin:0.8rem 0'>
+          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Max Settlement (70%)</div>
+          <div style='font-size:1.6rem;font-weight:800;color:#1a7a40'>£{_max_settlement:.2f}</div>
+          <div style='font-size:0.8rem;color:#aaa'>70% of total lease value</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with feas_col2:
+        _col  = '#1a7a40' if _settlement_ok else '#c0392b'
+        _bg   = '#e8f8f0' if _settlement_ok else '#fdf0f0'
+        _icon = '✅' if _settlement_ok else '🔴'
+        _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% — Review Required'
+        _diff = _max_settlement - termination_cost
+        st.markdown(f"""
+        <div style='background:{_bg};border:2px solid {_col};border-radius:12px;padding:1.4rem;text-align:center'>
+          <div style='font-size:2.5rem'>{_icon}</div>
+          <div style='font-size:1rem;font-weight:700;color:{_col};margin-top:0.5rem'>{_msg}</div>
+          <hr style='margin:0.8rem 0;border-color:{_col};opacity:0.3'>
+          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:{_col}'>Customer Settlement / Buyout</div>
+          <div style='font-size:1.8rem;font-weight:800;color:{_col}'>£{termination_cost:.2f}</div>
+          <div style='font-size:0.8rem;color:{_col};margin-top:0.4rem'>
+            {'£' + f'{abs(_diff):.2f}' + ' headroom remaining' if _settlement_ok else '£' + f'{abs(_diff):.2f}' + ' over the 70% limit'}
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if termination_cost == 0:
+        st.info('💡 Enter a buyout / termination cost in the sidebar Deal Adjustments to run the feasibility check.')
+
+
+with tab7:
     st.markdown('<div class="tab-content"></div>', unsafe_allow_html=True)
 
     if not comp_name:
@@ -3819,7 +3916,7 @@ The password you entered when setting up the account won't work - you must use a
             """)
 
 # ── TAB 6: REMOTE SIGNING ─────────────────────────────────────────────────────
-with tab7:
+with tab8:
     st.markdown("### 📨 Send Documents for Remote Signing")
     st.caption("Upload PDFs and send the customer a secure signing link — no need for them to be in the room.")
 
