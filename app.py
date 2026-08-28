@@ -3659,7 +3659,7 @@ with tab6:
     st.markdown('## 📊 Feasibility Calculator')
     st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
 
-    _new_rental    = pl_data['rental']
+    _new_rental    = float(st.session_state.get('adj_rent', pl_data['rental']))
     _lease_total   = _new_rental * lease_term
     _max_settlement = round(_lease_total * 0.70, 2)
     _settlement_ok  = termination_cost <= _max_settlement
