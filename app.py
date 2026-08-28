@@ -1014,12 +1014,19 @@ with col_hw2:
     # when the user has never opened the expander — meaning auto-add should fire.
     # If the user opened the expander and explicitly set it to 0, it returns 0 — skip auto-add.
     _router_user_val = st.session_state.get("oth_Broadband Router", 1)
+    # Check via session state whether the router section will add a router
+    _router_mode_val = st.session_state.get("router_mode", "Auto-select")
+    _router_will_add = (
+        (_router_mode_val == "Auto-select" and bb_provider != "None / Customer Supplied") or
+        (_router_mode_val == "Manual select" and
+         any(st.session_state.get(f"rt_qty_{rn}", 0) > 0 for rn in ROUTERS.keys()))
+    )
     _bb_auto_router = (
         bb_provider != "None / Customer Supplied" and
         "Broadband Router" in OTHER_HARDWARE and
         "Broadband Router" not in other_quantities and
         _router_user_val != 0 and      # 0 = user explicitly cleared it
-        not router_quantities           # skip if a router is already selected via router section
+        not _router_will_add            # skip if router section will add one
     )
     if _bb_auto_router:
         other_quantities["Broadband Router"] = 1
