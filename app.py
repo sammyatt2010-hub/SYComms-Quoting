@@ -3550,36 +3550,64 @@ with tab5:
         st.markdown("### 📋 Monthly Charge Breakdown")
         st.caption("Adjust any line to price-match or offer a discount. Commission recalculates automatically.")
 
+        # No persistent keys — resets to live calculated values each run
+        # Equipment Rental is handled by the Lease Rental Adjustment above
         _vc_default   = float(round(svc["lic_monthly"], 2))
         _sw_default   = float(round(sw_sell_total, 2))
         _bb_default   = float(round(svc["bb_sell"], 2))
-        _rent_default = float(round(pl_data["rental"], 2))
 
         _ch_col1, _ch_col2 = st.columns(2)
         with _ch_col1:
-            adj_call_charges  = st.number_input("Est. Call Charges (£/mo)",     0.0, step=5.0, value=0.0, key="adj_calls")
-            adj_user_lic      = st.number_input("Hosted User Licences (£/mo)",  0.0, step=1.0, value=_vc_default, key="adj_vc")
-            adj_software      = st.number_input("Software Charges (£/mo)",       0.0, step=5.0, value=_sw_default, key="adj_sw")
-            adj_broadband     = st.number_input("Broadband Charges (£/mo)",      0.0, step=1.0, value=_bb_default, key="adj_bb")
+            adj_call_charges  = st.number_input("Est. Call Charges (£/mo)",     0.0, step=5.0, value=0.0)
+            adj_user_lic      = st.number_input("Hosted User Licences (£/mo)",  0.0, step=1.0, value=_vc_default)
+            adj_software      = st.number_input("Software Charges (£/mo)",       0.0, step=5.0, value=_sw_default)
         with _ch_col2:
-            adj_rental        = st.number_input("Equipment Rental (£/mo)",       0.0, step=1.0, value=_rent_default, key="adj_rent")
-            adj_leased_line   = st.number_input("Leased Line Charges (£/mo)",    0.0, step=5.0, value=0.0, key="adj_ll")
-            adj_other1        = st.number_input("Other Charges (£/mo)",          0.0, step=5.0, value=0.0, key="adj_oth1")
-            adj_other2        = st.number_input("Other Charges 2 (£/mo)",        0.0, step=5.0, value=0.0, key="adj_oth2")
+            adj_broadband     = st.number_input("Broadband Charges (£/mo)",      0.0, step=1.0, value=_bb_default)
+            adj_leased_line   = st.number_input("Leased Line Charges (£/mo)",    0.0, step=5.0, value=0.0)
+            adj_other1        = st.number_input("Other Charges (£/mo)",          0.0, step=5.0, value=0.0)
 
-        adj_total_mo = (adj_call_charges + adj_user_lic + adj_software + adj_broadband +
-                        adj_rental + adj_leased_line + adj_other1 + adj_other2)
+        # Equipment rental comes from the Desired Lease Rental above
+        adj_rental   = float(_desired_rental)
+        adj_total_mo = (adj_call_charges + adj_user_lic + adj_software +
+                        adj_broadband + adj_rental + adj_leased_line + adj_other1)
 
-        # Recalculate GP and commission from adjusted rental
+        # Recalculate GP and commission from the desired rental
         _adj_disc_turn  = (adj_rental / pl_data["true_rate"]) * 1000 if pl_data["true_rate"] > 0 else 0
         _adj_gp         = _adj_disc_turn - pl_data["cos_full"]
         _adj_units      = _adj_gp / 4000
         _adj_commission = round(_adj_units * 1000, 2)
 
-        # Show summary row
-        _tot_col = "#1a7a40" if adj_total_mo <= (svc["total_sell"] + pl_data["rental"]) else "#c0392b"
+        # Feasibility mini-panel ────────────────────────────────────────────────
+        _feas_lease_total   = adj_rental * lease_term
+        _feas_max_settle    = round(_feas_lease_total * 0.70, 2)
+        _settle_ok          = termination_cost <= _feas_max_settle
+        _f_col  = "#1a7a40" if _settle_ok else "#c0392b"
+        _f_bg   = "#e8f8f0" if _settle_ok else "#fdf0f0"
+        _f_icon = "✅" if _settle_ok else "🔴"
+        _f_msg  = "Settlement feasible" if _settle_ok else "Settlement exceeds 70% — review"
+        _f_diff = _feas_max_settle - termination_cost
+
         st.markdown(f"""
-        <div style="background:#1f1450;border-radius:10px;padding:0.8rem 1.2rem;margin-top:0.5rem;
+        <div style="margin-top:0.8rem;padding:0.8rem 1.2rem;background:{_f_bg};border:1px solid {_f_col};
+             border-radius:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:{_f_col}">
+              {_f_icon} Feasibility — Max Settlement (70%)</div>
+            <div style="font-size:1.2rem;font-weight:800;color:{_f_col}">£{_feas_max_settle:.2f}</div>
+            <div style="font-size:0.78rem;color:{_f_col}">{_f_msg} &nbsp;·&nbsp;
+              {"£" + f"{abs(_f_diff):.2f}" + " headroom" if _settle_ok else "£" + f"{abs(_f_diff):.2f}" + " over limit"}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:0.75rem;color:{_f_col}">Settlement / Buyout</div>
+            <div style="font-size:1.4rem;font-weight:800;color:{_f_col}">£{termination_cost:.2f}</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Summary bar ────────────────────────────────────────────────────────────
+        st.markdown(f"""
+        <div style="background:#1f1450;border-radius:10px;padding:0.8rem 1.2rem;margin-top:0.6rem;
              display:flex;justify-content:space-between;align-items:center;color:#fff">
           <div><span style="font-size:0.8rem;color:rgba(255,255,255,0.6)">ADJUSTED TOTAL</span>
                <div style="font-size:1.6rem;font-weight:800;color:#00b5a3">£{adj_total_mo:.2f}/mo</div></div>
