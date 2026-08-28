@@ -3173,7 +3173,7 @@ with tab4:
         # Add additional wired ports as a card
         if additional_wired_ports > 0:
             all_selected.append((
-                f"Additional Wired Ports ×{additional_wired_ports}",
+                "Extra Network Ports",
                 additional_wired_ports,
                 {"cat": "Switch"}
             ))
