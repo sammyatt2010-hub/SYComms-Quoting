@@ -3548,16 +3548,30 @@ with tab5:
                 """, unsafe_allow_html=True)
 
         # Row 2 — Full monthly total
+        _diff_total    = current_total - total_mo
+        _diff_col      = "#1a7a40" if _diff_total >= 0 else "#c0392b"
+        _curr_total_str = f"£{current_total:.2f}" if current_total > 0 else "—"
+        _curr_sys_str   = f"£{current_system:.2f}" if current_system > 0 else "—"
         st.markdown(f"""
         <div style="background:#f0f4ff;border:1px solid #c0cce0;border-radius:10px;
-             padding:0.8rem 1.2rem;margin-top:0.5rem;display:flex;
-             justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                 letter-spacing:.08em;color:#1f1450">New Monthly Total (Lease + Services)</div>
-            <div style="font-size:0.8rem;color:#555">£{_desired_rental:.2f} lease + £{svc["total_sell"]:.2f} services</div>
+             padding:0.8rem 1.2rem;margin-top:0.5rem">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;border-right:1px solid #c0cce0;padding-right:1rem">
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#888">Customer Current Total</div>
+              <div style="font-size:1.4rem;font-weight:800;color:#c0392b">{_curr_total_str}<span style="font-size:0.75rem;font-weight:400"> /mo</span></div>
+              <div style="font-size:0.72rem;color:#aaa">Lease {_curr_sys_str} + other spend</div>
+            </div>
+            <div style="flex:1;text-align:center;padding:0 1rem">
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#1f1450">New Monthly Total (Lease + Services)</div>
+              <div style="font-size:1.6rem;font-weight:800;color:#1f1450">£{total_mo:.2f}<span style="font-size:0.75rem;font-weight:400"> + VAT</span></div>
+              <div style="font-size:0.72rem;color:#555">£{_desired_rental:.2f} lease + £{svc["total_sell"]:.2f} services</div>
+            </div>
+            <div style="flex:1;text-align:center;border-left:1px solid #c0cce0;padding-left:1rem">
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:{_diff_col}">{"Total Saving" if _diff_total >= 0 else "Total Increase"}</div>
+              <div style="font-size:1.4rem;font-weight:800;color:{_diff_col}">{"+" if _diff_total < 0 else "-"}£{abs(_diff_total):.2f}<span style="font-size:0.75rem;font-weight:400"> /mo</span></div>
+              <div style="font-size:0.72rem;color:{_diff_col}">£{abs(_diff_total*12):.0f}/yr</div>
+            </div>
           </div>
-          <div style="font-size:1.6rem;font-weight:800;color:#1f1450">£{total_mo:.2f}<span style="font-size:0.8rem;font-weight:400"> + VAT</span></div>
         </div>
         """, unsafe_allow_html=True)
 
