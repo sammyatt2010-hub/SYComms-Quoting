@@ -153,6 +153,7 @@ def _default_config():
             {"name": "Broadband Router",             "buy": 65.00},
             {"name": "Bluetooth Headset",            "buy": 110.00},
             {"name": "Conference Unit (GAC250)",       "buy": 130.00, "sell": 390.00},
+            {"name": "TP Link NX200 (4G/5G Standalone)",  "buy": 210.00, "sell": 630.00},
             {"name": "HIK Vision Turret 8MP",          "buy": 125.00, "sell": 427.50},
             {"name": "HIK Vision Dome 8MP",            "buy": 125.00, "sell": 400.00},
             {"name": "HIK Vision 24TB NVR",            "buy": 750.00, "sell": 1875.00},
@@ -257,6 +258,7 @@ cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
 _no_switch = False  # default — overridden by sidebar switch radio button
+switch_quantities = {}  # for manual multi-switch mode
 cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
 mobile_rows = []   # default — overridden by sidebar
 # Current customer cost defaults (overridden by sidebar)
@@ -978,8 +980,19 @@ with col_hw2:
     with st.expander("📦 Other Hardware (ATA, WiFi, Routers)", expanded=False):
         other_quantities = {}
         for name, info in OTHER_HARDWARE.items():
-            # Skip items already shown above as quick-select
-            if name in ("PBX Unit", "Door Entry System", "Intercom System", "Loud Speaker"):
+            # Skip items handled elsewhere:
+            # — CCTV section: HIK Vision cameras/NVR
+            # — Router section: Broadband Router (auto-added)
+            # — CCTV section: Intercom, Loud Speaker, Door Entry
+            # — Headsets section: Bluetooth Headset
+            # — PBX: shown in desktop grid
+            if name in (
+                "PBX Unit",
+                "Door Entry System", "Intercom System", "Loud Speaker",
+                "HIK Vision Turret 8MP", "HIK Vision Dome 8MP", "HIK Vision 24TB NVR",
+                "Broadband Router",
+                "Bluetooth Headset",
+            ):
                 continue
             qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
             if qty > 0:
@@ -1034,13 +1047,23 @@ with col_hw2:
                             horizontal=True, key="switch_mode")
     if _switch_mode == "None / Customer Supplied":
         auto_switch = False; manual_switch_name = None; _no_switch = True
+        switch_quantities = {}
     elif _switch_mode == "Auto-select":
         auto_switch = True; manual_switch_name = None; _no_switch = False
+        switch_quantities = {}
     else:
         auto_switch = False
-        switch_names = [s["name"] for s in SWITCHES]
-        manual_switch_name = st.selectbox("Select Switch", switch_names, key="manual_sw")
-        _no_switch = False
+        _no_switch  = False
+        manual_switch_name = None
+        st.caption("Set quantities for each switch needed:")
+        _sw_cols = st.columns(3)
+        switch_quantities = {}
+        for _si, _sw in enumerate(SWITCHES):
+            with _sw_cols[_si % 3]:
+                _sq = st.number_input(_sw["name"], min_value=0, value=0, step=1,
+                                      key=f"sw_qty_{_sw['name']}", label_visibility="visible")
+                if _sq > 0:
+                    switch_quantities[_sw["name"]] = _sq
     # Auto-select Draytek when SY Comms BB is selected, same pattern as switch
     _default_router_mode = "Auto-select" if bb_provider != "None / Customer Supplied" else "None / Customer Supplied"
     _router_mode = st.radio("Router", ["Auto-select", "Manual select", "None / Customer Supplied"],
@@ -1449,8 +1472,13 @@ def compute_hw_buy():
     for name, qty in other_quantities.items():
         total += OTHER_HARDWARE[name]["buy"] * qty
     if not _no_switch:
-        poe_n = compute_poe_needed()
-        total += get_recommended_switch(poe_n)["buy"]
+        if switch_quantities:  # manual multi-switch
+            for _sn, _sq in switch_quantities.items():
+                _si = next((s for s in SWITCHES if s["name"] == _sn), None)
+                if _si: total += _si["buy"] * _sq
+        else:  # auto-select
+            poe_n = compute_poe_needed()
+            total += get_recommended_switch(poe_n)["buy"]
     if add_router:
         total += ROUTERS[router_type]
     return total
@@ -1477,8 +1505,13 @@ def compute_hw_sell():
         total += sell * qty
     # Switch and router use uplift (no item-specific sell price stored)
     if not _no_switch:
-        sw = get_recommended_switch(compute_poe_needed())
-        total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
+        if switch_quantities:
+            for _sn, _sq in switch_quantities.items():
+                _si = next((s for s in SWITCHES if s["name"] == _sn), None)
+                if _si: total += _si["buy"] * (1 + hw_uplift_override / 100) * _sq
+        else:
+            sw = get_recommended_switch(compute_poe_needed())
+            total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
     if add_router:
         total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
     return round(total, 2)
@@ -2745,8 +2778,12 @@ with tab1:
             if qty > 0: all_hw_items.append((name, qty, _hw_billing))
         for name, qty in other_quantities.items():
             if qty > 0: all_hw_items.append((name, qty, _hw_billing))
-        if auto_switch and not _no_switch:
-            all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
+        if not _no_switch:
+            if switch_quantities:
+                for _sn, _sq in switch_quantities.items():
+                    all_hw_items.append((f"Switch: {_sn}", _sq, _hw_billing))
+            elif auto_switch:
+                all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
         if add_router:
             all_hw_items.append((router_type, 1, _hw_billing))
 
@@ -3035,9 +3072,13 @@ with tab4:
             [(n, q, OTHER_HARDWARE[n])     for n, q in other_quantities.items()     if q > 0]
         )
 
-        # Add switch as a card
-        sw_name = rec_switch["name"]
-        all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
+        # Add switch card(s)
+        if switch_quantities:
+            for _sn, _sq in switch_quantities.items():
+                all_selected.append((f"Switch: {_sn}", _sq, {"cat": "Switch"}))
+        elif not _no_switch:
+            sw_name = rec_switch["name"]
+            all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
 
         # Add router as a card if included
         if add_router:
