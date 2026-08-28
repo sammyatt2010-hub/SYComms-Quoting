@@ -1085,7 +1085,16 @@ with col_hw2:
                                     st.session_state.get("router_mode", _default_router_mode)
                                 ) if st.session_state.get("router_mode") else
                                 ["Auto-select","Manual select","None / Customer Supplied"].index(_default_router_mode))
-        _default_router = list(ROUTERS.keys())[0]   # Draytek Vigor 2927
+        # Smart default: FTTP → GWN 706, SoGEA → Technicolour, else Draytek
+        _bb_pkg_lower = (bb_package or "").lower()
+        if "fttp" in _bb_pkg_lower and "Grandstream GWN 706 (FTTP)" in ROUTERS:
+            _default_router = "Grandstream GWN 706 (FTTP)"
+        elif "sogea" in _bb_pkg_lower and "Technicolour DGA Series (SoGEA)" in ROUTERS:
+            _default_router = "Technicolour DGA Series (SoGEA)"
+        elif "Draytek Vigor 2927 (FTTP/SoGEA)" in ROUTERS:
+            _default_router = "Draytek Vigor 2927 (FTTP/SoGEA)"
+        else:
+            _default_router = list(ROUTERS.keys())[0]
         router_quantities = {}
         if _router_mode == "None / Customer Supplied":
             router_type = "None / Customer Supplied"
@@ -1785,10 +1794,11 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
     if not st.session_state.admin_unlocked:
         st.info("🔒 Unlock the Admin Panel above to view deal financials.")
     else:
+        # Row 1 — 4 original cards
         fi1, fi2, fi3, fi4 = st.columns(4)
         with fi1:
             st.markdown(f'''<div class="metric-card">
-              <div class="metric-label">Gross Profit</div>
+              <div class="metric-label">Gross Profit (Lease)</div>
               <div class="metric-value {pc}">£{pl_data["gross_profit"]:.0f}</div>
               <div class="metric-sub">Rental: £{pl_data["rental"]:.2f}/mo</div>
             </div>''', unsafe_allow_html=True)
@@ -1809,6 +1819,32 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
               <div class="metric-label">Commission ({commission_units:.2f} units)</div>
               <div class="metric-value" style="font-size:1.3rem;color:#00b5a3">£{commission:.0f}</div>
               <div class="metric-sub">£{commission_per_unit:.0f}/unit · £{commission_unit_size:.0f} GP = 1 unit</div>
+            </div>''', unsafe_allow_html=True)
+        st.markdown("---")
+        # Row 2 — Profit breakdown cards
+        _svc_cost_pm    = svc["bb_cost"] + total_voice_channels * C.get("vc_cost_per_seat",2.95) + sw_cost_total + svc.get("mobile_cost",0.0)
+        _svc_sell_pm    = svc["total_sell"]
+        _svc_margin_pm  = _svc_sell_pm - _svc_cost_pm
+        _svc_profit_term = round(_svc_margin_pm * lease_term, 2)
+        _total_gp        = round(pl_data["gross_profit"] + _svc_profit_term, 2)
+        pb1, pb2, pb3   = st.columns(3)
+        with pb1:
+            st.markdown(f'''<div class="metric-card" style="border-left:4px solid #1f1450">
+              <div class="metric-label">Lease Profit</div>
+              <div class="metric-value" style="color:#1f1450">£{pl_data["gross_profit"]:.0f}</div>
+              <div class="metric-sub">From pricebook P&L formula</div>
+            </div>''', unsafe_allow_html=True)
+        with pb2:
+            st.markdown(f'''<div class="metric-card" style="border-left:4px solid #00b5a3">
+              <div class="metric-label">Services Profit</div>
+              <div class="metric-value" style="color:#00b5a3">£{_svc_profit_term:.0f}</div>
+              <div class="metric-sub">£{_svc_margin_pm:.2f}/mo × {lease_term}mo  ·  sell £{_svc_sell_pm:.2f} cost £{_svc_cost_pm:.2f}</div>
+            </div>''', unsafe_allow_html=True)
+        with pb3:
+            st.markdown(f'''<div class="metric-card" style="border-left:4px solid #1a7a40;background:#f0faf4">
+              <div class="metric-label" style="color:#1a7a40">Total Gross Profit</div>
+              <div class="metric-value" style="color:#1a7a40">£{_total_gp:.0f}</div>
+              <div class="metric-sub">Lease £{pl_data["gross_profit"]:.0f} + Services £{_svc_profit_term:.0f}</div>
             </div>''', unsafe_allow_html=True)
         if termination_cost > 0:
             st.markdown(
@@ -2568,22 +2604,20 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         _eca_hdr("Signatures")
         pdf.ln(2)
         pdf.set_font("Helvetica","B",9)
-        pdf.cell(95,5,"Customer",ln=False); pdf.cell(0,5,"SY COMMS LTD Representative",ln=True)
+        pdf.set_font("Helvetica","B",9)
+        pdf.cell(0,5,"Customer Signature",ln=True)
         pdf.set_font("Helvetica","",9)
-        pdf.cell(95,5,f"Name: {s(_contact or '')}",ln=False)
-        pdf.cell(0,5,f"Representative: {s(rep_name)}",ln=True)
-        pdf.cell(95,5,"",ln=False)
-        pdf.cell(0,5,f"Position: {s(rep_position)}",ln=True)
+        pdf.cell(80,5,f"Name: {s(_contact or '')}",ln=False)
+        pdf.cell(0,5,f"Company: {s(_comp or '')}",ln=True)
         if sig_bytes:
             try:
                 _sb_eca = io.BytesIO(sig_bytes); _sb_eca.seek(0)
                 pdf.image(_sb_eca, x=pdf.l_margin, y=pdf.get_y(), h=14)
                 pdf.ln(16)
-            except Exception: pdf.cell(95,14,"Signature: ________________",ln=True)
+            except Exception: pdf.cell(0,14,"Signature: ________________",ln=True)
         else:
-            pdf.cell(95,14,"Signature: ________________",ln=False)
             pdf.cell(0,14,"Signature: ________________",ln=True)
-        pdf.cell(95,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=False)
+        pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
         pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
         pdf.ln(2)
         pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
@@ -3659,7 +3693,17 @@ with tab5:
                 """, unsafe_allow_html=True)
 
         # Row 2 — Full monthly total
-        _diff_total    = current_total - total_mo
+        # Use adjusted values from breakdown if consultant has made changes
+        _c_adj_total = (
+            float(st.session_state.get("c_adj_calls", 0.0)) +
+            float(st.session_state.get("c_adj_vc",    svc["lic_monthly"])) +
+            float(st.session_state.get("c_adj_sw",    sw_sell_total)) +
+            float(st.session_state.get("c_adj_bb",    svc["bb_sell"])) +
+            _desired_rental +
+            float(st.session_state.get("c_adj_ll",    0.0)) +
+            float(st.session_state.get("c_adj_oth",   0.0))
+        )
+        _diff_total    = current_total - _c_adj_total
         _diff_col      = "#1a7a40" if _diff_total >= 0 else "#c0392b"
         _curr_total_str = f"£{current_total:.2f}" if current_total > 0 else "—"
         _curr_sys_str   = f"£{current_system:.2f}" if current_system > 0 else "—"
@@ -3674,7 +3718,7 @@ with tab5:
             </div>
             <div style="flex:1;text-align:center;padding:0 1rem">
               <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#1f1450">New Monthly Total (Lease + Services)</div>
-              <div style="font-size:1.6rem;font-weight:800;color:#1f1450">£{total_mo:.2f}<span style="font-size:0.75rem;font-weight:400"> + VAT</span></div>
+              <div style="font-size:1.6rem;font-weight:800;color:#1f1450">£{_c_adj_total:.2f}<span style="font-size:0.75rem;font-weight:400"> + VAT</span></div>
               <div style="font-size:0.72rem;color:#555">£{_desired_rental:.2f} lease + £{svc["total_sell"]:.2f} services</div>
             </div>
             <div style="flex:1;text-align:center;border-left:1px solid #c0cce0;padding-left:1rem">
