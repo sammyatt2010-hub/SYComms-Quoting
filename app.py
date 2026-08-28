@@ -931,7 +931,7 @@ with col_hw1:
 
 with col_hw2:
     # ── PBX & CCTV — prominent quick-select ───────────────────────────────────
-    st.markdown("<div style='margin-top:2.9rem'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:2.6rem'></div>", unsafe_allow_html=True)
     with st.expander("📹 CCTV, Security & Access", expanded=False):
         _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
         with _cctv_col1:
