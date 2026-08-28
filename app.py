@@ -1041,9 +1041,29 @@ with col_hw2:
         switch_names = [s["name"] for s in SWITCHES]
         manual_switch_name = st.selectbox("Select Switch", switch_names, key="manual_sw")
         _no_switch = False
-    _router_opts = ["None / Customer Supplied"] + [k for k in ROUTERS.keys()]
-    router_type  = st.selectbox("Router", _router_opts)
-    add_router   = st.checkbox("Include router in lease", value=True)
+    # Auto-select Draytek when SY Comms BB is selected, same pattern as switch
+    _default_router_mode = "Auto-select" if bb_provider != "None / Customer Supplied" else "None / Customer Supplied"
+    _router_mode = st.radio("Router", ["Auto-select", "Manual select", "None / Customer Supplied"],
+                            horizontal=True, key="router_mode",
+                            index=["Auto-select","Manual select","None / Customer Supplied"].index(
+                                st.session_state.get("router_mode", _default_router_mode)
+                            ) if st.session_state.get("router_mode") else
+                            ["Auto-select","Manual select","None / Customer Supplied"].index(_default_router_mode))
+    _default_router = list(ROUTERS.keys())[0]   # Draytek Vigor 2927 (first in list)
+    if _router_mode == "None / Customer Supplied":
+        router_type = "None / Customer Supplied"
+        add_router  = False
+    elif _router_mode == "Auto-select":
+        # When BB is SY Comms → Draytek; when no BB → no router
+        if bb_provider != "None / Customer Supplied":
+            router_type = _default_router
+            add_router  = True
+        else:
+            router_type = "None / Customer Supplied"
+            add_router  = False
+    else:  # Manual select
+        router_type = st.selectbox("Select Router", list(ROUTERS.keys()), key="manual_router")
+        add_router  = True
 
     with st.expander("📱 Mobiles", expanded=False):
         mobile_rows = []
@@ -1431,7 +1451,7 @@ def compute_hw_buy():
     if not _no_switch:
         poe_n = compute_poe_needed()
         total += get_recommended_switch(poe_n)["buy"]
-    if add_router and router_type != "None / Customer Supplied":
+    if add_router:
         total += ROUTERS[router_type]
     return total
 
@@ -1459,7 +1479,7 @@ def compute_hw_sell():
     if not _no_switch:
         sw = get_recommended_switch(compute_poe_needed())
         total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
-    if add_router and router_type != "None / Customer Supplied":
+    if add_router:
         total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
     return round(total, 2)
 
@@ -2009,7 +2029,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             all_equip_pdf.append((name, qty, _pdf_hw_billing))
     if auto_switch and not _no_switch:
         all_equip_pdf.append((f"Switch: {rec_switch['name']}", 1, _pdf_hw_billing))
-    if add_router and router_type != "None / Customer Supplied":
+    if add_router:
         all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
 
     # Voice Channel Licences
@@ -2727,7 +2747,7 @@ with tab1:
             if qty > 0: all_hw_items.append((name, qty, _hw_billing))
         if auto_switch and not _no_switch:
             all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
-        if add_router and router_type != "None / Customer Supplied":
+        if add_router:
             all_hw_items.append((router_type, 1, _hw_billing))
 
         if all_hw_items:
@@ -2897,7 +2917,7 @@ with tab2:
                      list(other_quantities.items()) if q > 0]
         if auto_switch:
             all_equip.append((f"Switch: {rec_switch['name']}", 1))
-        if add_router and router_type != "None / Customer Supplied":
+        if add_router:
             all_equip.append((router_type, 1))
         if total_voice_channels > 0:
             all_equip.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels))
@@ -3020,7 +3040,7 @@ with tab4:
         all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
 
         # Add router as a card if included
-        if add_router and router_type != "None / Customer Supplied":
+        if add_router:
             all_selected.append((router_type, 1, {"cat": "Router"}))
 
         # Add software add-ons as cards
