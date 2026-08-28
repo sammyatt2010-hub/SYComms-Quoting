@@ -2817,8 +2817,11 @@ with tab1:
             elif auto_switch:
                 all_hw_items.append((f"Switch: {rec_switch['name']}", 1, _hw_billing))
         if add_router:
-            all_hw_items.append((router_type, 1, _hw_billing))
-
+            if router_quantities:
+                for _rn, _rq in router_quantities.items():
+                    all_hw_items.append((_rn, _rq, _hw_billing))
+            elif router_type not in ("None / Customer Supplied", ""):
+                all_hw_items.append((router_type, 1, _hw_billing))
         if all_hw_items:
             hw_df = pd.DataFrame(all_hw_items, columns=["Description", "Qty", "Billing"])
             st.dataframe(hw_df, use_container_width=True, hide_index=True)
@@ -2987,7 +2990,11 @@ with tab2:
         if auto_switch:
             all_equip.append((f"Switch: {rec_switch['name']}", 1))
         if add_router:
-            all_equip.append((router_type, 1))
+            if router_quantities:
+                for _rn, _rq in router_quantities.items():
+                    all_equip.append((_rn, _rq))
+            elif router_type not in ("None / Customer Supplied", ""):
+                all_equip.append((router_type, 1))
         if total_voice_channels > 0:
             all_equip.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels))
         for addon_name, addon_qty, _, _ in SW_ADDONS:
@@ -3112,10 +3119,13 @@ with tab4:
             sw_name = rec_switch["name"]
             all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
 
-        # Add router as a card if included
+        # Add router card(s) — iterate router_quantities for multi-router support
         if add_router:
-            all_selected.append((router_type, 1, {"cat": "Router"}))
-
+            if router_quantities:
+                for _rn, _rq in router_quantities.items():
+                    all_selected.append((_rn, _rq, {"cat": "Router"}))
+            elif router_type not in ("None / Customer Supplied", ""):
+                all_selected.append((router_type, 1, {"cat": "Router"}))
         # Add software add-ons as cards
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
