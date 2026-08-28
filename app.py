@@ -3469,16 +3469,16 @@ with tab5:
             """, unsafe_allow_html=True)
 
 
-        # Row 1 — Spend comparison
+        # Row 1 — Lease-only comparison
         r1a, r1b, r1c = st.columns(3)
         with r1a:
-            if current_total > 0:
+            if current_system > 0:
                 st.markdown(f"""
                 <div style="background:#fff;border:2px solid #e0e8f0;border-radius:12px;
                      padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Customer Currently Pays</div>
-                  <div style="font-size:2rem;font-weight:800;color:#c0392b">£{current_total:.2f}</div>
+                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Phone System / Lease (Current)</div>
+                  <div style="font-size:2rem;font-weight:800;color:#c0392b">£{current_system:.2f}</div>
                   <div style="font-size:0.78rem;color:#aaa">per month + VAT</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -3487,8 +3487,8 @@ with tab5:
                 <div style="background:#f8f9ff;border:2px dashed #d0d8e8;border-radius:12px;
                      padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Customer Currently Pays</div>
-                  <div style="font-size:1rem;color:#aaa">Fill in current<br>costs in sidebar</div>
+                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Phone System / Lease (Current)</div>
+                  <div style="font-size:1rem;color:#aaa">Enter under<br>Current Costs →</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -3497,26 +3497,26 @@ with tab5:
             <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);
                  border-radius:12px;padding:1.2rem;text-align:center;border:2px solid #00b5a3">
               <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                   letter-spacing:.08em;color:rgba(255,255,255,0.6);margin-bottom:0.5rem">New Monthly with SY Comms</div>
-              <div style="font-size:2rem;font-weight:800;color:#00b5a3">£{total_mo:.2f}</div>
-              <div style="font-size:0.78rem;color:rgba(255,255,255,0.5)">per month + VAT</div>
+                   letter-spacing:.08em;color:rgba(255,255,255,0.6);margin-bottom:0.5rem">New Monthly Lease with SY Comms</div>
+              <div style="font-size:2rem;font-weight:800;color:#00b5a3">£{_desired_rental:.2f}</div>
+              <div style="font-size:0.78rem;color:rgba(255,255,255,0.5)">hardware lease per month + VAT</div>
             </div>
             """, unsafe_allow_html=True)
 
         with r1c:
-            if current_total > 0:
-                saving    = current_total - total_mo
-                s_col     = "#1a7a40" if saving >= 0 else "#c0392b"
-                s_bg      = "#e8f8f0" if saving >= 0 else "#fdf0f0"
-                s_lbl     = "Customer Saves" if saving >= 0 else "Customer Pays More"
-                s_prefix  = "-" if saving >= 0 else "+"
+            if current_system > 0:
+                _ls_saving = current_system - _desired_rental
+                _ls_col    = "#1a7a40" if _ls_saving >= 0 else "#c0392b"
+                _ls_bg     = "#e8f8f0" if _ls_saving >= 0 else "#fdf0f0"
+                _ls_lbl    = "Lease Saving" if _ls_saving >= 0 else "Lease Increase"
+                _ls_pfx    = "-" if _ls_saving >= 0 else "+"
                 st.markdown(f"""
-                <div style="background:{s_bg};border:2px solid {s_col};
+                <div style="background:{_ls_bg};border:2px solid {_ls_col};
                      border-radius:12px;padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:{s_col};margin-bottom:0.5rem">{s_lbl}</div>
-                  <div style="font-size:2rem;font-weight:800;color:{s_col}">{s_prefix}£{abs(saving):.2f}</div>
-                  <div style="font-size:0.78rem;color:{s_col}">per month  &middot;  {s_prefix}£{abs(saving*12):.0f}/yr</div>
+                       letter-spacing:.08em;color:{_ls_col};margin-bottom:0.5rem">{_ls_lbl}</div>
+                  <div style="font-size:2rem;font-weight:800;color:{_ls_col}">{_ls_pfx}£{abs(_ls_saving):.2f}</div>
+                  <div style="font-size:0.78rem;color:{_ls_col}">per month  &middot;  {_ls_pfx}£{abs(_ls_saving*12):.0f}/yr</div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
@@ -3524,10 +3524,25 @@ with tab5:
                 <div style="background:#f8f9ff;border:2px dashed #d0d8e8;border-radius:12px;
                      padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Customer Saving</div>
-                  <div style="font-size:1rem;color:#aaa">Add current<br>costs to calculate</div>
+                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Lease Saving</div>
+                  <div style="font-size:1rem;color:#aaa">Add current costs<br>to calculate</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+        # Row 2 — Full monthly total
+        st.markdown(f"""
+        <div style="background:#f0f4ff;border:1px solid #c0cce0;border-radius:10px;
+             padding:0.8rem 1.2rem;margin-top:0.5rem;display:flex;
+             justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                 letter-spacing:.08em;color:#1f1450">New Monthly Total (Lease + Services)</div>
+            <div style="font-size:0.8rem;color:#555">£{_desired_rental:.2f} lease + £{svc["total_sell"]:.2f} services</div>
+          </div>
+          <div style="font-size:1.6rem;font-weight:800;color:#1f1450">£{total_mo:.2f}<span style="font-size:0.8rem;font-weight:400"> + VAT</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
 
         st.markdown("")
 
