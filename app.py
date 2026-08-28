@@ -3550,10 +3550,10 @@ with tab5:
         st.markdown("### 📋 Monthly Charge Breakdown")
         st.caption("Adjust any line to price-match or offer a discount. Commission recalculates automatically.")
 
-        _vc_default   = round(svc["lic_monthly"], 2)
-        _sw_default   = round(svc.get("sw_sell", 0), 2)
-        _bb_default   = round(svc["bb_sell"], 2)
-        _rent_default = round(pl_data["rental"], 2)
+        _vc_default   = float(round(svc["lic_monthly"], 2))
+        _sw_default   = float(round(sw_sell_total, 2))
+        _bb_default   = float(round(svc["bb_sell"], 2))
+        _rent_default = float(round(pl_data["rental"], 2))
 
         _ch_col1, _ch_col2 = st.columns(2)
         with _ch_col1:
