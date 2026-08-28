@@ -1113,7 +1113,9 @@ with col_hw2:
                         router_type = _rname  # use last selected for legacy references
 
         additional_wired_ports = st.number_input(
-            "Additional wired network ports", min_value=0, value=0,
+            "Additional wired network ports", min_value=0,
+            value=st.session_state.get("add_wired_ports", 0),
+            step=1, key="add_wired_ports",
             help="Extra POE ports needed beyond desk phones — affects switch auto-selection")
 
     with st.expander("📱 Mobiles", expanded=False):
@@ -3166,6 +3168,14 @@ with tab4:
                 "Mobile App / Softphone Users",
                 standalone_softphones,
                 {"cat": "Mobile"}
+            ))
+
+        # Add additional wired ports as a card
+        if additional_wired_ports > 0:
+            all_selected.append((
+                f"Additional Wired Ports ×{additional_wired_ports}",
+                additional_wired_ports,
+                {"cat": "Switch"}
             ))
 
         # Show in rows of 4
