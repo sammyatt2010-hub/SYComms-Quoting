@@ -1018,7 +1018,8 @@ with col_hw2:
         bb_provider != "None / Customer Supplied" and
         "Broadband Router" in OTHER_HARDWARE and
         "Broadband Router" not in other_quantities and
-        _router_user_val != 0   # 0 = user explicitly cleared it
+        _router_user_val != 0 and      # 0 = user explicitly cleared it
+        not router_quantities           # skip if a router is already selected via router section
     )
     if _bb_auto_router:
         other_quantities["Broadband Router"] = 1
