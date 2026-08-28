@@ -1639,6 +1639,24 @@ rec_switch = get_recommended_switch(poe_needed)
 hw_buy     = compute_hw_buy()
 hw_sell    = compute_hw_sell()
 svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
+
+# Apply consultant charge adjustments (from Monthly Charge Breakdown in Consultant tab)
+# Uses previous-run session state so adjustments flow through to all customer-facing sections
+_c_adj_vc  = st.session_state.get("c_adj_vc",  None)
+_c_adj_sw  = st.session_state.get("c_adj_sw",  None)
+_c_adj_bb  = st.session_state.get("c_adj_bb",  None)
+_c_adj_ll  = st.session_state.get("c_adj_ll",  0.0)
+_c_adj_oth = st.session_state.get("c_adj_oth", 0.0)
+if _c_adj_vc is not None:
+    svc["lic_monthly"] = float(_c_adj_vc)
+if _c_adj_sw is not None:
+    sw_sell_total = float(_c_adj_sw)
+    svc["sw_sell"] = float(_c_adj_sw)
+if _c_adj_bb is not None:
+    svc["bb_sell"] = float(_c_adj_bb)
+# Recompute total_sell with all adjustments applied
+svc["total_sell"] = (svc["bb_sell"] + svc["lic_monthly"] +
+                     svc.get("mobile_sell", 0.0) + sw_sell_total + _c_adj_ll + _c_adj_oth)
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
@@ -3573,13 +3591,13 @@ with tab5:
 
         _ch_col1, _ch_col2 = st.columns(2)
         with _ch_col1:
-            adj_call_charges  = st.number_input("Est. Call Charges (£/mo)",     0.0, step=5.0, value=0.0)
-            adj_user_lic      = st.number_input("Hosted User Licences (£/mo)",  0.0, step=1.0, value=_vc_default)
-            adj_software      = st.number_input("Software Charges (£/mo)",       0.0, step=5.0, value=_sw_default)
+            adj_call_charges  = st.number_input("Est. Call Charges (£/mo)",     0.0, step=5.0, value=0.0,           key="c_adj_calls")
+            adj_user_lic      = st.number_input("Hosted User Licences (£/mo)",  0.0, step=1.0, value=_vc_default, key="c_adj_vc")
+            adj_software      = st.number_input("Software Charges (£/mo)",       0.0, step=5.0, value=_sw_default, key="c_adj_sw")
         with _ch_col2:
-            adj_broadband     = st.number_input("Broadband Charges (£/mo)",      0.0, step=1.0, value=_bb_default)
-            adj_leased_line   = st.number_input("Leased Line Charges (£/mo)",    0.0, step=5.0, value=0.0)
-            adj_other1        = st.number_input("Other Charges (£/mo)",          0.0, step=5.0, value=0.0)
+            adj_broadband     = st.number_input("Broadband Charges (£/mo)",      0.0, step=1.0, value=_bb_default, key="c_adj_bb")
+            adj_leased_line   = st.number_input("Leased Line Charges (£/mo)",    0.0, step=5.0, value=0.0,           key="c_adj_ll")
+            adj_other1        = st.number_input("Other Charges (£/mo)",          0.0, step=5.0, value=0.0,           key="c_adj_oth")
 
         # Equipment rental comes from the Desired Lease Rental above
         adj_rental   = float(_desired_rental)
