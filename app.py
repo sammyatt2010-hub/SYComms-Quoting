@@ -2490,6 +2490,101 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 5, _CO_FOOT, align="C")
 
 
+    # ── EXCEPTIONAL COMMERCIAL ARRANGEMENT (only when settlement > 0) ──
+    if termination_cost > 0:
+        pdf.add_page()
+        _add_header(pdf, "Exceptional Commercial Arrangement")
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, "Customer Acknowledgement & Authority to Proceed", ln=True)
+        pdf.ln(2)
+        def _eca_row(lbl, val=""):
+            pdf.set_font("Helvetica", "", 9); pdf.set_fill_color(248,249,255)
+            pdf.cell(70, 5, f"  {lbl}", fill=True, ln=False)
+            pdf.cell(0, 5, f"  {val}", fill=True, ln=True, border="B")
+        def _eca_hdr(title):
+            pdf.set_fill_color(31,20,80); pdf.set_text_color(255,255,255)
+            pdf.set_font("Helvetica","B",10); pdf.cell(0,6,f"  {title}",fill=True,ln=True)
+            pdf.set_text_color(0,0,0)
+        _eca_hdr("Customer Details")
+        _eca_row("Customer Name", s(_contact or "________________________"))
+        _eca_row("Company",       s(_comp    or "________________________"))
+        _eca_row("Date",          date.today().strftime("%d/%m/%Y"))
+        pdf.ln(2)
+        _eca_hdr("Commercial Summary")
+        pdf.set_font("Helvetica","B",8); pdf.set_fill_color(210,218,235)
+        pdf.cell(0,4,"  Existing Finance Agreements",fill=True,ln=True)
+        _eca_row("Current Monthly Lease Payment", f"\xa3{current_system:.2f}" if current_system > 0 else "\xa3________________")
+        _eca_row("Total Lease Settlement charges", f"\xa3{termination_cost:.2f}")
+        pdf.set_font("Helvetica","B",8); pdf.set_fill_color(210,218,235)
+        pdf.cell(0,4,"  New Finance Agreement",fill=True,ln=True)
+        _eca_row("Finance Provider",         "Shire Leasing")
+        _eca_row("Agreement Term",           LEASE_TERM_LABELS[lease_term])
+        _eca_row("Monthly Amount",           f"\xa3{hw_monthly_spread:.2f} + VAT")
+        _eca_row("Total Existing Finance to settle", f"\xa3{termination_cost:.2f}")
+        pdf.ln(2)
+        _eca_hdr("Customer Acknowledgement")
+        pdf.set_font("Helvetica","",7.5)
+        for n, ack in enumerate([
+            "Telecommunications equipment supplied by SY COMMS LTD are financed under a new finance agreement.",
+            "Our existing finance agreement will be terminated early and an early settlement payment is required.",
+            "We understand the settlement of our existing finance agreement does not include settlement of any existing contracts for telecom services or maintenance.",
+            "We have reviewed the Commercial Summary and confirm it accurately reflects the key commercial terms.",
+            "We have had sufficient opportunity to ask questions.",
+            "We have had the opportunity to obtain independent legal and/or financial advice.",
+            "We are entering into this agreement voluntarily.",
+            "This transaction is our own commercial decision. SY COMMS LTD has not provided legal, financial, tax or accounting advice.",
+            "We authorise SY COMMS LTD to proceed and authorise SY Comms Ltd to receive the settlement payment from the new finance provider.",
+        ], 1):
+            pdf.set_x(pdf.l_margin); pdf.multi_cell(pdf.epw, 3.8, f"{n}.  {s(ack)}", align="J")
+        pdf.ln(2)
+        _eca_hdr("Customer Initial Confirmation")
+        for item in [
+            "I understand the Current Lease Settlement Figure.",
+            f"I understand the new agreement is for {LEASE_TERM_LABELS[lease_term]}.",
+            "I understand the new monthly payment.",
+            "I understand the Total Finance Amount.",
+            "I authorise SY COMMS LTD to settle the existing agreement.",
+            "I understand this is my company's commercial decision.",
+            "I understand any settlement amount may change until confirmed by the finance provider.",
+            "I confirm I have authority to enter into this agreement on behalf of the Customer.",
+        ]:
+            pdf.set_font("Helvetica","",8)
+            pdf.cell(28,5,"  Initials ______",ln=False)
+            pdf.multi_cell(0,5,s(item))
+        pdf.ln(2)
+        _eca_hdr("Final Declaration")
+        pdf.set_font("Helvetica","",7.5); pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw,3.8,
+            "This document records the exceptional commercial arrangement only and does not amend or replace "
+            "the terms of the Commercial Proposal, Service Agreement or Finance Agreement. "
+            "We confirm this document, together with the Commercial Proposal, Service Agreement and Finance Agreement, "
+            "accurately reflects the transaction we have chosen to enter into. We authorise SY COMMS LTD to proceed.", align="J")
+        pdf.ln(3)
+        _eca_hdr("Signatures")
+        pdf.ln(2)
+        pdf.set_font("Helvetica","B",9)
+        pdf.cell(95,5,"Customer",ln=False); pdf.cell(0,5,"SY COMMS LTD Representative",ln=True)
+        pdf.set_font("Helvetica","",9)
+        pdf.cell(95,5,f"Name: {s(_contact or '')}",ln=False)
+        pdf.cell(0,5,f"Representative: {s(rep_name)}",ln=True)
+        pdf.cell(95,5,"",ln=False)
+        pdf.cell(0,5,f"Position: {s(rep_position)}",ln=True)
+        if sig_bytes:
+            try:
+                _sb_eca = io.BytesIO(sig_bytes); _sb_eca.seek(0)
+                pdf.image(_sb_eca, x=pdf.l_margin, y=pdf.get_y(), h=14)
+                pdf.ln(16)
+            except Exception: pdf.cell(95,14,"Signature: ________________",ln=True)
+        else:
+            pdf.cell(95,14,"Signature: ________________",ln=False)
+            pdf.cell(0,14,"Signature: ________________",ln=True)
+        pdf.cell(95,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=False)
+        pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
+        pdf.ln(2)
+        pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
+        pdf.multi_cell(pdf.epw,3.5,"I confirm that I am authorised to sign this agreement on behalf of the Customer.",align="C")
+        pdf.set_text_color(0,0,0)
+
     # ── TERMS & CONDITIONS PAGE ──────────────────────────────────────
     pdf.add_page()
     _add_header(pdf, "Terms & Conditions - Network Services")
