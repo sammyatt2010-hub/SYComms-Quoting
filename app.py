@@ -1110,6 +1110,10 @@ with col_hw2:
                         add_router = True
                         router_type = _rname  # use last selected for legacy references
 
+        additional_wired_ports = st.number_input(
+            "Additional wired network ports", min_value=0, value=0,
+            help="Extra POE ports needed beyond desk phones — affects switch auto-selection")
+
     with st.expander("📱 Mobiles", expanded=False):
         mobile_rows = []
         for net, pkgs in MOBILE_NETWORKS.items():
@@ -1120,8 +1124,6 @@ with col_hw2:
                 )
                 if qty > 0:
                     mobile_rows.append({"network": net, "package": pkg, "qty": qty, **pricing})
-
-    additional_wired_ports = st.number_input("Additional wired network ports", min_value=0, value=0)
 
 # ─── MANAGER OVERRIDE SECTION ────────────────────────────────────────────────
 
