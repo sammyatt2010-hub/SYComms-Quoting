@@ -2549,8 +2549,10 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "I confirm I have authority to enter into this agreement on behalf of the Customer.",
         ]:
             pdf.set_font("Helvetica","",8)
-            pdf.cell(28,5,"  Initials ______",ln=False)
-            pdf.multi_cell(0,5,s(item))
+            pdf.set_font("Helvetica","",8)
+            _init_w = pdf.epw - 30
+            pdf.cell(30,5,"  Initials ______",ln=False)
+            pdf.multi_cell(_init_w,5,s(item))
         pdf.ln(2)
         _eca_hdr("Final Declaration")
         pdf.set_font("Helvetica","",7.5); pdf.set_x(pdf.l_margin)
