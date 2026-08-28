@@ -776,27 +776,7 @@ with st.sidebar:
         help="Cost to exit the customer's existing contract. Added to the lease spread — not shown to customer."
     )
 
-    st.markdown("### 💻 Software Add-ons")
-    st.caption("Optional Telepo features — added to monthly total")
-    sw_col1, sw_col2 = st.columns(2)
-    with sw_col1:
-        sw_studio_qty   = st.number_input("SY Comms Studio",   0, 50, 0, key="q_sw_studio",  help="sell £11.95/user")
-        sw_callrec_qty  = st.number_input("Call Recording",    0, 50, 0, key="q_sw_callrec", help="sell £1.50/user")
-        sw_crm_qty      = st.number_input("CRM AI per User",   0, 50, 0, key="q_sw_crm",     help="sell £15.00/user")
-    with sw_col2:
-        sw_acd_qty      = st.number_input("ACD Light Agent",   0, 50, 0, key="q_sw_acd",     help="sell £1.50/user")
-        sw_teams_qty    = st.number_input("Teams Integration", 0, 50, 0, key="q_sw_teams",   help="sell £3.75/user")
-        sw_wallboard_qty= st.number_input("HTML Wallboard",    0, 10, 0, key="q_sw_wb",      help="sell £99.00/instance")
-    SW_ADDONS = [
-        ("SY Comms Studio",   sw_studio_qty,    4.50, 11.95),
-        ("Call Recording",    sw_callrec_qty,   0.01,  1.50),
-        ("CRM AI per User",   sw_crm_qty,       0.10, 15.00),
-        ("ACD Light Agent",   sw_acd_qty,       0.30,  1.50),
-        ("Teams Integration", sw_teams_qty,     0.75,  3.75),
-        ("HTML Wallboard",    sw_wallboard_qty, 5.00, 99.00),
-    ]
-    sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
-    sw_cost_total = sum(qty * cost for _, qty, cost, _ in SW_ADDONS if qty > 0)
+    # SW Add-ons moved to Licences & Add-ons expander in right column
 
     with st.expander("📊 Current Customer Costs", expanded=False):
         st.caption("Fill in what the customer currently pays — used in the comparison view.")
@@ -951,24 +931,24 @@ with col_hw1:
 
 with col_hw2:
     # ── PBX & CCTV — prominent quick-select ───────────────────────────────────
-    st.markdown("**📹 CCTV, Security & Access**")
-    _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
-    with _cctv_col1:
-        cctv_turret_qty = st.number_input("HIK Vision Turret 8MP", min_value=0, value=0, step=1,
-                                           key="cctv_turret", help="buy £125 / sell £427.50")
-        cctv_dome_qty   = st.number_input("HIK Vision Dome 8MP",   min_value=0, value=0, step=1,
-                                           key="cctv_dome",   help="buy £125 / sell £400.00")
-        cctv_nvr_qty    = st.number_input("HIK Vision 24TB NVR",   min_value=0, value=0, step=1,
-                                           key="cctv_nvr",    help="buy £750 / sell £1,875")
-    with _cctv_col2:
-        cctv_int_qty  = st.number_input("Intercom System", min_value=0, value=0, step=1,
-                                         key="oth_Intercom System")
-        cctv_spk_qty  = st.number_input("Loud Speaker", min_value=0, value=0, step=1,
-                                         key="oth_Loud Speaker")
-    with _cctv_col3:
-        door_qty      = st.number_input("Door Entry System", min_value=0, value=0, step=1,
-                                         key="oth_Door Entry System")
-        cctv_mon_qty  = st.number_input("Monitor", min_value=0, value=0, step=1, key="cctv_monitor")
+    with st.expander("📹 CCTV, Security & Access", expanded=False):
+        _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
+        with _cctv_col1:
+            cctv_turret_qty = st.number_input("HIK Vision Turret 8MP", min_value=0, value=0, step=1,
+                                               key="cctv_turret", help="buy £125 / sell £427.50")
+            cctv_dome_qty   = st.number_input("HIK Vision Dome 8MP",   min_value=0, value=0, step=1,
+                                               key="cctv_dome",   help="buy £125 / sell £400.00")
+            cctv_nvr_qty    = st.number_input("HIK Vision 24TB NVR",   min_value=0, value=0, step=1,
+                                               key="cctv_nvr",    help="buy £750 / sell £1,875")
+        with _cctv_col2:
+            cctv_int_qty  = st.number_input("Intercom System", min_value=0, value=0, step=1,
+                                             key="oth_Intercom System")
+            cctv_spk_qty  = st.number_input("Loud Speaker", min_value=0, value=0, step=1,
+                                             key="oth_Loud Speaker")
+        with _cctv_col3:
+            door_qty      = st.number_input("Door Entry System", min_value=0, value=0, step=1,
+                                             key="oth_Door Entry System")
+            cctv_mon_qty  = st.number_input("Monitor", min_value=0, value=0, step=1, key="cctv_monitor")
 
     with st.expander("🎧 Headsets", expanded=False):
         headset_quantities = {}
@@ -1041,7 +1021,7 @@ with col_hw2:
         st.info("🔧 PBX Unit auto-added (required for 5+ users)")
 
 
-    st.markdown("**🎙️ Licences**")
+    st.markdown("**🎙️ Licences & Add-ons**")
     standalone_softphones = st.number_input(
         "📱 Mobile App / Softphone-Only Users",
         min_value=0, value=0, step=1,
@@ -1049,6 +1029,28 @@ with col_hw2:
         key="standalone_softphones_key"
     )
     wallboard_users = 0
+
+    with st.expander("💻 Software Licences & Add-ons", expanded=False):
+        st.caption("Optional Telepo features billed monthly per user")
+        _sw_col1, _sw_col2 = st.columns(2)
+        with _sw_col1:
+            sw_studio_qty    = st.number_input("SY Comms Studio",   0, 50, 0, key="q_sw_studio",  help="sell £11.95/user")
+            sw_callrec_qty   = st.number_input("Call Recording",    0, 50, 0, key="q_sw_callrec", help="sell £1.50/user")
+            sw_crm_qty       = st.number_input("CRM AI per User",   0, 50, 0, key="q_sw_crm",     help="sell £15.00/user")
+        with _sw_col2:
+            sw_acd_qty       = st.number_input("ACD Light Agent",   0, 50, 0, key="q_sw_acd",     help="sell £1.50/user")
+            sw_teams_qty     = st.number_input("Teams Integration", 0, 50, 0, key="q_sw_teams",   help="sell £3.75/user")
+            sw_wallboard_qty = st.number_input("HTML Wallboard",    0, 10, 0, key="q_sw_wb",      help="sell £99.00/instance")
+    SW_ADDONS = [
+        ("SY Comms Studio",   sw_studio_qty,    4.50, 11.95),
+        ("Call Recording",    sw_callrec_qty,   0.01,  1.50),
+        ("CRM AI per User",   sw_crm_qty,       0.10, 15.00),
+        ("ACD Light Agent",   sw_acd_qty,       0.30,  1.50),
+        ("Teams Integration", sw_teams_qty,     0.75,  3.75),
+        ("HTML Wallboard",    sw_wallboard_qty, 5.00, 99.00),
+    ]
+    sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
+    sw_cost_total = sum(qty * cost for _, qty, cost, _ in SW_ADDONS if qty > 0)
 
     st.markdown("**🌐 Networking**")
     _switch_mode = st.radio("Switch", ["Auto-select", "Manual select", "None / Customer Supplied"],
