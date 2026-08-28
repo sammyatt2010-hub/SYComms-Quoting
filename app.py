@@ -1022,16 +1022,17 @@ with col_hw2:
 
 
     st.markdown("**🎙️ Licences & Add-ons**")
-    standalone_softphones = st.number_input(
-        "📱 Mobile App / Softphone-Only Users",
-        min_value=0, value=0, step=1,
-        help="Users with no desk phone — mobile app or PC softphone. Each adds one hosted user licence.",
-        key="standalone_softphones_key"
-    )
     wallboard_users = 0
 
     with st.expander("💻 Software Licences & Add-ons", expanded=False):
-        st.caption("Optional Telepo features billed monthly per user")
+        st.caption("Optional Telepo features and softphone users")
+        standalone_softphones = st.number_input(
+            "📱 Mobile App / Softphone-Only Users",
+            min_value=0, value=0, step=1,
+            help="Users with no desk phone — mobile app or PC softphone. Each adds one hosted user licence.",
+            key="standalone_softphones_key"
+        )
+        st.markdown("---")
         _sw_col1, _sw_col2 = st.columns(2)
         with _sw_col1:
             sw_studio_qty    = st.number_input("SY Comms Studio",   0, 50, 0, key="q_sw_studio",  help="sell £11.95/user")
@@ -1052,62 +1053,62 @@ with col_hw2:
     sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
     sw_cost_total = sum(qty * cost for _, qty, cost, _ in SW_ADDONS if qty > 0)
 
-    st.markdown("**🌐 Networking**")
-    _switch_mode = st.radio("Switch", ["Auto-select", "Manual select", "None / Customer Supplied"],
-                            horizontal=True, key="switch_mode")
-    if _switch_mode == "None / Customer Supplied":
-        auto_switch = False; manual_switch_name = None; _no_switch = True
-        switch_quantities = {}
-    elif _switch_mode == "Auto-select":
-        auto_switch = True; manual_switch_name = None; _no_switch = False
-        switch_quantities = {}
-    else:
-        auto_switch = False
-        _no_switch  = False
-        manual_switch_name = None
-        st.caption("Set quantities for each switch needed:")
-        _sw_cols = st.columns(3)
-        switch_quantities = {}
-        for _si, _sw in enumerate(SWITCHES):
-            with _sw_cols[_si % 3]:
-                _sq = st.number_input(_sw["name"], min_value=0, value=0, step=1,
-                                      key=f"sw_qty_{_sw['name']}", label_visibility="visible")
-                if _sq > 0:
-                    switch_quantities[_sw["name"]] = _sq
-    # Auto-select Draytek when SY Comms BB is selected, same pattern as switch
-    _default_router_mode = "Auto-select" if bb_provider != "None / Customer Supplied" else "None / Customer Supplied"
-    _router_mode = st.radio("Router", ["Auto-select", "Manual select", "None / Customer Supplied"],
-                            horizontal=True, key="router_mode",
-                            index=["Auto-select","Manual select","None / Customer Supplied"].index(
-                                st.session_state.get("router_mode", _default_router_mode)
-                            ) if st.session_state.get("router_mode") else
-                            ["Auto-select","Manual select","None / Customer Supplied"].index(_default_router_mode))
-    _default_router = list(ROUTERS.keys())[0]   # Draytek Vigor 2927
-    router_quantities = {}
-    if _router_mode == "None / Customer Supplied":
-        router_type = "None / Customer Supplied"
-        add_router  = False
-    elif _router_mode == "Auto-select":
-        if bb_provider != "None / Customer Supplied":
-            router_type = _default_router
-            router_quantities = {_default_router: 1}
-            add_router  = True
+    with st.expander("🌐 Networking", expanded=False):
+        _switch_mode = st.radio("Switch", ["Auto-select", "Manual select", "None / Customer Supplied"],
+                                horizontal=True, key="switch_mode")
+        if _switch_mode == "None / Customer Supplied":
+            auto_switch = False; manual_switch_name = None; _no_switch = True
+            switch_quantities = {}
+        elif _switch_mode == "Auto-select":
+            auto_switch = True; manual_switch_name = None; _no_switch = False
+            switch_quantities = {}
         else:
+            auto_switch = False
+            _no_switch  = False
+            manual_switch_name = None
+            st.caption("Set quantities for each switch needed:")
+            _sw_cols = st.columns(3)
+            switch_quantities = {}
+            for _si, _sw in enumerate(SWITCHES):
+                with _sw_cols[_si % 3]:
+                    _sq = st.number_input(_sw["name"], min_value=0, value=0, step=1,
+                                          key=f"sw_qty_{_sw['name']}", label_visibility="visible")
+                    if _sq > 0:
+                        switch_quantities[_sw["name"]] = _sq
+        # Auto-select Draytek when SY Comms BB is selected, same pattern as switch
+        _default_router_mode = "Auto-select" if bb_provider != "None / Customer Supplied" else "None / Customer Supplied"
+        _router_mode = st.radio("Router", ["Auto-select", "Manual select", "None / Customer Supplied"],
+                                horizontal=True, key="router_mode",
+                                index=["Auto-select","Manual select","None / Customer Supplied"].index(
+                                    st.session_state.get("router_mode", _default_router_mode)
+                                ) if st.session_state.get("router_mode") else
+                                ["Auto-select","Manual select","None / Customer Supplied"].index(_default_router_mode))
+        _default_router = list(ROUTERS.keys())[0]   # Draytek Vigor 2927
+        router_quantities = {}
+        if _router_mode == "None / Customer Supplied":
             router_type = "None / Customer Supplied"
             add_router  = False
-    else:  # Manual select — qty grid like switches
-        add_router = False
-        router_type = "None / Customer Supplied"
-        st.caption("Set quantities for each router needed:")
-        _rt_cols = st.columns(2)
-        for _ri, (_rname, _rbuy) in enumerate(ROUTERS.items()):
-            with _rt_cols[_ri % 2]:
-                _rq = st.number_input(_rname, min_value=0, value=0, step=1,
-                                      key=f"rt_qty_{_rname}", label_visibility="visible")
-                if _rq > 0:
-                    router_quantities[_rname] = _rq
-                    add_router = True
-                    router_type = _rname  # use last selected for legacy references
+        elif _router_mode == "Auto-select":
+            if bb_provider != "None / Customer Supplied":
+                router_type = _default_router
+                router_quantities = {_default_router: 1}
+                add_router  = True
+            else:
+                router_type = "None / Customer Supplied"
+                add_router  = False
+        else:  # Manual select — qty grid like switches
+            add_router = False
+            router_type = "None / Customer Supplied"
+            st.caption("Set quantities for each router needed:")
+            _rt_cols = st.columns(2)
+            for _ri, (_rname, _rbuy) in enumerate(ROUTERS.items()):
+                with _rt_cols[_ri % 2]:
+                    _rq = st.number_input(_rname, min_value=0, value=0, step=1,
+                                          key=f"rt_qty_{_rname}", label_visibility="visible")
+                    if _rq > 0:
+                        router_quantities[_rname] = _rq
+                        add_router = True
+                        router_type = _rname  # use last selected for legacy references
 
     with st.expander("📱 Mobiles", expanded=False):
         mobile_rows = []
