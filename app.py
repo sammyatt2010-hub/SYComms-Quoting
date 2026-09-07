@@ -2582,7 +2582,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             pdf.set_font("Helvetica","",8)
             pdf.set_font("Helvetica","",8)
             pdf.set_x(pdf.l_margin)
-            pdf.cell(32, 5, "  Initials ______", ln=False)
+            # Show customer's initials if signed, else blank line
+            _initials_str = "".join(w[0].upper() for w in sig_name.split() if w)[:4] if sig_name else "______"
+            pdf.cell(32, 5, f"  {_initials_str}", ln=False)
             pdf.set_x(pdf.l_margin + 32)
             pdf.multi_cell(pdf.epw - 32, 5, s(item))
             pdf.set_x(pdf.l_margin)
@@ -3103,10 +3105,19 @@ def _embed_sig(pdf_obj, sig_bytes, x=15, w=65, h=20,
         return
     try:
         y_start = pdf_obj.get_y()
-        if sig_bytes:
-            sig_buf = io.BytesIO(sig_bytes)
-            pdf_obj.image(sig_buf, x=x, y=y_start, w=w, h=h)
-            pdf_obj.set_y(y_start + h + 1)
+        if sig_bytes and len(sig_bytes) > 100:  # skip placeholder/corrupt bytes
+            try:
+                import tempfile, os as _os
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _tf:
+                    _tf.write(sig_bytes)
+                    _tmp_sig_path = _tf.name
+                try:
+                    pdf_obj.image(_tmp_sig_path, x=x, y=y_start, w=w, h=h)
+                    pdf_obj.set_y(y_start + h + 1)
+                finally:
+                    _os.unlink(_tmp_sig_path)
+            except Exception:
+                pass  # image unreadable — skip, show name only
 
         # Metadata — always in left column (x=15), max 90mm wide
         pdf_obj.set_font("Helvetica", "I", 8)
@@ -4296,28 +4307,41 @@ with tab7:
                 with _btn_col:
                     if st.button("✅ Save Signature", use_container_width=True,
                                  type="primary", key="btn_save_sig"):
-                        _saved = False
                         try:
                             _img_data = canvas_result.image_data if canvas_result else None
                             if _img_data is not None:
                                 from PIL import Image as _PILImage
+                                # Save as RGBA PNG — fpdf2 temp file handles transparency
                                 sig_pil = _PILImage.fromarray(
                                     _img_data.astype("uint8"), "RGBA"
-                                ).convert("RGB")
+                                )
+                                # Flatten onto white
+                                _white = _PILImage.new("RGBA", sig_pil.size, (255,255,255,255))
+                                _white.paste(sig_pil, mask=sig_pil.split()[3])
+                                sig_pil_rgb = _white.convert("RGB")
                                 sig_buf = io.BytesIO()
-                                sig_pil.save(sig_buf, format="PNG")
+                                sig_pil_rgb.save(sig_buf, format="PNG")
                                 st.session_state["_sig_bytes"] = sig_buf.getvalue()
-                                _saved = True
+                                st.rerun()
+                            else:
+                                st.warning("Canvas returned no data — please try Upload photo.")
                         except Exception as _ce:
-                            pass
-                        if not _saved:
-                            # Fallback: create a placeholder sig from the name
-                            st.session_state["_sig_bytes"] = b"placeholder"
-                        st.rerun()
+                            st.warning(f"Canvas capture failed ({type(_ce).__name__}: {_ce}). Use Upload photo.")
                 with _clr_col:
                     if st.button("🗑️ Clear", use_container_width=True, key="btn_clr_sig"):
                         st.session_state.pop("_sig_bytes", None)
                         st.rerun()
+
+        sig_bytes = st.session_state.get("_sig_bytes")
+        if sig_bytes:
+            # Show preview so consultant can confirm it captured correctly
+            st.success("✅ Signature saved")
+            try:
+                st.image(sig_bytes, width=200, caption="Signature preview")
+            except Exception:
+                pass
+        else:
+            st.caption("✏️ Draw signature above then click Save Signature")
 
         sig_bytes = st.session_state.get("_sig_bytes")
         if sig_bytes:
