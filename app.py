@@ -2284,7 +2284,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 0.5, "", border="T", ln=True)
     pdf.ln(3)
     pdf.cell(0, 5, f"Name & Position: {_contact or '___________________________'}", ln=True)
-    pdf.cell(0, 5, f"Date: {date.today()}", ln=True)
     pdf.ln(6)
 
     # -- PAGE 3: NETWORK SERVICES AGREEMENT --
@@ -2362,7 +2361,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(3)
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 5, f"Name & Position: {_contact or '___________________________'}", ln=True)
-    pdf.cell(0, 5, f"Date: {date.today()}", ln=True)
     pdf.ln(4)
     # -- PAGE 4: LEASE AGREEMENT / QUOTATION SUMMARY --
     pdf.add_page()
@@ -2441,8 +2439,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     if sig_bytes:
         try:
-            _sig_buf2 = io.BytesIO(sig_bytes); _sig_buf2.seek(0)
-            pdf.image(_sig_buf2, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            import tempfile as _tf2, os as _os2
+            with _tf2.NamedTemporaryFile(suffix=".png", delete=False) as _stf:
+                _stf.write(sig_bytes); _stf_path = _stf.name
+            try:
+                pdf.image(_stf_path, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            finally:
+                _os2.unlink(_stf_path)
             pdf.ln(16)
         except Exception:
             pdf.cell(0, 14, "Signed: ________________", ln=True)
@@ -2607,8 +2610,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.cell(0,5,f"Company: {s(_comp or '')}",ln=True)
         if sig_bytes:
             try:
-                _sb_eca = io.BytesIO(sig_bytes); _sb_eca.seek(0)
-                pdf.image(_sb_eca, x=pdf.l_margin, y=pdf.get_y(), h=14)
+                import tempfile as _tf2, os as _os2
+                with _tf2.NamedTemporaryFile(suffix=".png", delete=False) as _stf:
+                    _stf.write(sig_bytes); _stf_path = _stf.name
+                try:
+                    pdf.image(_stf_path, x=pdf.l_margin, y=pdf.get_y(), h=14)
+                finally:
+                    _os2.unlink(_stf_path)
                 pdf.ln(16)
             except Exception: pdf.cell(0,14,"Signature: ________________",ln=True)
         else:
@@ -2718,8 +2726,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
     if sig_bytes:
         try:
-            _sb_w = io.BytesIO(sig_bytes); _sb_w.seek(0)
-            pdf.image(_sb_w, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            import tempfile as _tf2, os as _os2
+            with _tf2.NamedTemporaryFile(suffix=".png", delete=False) as _stf:
+                _stf.write(sig_bytes); _stf_path = _stf.name
+            try:
+                pdf.image(_stf_path, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            finally:
+                _os2.unlink(_stf_path)
             pdf.ln(16)
         except Exception:
             pdf.cell(0,14,"Signed: ________________",ln=True)
@@ -2865,8 +2878,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
     if sig_bytes:
         try:
-            _sb_crf = io.BytesIO(sig_bytes); _sb_crf.seek(0)
-            pdf.image(_sb_crf, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            import tempfile as _tf2, os as _os2
+            with _tf2.NamedTemporaryFile(suffix=".png", delete=False) as _stf:
+                _stf.write(sig_bytes); _stf_path = _stf.name
+            try:
+                pdf.image(_stf_path, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            finally:
+                _os2.unlink(_stf_path)
             pdf.ln(16)
         except Exception:
             pdf.cell(0,14,"Signed: ________________",ln=True)
@@ -3013,7 +3031,10 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         # Middle: signature image
         if sig_bytes:
             try:
-                _s_buf2 = io.BytesIO(sig_bytes)
+                import tempfile as _tf3, os as _os3
+                with _tf3.NamedTemporaryFile(suffix=".png",delete=False) as _atf:
+                    _atf.write(sig_bytes); _atf_path=_atf.name
+                _s_buf2 = open(_atf_path,"rb")
                 pdf.image(_s_buf2, x=lx + 67, y=y_row, w=60, h=18)
             except Exception:
                 pass
