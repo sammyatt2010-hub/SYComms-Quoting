@@ -2508,14 +2508,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(90, 5, f"Name & Position: {_contact or '___________________________'}", ln=False)
     pdf.cell(0, 5, "Name & Position: ___________________________", ln=True)
-    pdf.cell(90, 5, f"Date: {date.today()}", ln=False)
-    pdf.cell(0, 5, "Date: ___________________________", ln=True)
+    pdf.cell(0, 5, f"Date: {date.today()}", ln=True)
 
-    # Ara Connect footer on all pages
-    pdf.set_y(-15)
-    pdf.set_font("Helvetica", "I", 7)
-    pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 5, _CO_FOOT, align="C")
 
 
     # ── EXCEPTIONAL COMMERCIAL ARRANGEMENT (only when settlement > 0) ──
@@ -2598,7 +2592,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "accurately reflects the transaction we have chosen to enter into. We authorise SY COMMS LTD to proceed.", align="J")
         pdf.ln(3)
         _eca_hdr("Signatures")
-        pdf.ln(2)
+        pdf.ln(1)
         pdf.set_font("Helvetica","B",9)
         pdf.set_font("Helvetica","B",9)
         pdf.cell(0,5,"Customer Signature",ln=True)
@@ -2618,7 +2612,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             except Exception: pdf.cell(0,14,"Signature: ________________",ln=True)
         else:
             pdf.cell(0,14,"Signature: ________________",ln=True)
-        pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
         pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
         pdf.ln(2)
         pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
@@ -3103,10 +3096,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "Communications Act 2000 and eIDAS Regulation (EU) 910/2014."
         )
 
-        pdf.set_y(-15)
-        pdf.set_font("Helvetica", "I", 7)
-        pdf.set_text_color(150, 150, 150)
-        pdf.cell(0, 5, _CO_FOOT, align="C")
 
     return bytes(pdf.output())
 
