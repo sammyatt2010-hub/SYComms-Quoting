@@ -1875,6 +1875,189 @@ def s(text):
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
+def build_proposal_pdf():
+    """Two-page marketing proposal: Page 1 = About SY Comms, Page 2 = Deal breakdown."""
+    from fpdf import FPDF
+    p = FPDF()
+    p.set_auto_page_break(True, margin=15)
+
+    # ── PAGE 1: ABOUT SY COMMS ────────────────────────────────────────────────
+    p.add_page()
+    # Purple header
+    p.set_fill_color(31,20,80)
+    p.rect(0,0,210,70,"F")
+    if _logo_buf:
+        try:
+            p.image(_logo_buf, x=12, y=8, h=38); _logo_buf.seek(0)
+        except Exception: pass
+    p.set_text_color(255,255,255)
+    p.set_font("Helvetica","B",26)
+    p.set_y(10); p.set_x(60)
+    p.cell(0,12,"SY COMMS LTD",ln=True)
+    p.set_font("Helvetica","",11)
+    p.set_x(60)
+    p.cell(0,8,"Your Complete Telecoms Partner",ln=True)
+    p.set_font("Helvetica","",9)
+    p.set_x(60)
+    p.set_text_color(0,181,163)
+    p.cell(0,6,"hello@sycomms.co.uk  |  01743 667419  |  www.sycomms.co.uk",ln=True)
+    p.set_fill_color(0,181,163)
+    p.rect(0,70,210,2,"F")
+    p.set_text_color(0,0,0)
+    p.set_y(80)
+
+    # About section
+    p.set_font("Helvetica","B",13)
+    p.set_text_color(31,20,80)
+    p.cell(0,8,"Who We Are",ln=True)
+    p.set_font("Helvetica","",9)
+    p.set_text_color(60,60,60)
+    p.set_x(p.l_margin)
+    p.multi_cell(p.epw, 4.5,
+        "SY Comms Ltd is a trusted UK telecoms reseller providing businesses with "
+        "end-to-end communication solutions. We design, supply, install and support "
+        "fully managed telephone systems, broadband, mobile and networking — all under "
+        "one agreement, one monthly cost, and one dedicated support team.",
+        align="J")
+    p.ln(6)
+
+    # 3-column value boxes
+    p.set_font("Helvetica","B",11); p.set_text_color(31,20,80)
+    p.cell(0,7,"Why Choose SY Comms?",ln=True)
+    p.ln(2)
+    vals = [
+        ("🚀","All-Inclusive","One monthly cost covers hardware, support, licences and broadband"),
+        ("🔧","Fully Managed","Installation, programming and on-site warranty included"),
+        ("📞","UK Support","Dedicated helpdesk and remote diagnostics from day one"),
+        ("📡","Flexible Connectivity","FTTP, SoGEA, leased line and 4G/5G solutions"),
+        ("💼","Business Focus","Tailored for SMEs — solutions that scale with you"),
+        ("✅","Transparent Pricing","No hidden costs — all terms stated upfront"),
+    ]
+    _vc = p.l_margin
+    for n, (icon, title, desc) in enumerate(vals):
+        if n % 2 == 0 and n > 0:
+            p.ln(4)
+        col_x = p.l_margin + (n % 2) * 95
+        p.set_xy(col_x, p.get_y())
+        p.set_fill_color(245,247,255)
+        p.rect(col_x, p.get_y(), 90, 24, "F")
+        p.set_font("Helvetica","B",10); p.set_text_color(0,181,163)
+        p.set_xy(col_x+3, p.get_y()+3)
+        p.cell(84,5,f"{icon}  {title}",ln=True)
+        p.set_font("Helvetica","",8); p.set_text_color(80,80,80)
+        p.set_x(col_x+3)
+        p.multi_cell(84,3.8,desc)
+        if n % 2 == 1:
+            p.ln(0)
+        else:
+            p.set_y(p.get_y()-12)
+    p.ln(8)
+
+    # Footer strip
+    p.set_fill_color(31,20,80)
+    p.rect(0,272,210,25,"F")
+    p.set_text_color(255,255,255)
+    p.set_font("Helvetica","",8)
+    p.set_y(278)
+    p.cell(0,5,"Suite C Jupiter House  |  Shrewsbury Business Park  |  Shrewsbury SY2 6LG",ln=True,align="C")
+    p.cell(0,5,"Registered in England No. 15722588  |  VAT No. 467 8165 48",ln=True,align="C")
+
+    # ── PAGE 2: PROPOSAL BREAKDOWN ────────────────────────────────────────────
+    p.add_page()
+    # Purple header
+    p.set_fill_color(31,20,80)
+    p.rect(0,0,210,22,"F")
+    p.set_text_color(255,255,255)
+    p.set_font("Helvetica","B",13)
+    p.set_y(4); p.cell(0,7,"Your Personalised Proposal",ln=True,align="C")
+    p.set_font("Helvetica","",8)
+    p.cell(0,5,f"Prepared for: {s(comp_name or 'Your Company')}  |  {date.today().strftime('%d %B %Y')}",ln=True,align="C")
+    p.set_fill_color(0,181,163); p.rect(0,22,210,2,"F")
+    p.set_text_color(0,0,0); p.set_y(28)
+
+    def _prop_hdr(title):
+        p.set_fill_color(31,20,80); p.set_text_color(255,255,255)
+        p.set_font("Helvetica","B",9)
+        p.cell(0,6,f"  {title}",fill=True,ln=True)
+        p.set_text_color(0,0,0)
+
+    def _prop_row(lbl, curr, new, bold=False):
+        p.set_fill_color(248,249,255)
+        p.set_font("Helvetica","B" if bold else "",8)
+        p.cell(90,5.5,f"  {lbl}",fill=True,ln=False)
+        p.set_font("Helvetica","",8)
+        _cc = (180,30,30) if curr and curr != "-" else (100,100,100)
+        p.set_text_color(*_cc)
+        p.cell(50,5.5,s(curr or "-"),fill=True,ln=False,align="C")
+        p.set_text_color(0,130,80)
+        p.set_font("Helvetica","B" if bold else "",8)
+        p.cell(0,5.5,s(new or "-"),fill=True,ln=True,align="C")
+        p.set_text_color(0,0,0)
+
+    # Column headers
+    p.set_font("Helvetica","B",8)
+    p.set_fill_color(210,218,235); p.set_text_color(31,20,80)
+    p.cell(90,5.5,"  Description",fill=True,ln=False)
+    p.cell(50,5.5,"Current",fill=True,ln=False,align="C")
+    p.cell(0,5.5,"SY Comms",fill=True,ln=True,align="C")
+    p.set_text_color(0,0,0)
+
+    # Cost comparison rows
+    curr_hw_str  = f"£{current_system:.2f}/mo" if current_system > 0 else "-"
+    curr_svc_str = f"£{(current_bb+current_calls):.2f}/mo" if (current_bb+current_calls) > 0 else "-"
+    curr_tot_str = f"£{current_total:.2f}/mo" if current_total > 0 else "-"
+    _prop_row("Hardware / Lease",       curr_hw_str,  f"£{hw_monthly_spread:.2f}/mo")
+    _prop_row("User / Voice Licences",  "-",          f"£{svc['lic_monthly']:.2f}/mo")
+    _prop_row("Broadband & Connectivity",curr_svc_str,f"£{svc['bb_sell']:.2f}/mo")
+    if sw_sell_total > 0:
+        _prop_row("Software Add-ons",   "-",          f"£{sw_sell_total:.2f}/mo")
+    _prop_row("TOTAL MONTHLY (excl VAT)",curr_tot_str,f"£{total_mo:.2f}/mo",bold=True)
+    p.ln(5)
+
+    # Equipment
+    _prop_hdr("Equipment Included in Lease")
+    for _nm, _qty, _billing in all_equip_pdf:
+        if _qty > 0 and _nm and "Voice" not in str(_nm):
+            p.set_font("Helvetica","",8)
+            p.set_fill_color(255,255,255)
+            p.cell(130,5,f"  {s(_nm)}",fill=True,ln=False)
+            p.set_fill_color(245,247,255)
+            p.cell(30,5,str(_qty),fill=True,ln=False,align="C")
+            p.cell(0,5,s(_billing),fill=True,ln=True,align="C")
+    p.ln(5)
+
+    # Agreement terms
+    _prop_hdr("Agreement Terms")
+    terms = [
+        ("Agreement Term", LEASE_TERM_LABELS[lease_term]),
+        ("Payment Profile", f"1+{lease_term-1} payments"),
+        ("Installation", install_type),
+        ("Warranty", "12 months inclusive on-site warranty"),
+        ("Support", "Remote diagnostics & programming included"),
+    ]
+    for lbl, val in terms:
+        p.set_font("Helvetica","",8)
+        p.set_fill_color(248,249,255)
+        p.cell(90,5,f"  {lbl}",fill=True,ln=False)
+        p.cell(0,5,s(val),fill=True,ln=True)
+    p.ln(5)
+
+    # Saving callout if current costs known
+    if current_total > 0 and total_mo < current_total:
+        _saving = current_total - total_mo
+        p.set_fill_color(0,181,163)
+        p.rect(p.l_margin, p.get_y(), p.epw, 14, "F")
+        p.set_text_color(255,255,255)
+        p.set_font("Helvetica","B",12)
+        p.set_y(p.get_y()+2)
+        p.cell(0,5,f"Estimated Monthly Saving: £{_saving:.2f} + VAT  (£{_saving*12:.0f}/yr)",ln=True,align="C")
+        p.set_font("Helvetica","",8)
+        p.cell(0,4,"Based on your current monthly expenditure vs. the SY Comms all-inclusive proposal",ln=True,align="C")
+        p.set_text_color(0,0,0)
+
+    return bytes(p.output())
+
+
 def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip='',
               curr_total=0.0, curr_bb=0.0, curr_system=0.0, curr_calls=0.0,
               curr_mobile=0.0, curr_support=0.0, curr_other=0.0):
@@ -2506,8 +2689,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(75, 0.5, "", border="T", ln=True)
     pdf.ln(3)
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(90, 5, f"Name & Position: {_contact or '___________________________'}", ln=False)
-    pdf.cell(0, 5, "Name & Position: ___________________________", ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 5, f"Name & Position: {_contact or '___________________________'}", ln=True)
     pdf.cell(0, 5, f"Date: {date.today()}", ln=True)
 
 
@@ -2777,10 +2960,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     # Y/N header
     pdf.set_font("Helvetica","",7.5)
-    pdf.set_x(pdf.w-pdf.r_margin-25)
-    pdf.cell(12,4,"Yes",align="C",ln=False)
-    pdf.cell(12,4,"No",align="C",ln=True)
-    pdf.line(pdf.l_margin,pdf.get_y(),pdf.w-pdf.r_margin,pdf.get_y())
     pdf.ln(1)
 
     _bb_desc = f"{bb_provider} {bb_package}" if svc["bb_sell"]>0 else "None / Customer Supplied"
@@ -2912,7 +3091,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.multi_cell(pdf.epw, 3.8, s(_sec_text), align="J")
     pdf.ln(3)
     pdf.set_font("Helvetica", "I", 6.5); pdf.set_text_color(128, 128, 128)
-    pdf.multi_cell(pdf.epw, 3.5, "This is a summary. Full Terms & Conditions at www.sycomms.co.uk. By signing the Order Form you agree to be bound by the full Terms & Conditions.", align="C")
+    pdf.multi_cell(pdf.epw, 3.5, "This is a summary. Full Terms & Conditions: https://sycomms.co.uk/terms-conditions", align="C")
     pdf.set_text_color(0, 0, 0)
 
     # ── AUDIT CERTIFICATE PAGE — DocuSign-style ─────────────────────────────
@@ -3491,6 +3670,19 @@ with tab3:
             use_container_width=True
         )
         st.markdown('<div class="success-box">✅ PDF ready — 4 sections: Proposal, Order Form, Network Agreement, Mandate & Checklist.</div>', unsafe_allow_html=True)
+        st.markdown("")
+        st.markdown("---")
+        st.markdown("#### 📋 One-Page Proposal")
+        st.caption("Clean two-page summary: About SY Comms + deal breakdown. Great for emailing to a prospect before the full paperwork.")
+        proposal_bytes = build_proposal_pdf()
+        st.download_button(
+            label=f"📋 Download Proposal Summary — {comp_name}",
+            data=proposal_bytes,
+            file_name=f"SYComms_Proposal_Summary_{safe_name}_{date.today()}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="dl_proposal"
+        )
 
 # ── TAB 4: CUSTOMER VIEW ──────────────────────────────────────────────────────
 with tab4:
