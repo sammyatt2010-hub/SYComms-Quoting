@@ -2624,6 +2624,151 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.multi_cell(pdf.epw,3.5,"I confirm that I am authorised to sign this agreement on behalf of the Customer.",align="C")
         pdf.set_text_color(0,0,0)
 
+    # ── CUSTOMER REQUIREMENT FORM ────────────────────────────────────────────
+    pdf.add_page()
+    # Header
+    pdf.set_font("Helvetica","B",11)
+    pdf.cell(0,5,"CUSTOMER REQUIREMENT FORM",ln=True,align="C")
+    pdf.ln(1)
+    pdf.set_font("Helvetica","",8)
+    pdf.set_text_color(100,100,100)
+    pdf.multi_cell(0,4,"SY Comms Ltd are committed to the very highest levels of customer care. This Questionnaire "
+        "is essential for our understanding of your needs and therefore satisfaction with our services.",align="C")
+    pdf.set_text_color(0,0,0)
+    pdf.ln(2)
+
+    # Helper functions
+    def _crf_tick(checked=False):
+        return "\u2611" if checked else "\u2610"
+
+    def _crf_q(num, text, has_yn=False, yn=None, extra=""):
+        pdf.set_font("Helvetica","B",8)
+        pdf.set_fill_color(245,247,255)
+        pdf.cell(8,5,str(num),fill=True,ln=False)
+        pdf.set_font("Helvetica","",7.5)
+        pdf.set_x(pdf.l_margin+8)
+        if has_yn:
+            pdf.multi_cell(pdf.epw-30,4,s(text))
+            _y = pdf.get_y()-4
+            pdf.set_xy(pdf.w-pdf.r_margin-25,_y)
+            pdf.cell(12,4,f"Yes {_crf_tick(yn==True)}",ln=False,align="C")
+            pdf.cell(12,4,f"No  {_crf_tick(yn==False)}",ln=True,align="C")
+        else:
+            pdf.multi_cell(pdf.epw-8,4,s(text))
+        if extra:
+            pdf.set_x(pdf.l_margin+8)
+            pdf.set_font("Helvetica","I",7)
+            pdf.set_text_color(120,120,120)
+            pdf.multi_cell(pdf.epw-8,3.8,s(extra))
+            pdf.set_text_color(0,0,0)
+        pdf.ln(1)
+
+    # Y/N header
+    pdf.set_font("Helvetica","",7.5)
+    pdf.set_x(pdf.w-pdf.r_margin-25)
+    pdf.cell(12,4,"Yes",align="C",ln=False)
+    pdf.cell(12,4,"No",align="C",ln=True)
+    pdf.line(pdf.l_margin,pdf.get_y(),pdf.w-pdf.r_margin,pdf.get_y())
+    pdf.ln(1)
+
+    _bb_desc = f"{bb_provider} {bb_package}" if svc["bb_sell"]>0 else "None / Customer Supplied"
+    _vc_desc = str(total_voice_channels)
+
+    _crf_q(1,"I currently have a PDQ line that connects to a Bank or Post office",has_yn=True)
+    _crf_q(2,"I currently have a Redcare, or similar alarm system connected to a telephone line. I understand that "
+             "liaison with the alarm company is my responsibility.",has_yn=True,
+             extra="If alarm works via the main system lines then a new standalone line may need to be added.")
+    _crf_q(3,f"This agreement includes: {_vc_desc} voice channels and {_bb_desc} broadband service(s) as agreed. "
+             "Additional services will be added at our standard tariffs.")
+    _crf_q(4,"I am aware, if we have signed up for SY Comms Ltd line provision, a single figure code such as '9' "
+             "must be used to make external calls. Other methods may result in these calls being charged by other providers.")
+    _crf_q(5,f"I can confirm that I currently have {num_employees or '______'} employees")
+    _crf_q(6,"SY Comms Ltd are unable to make any representations to any carrier or service provider on our behalf. "
+             "I appreciate that SY Comms Ltd can provide advice, but understand that any correspondence with current providers is ultimately our responsibility.")
+    _crf_q(7,"I am aware that there may be a delay in switching chosen carrier after installation has taken place "
+             "and that calls during this period may be routed through your existing provider.")
+    _crf_q(8,"I understand that in the event that our telephone numbers do not exist within the BT network, "
+             "Cloud5 Comms Network Services Ltd cannot guarantee that they will be ported to the SY Comms Ltd Network.")
+    _crf_q(9,"I am aware that the engineer will conduct a physical line check on site to help identify all available lines "
+             "coming into the premises. It is ultimately my responsibility to ensure all lines are accounted for.")
+    if termination_cost > 0:
+        _crf_q(10,f"We acknowledge that in entering into the above agreement you have agreed to not only rent new equipment "
+                 f"supplied by SY Comms Ltd, but also settlement of an existing agreement to the maximum sum of: "
+                 f"£{termination_cost:.2f} as per the figure agreed on the order forms.")
+    else:
+        _crf_q(10,"We acknowledge that in entering into the above agreement you have agreed to rent new equipment "
+                 "supplied by SY Comms Ltd as per the figure agreed on the order forms.")
+    _crf_q(11,"I have confirmed the number of months remaining on existing contracts to the sales consultant")
+    _crf_q(12,"I understand that only the cash back for ETC charges agreed & listed on the order forms will be paid "
+             "by SY Comms Ltd upon receipt of a copy invoice & contract from the previous supplier")
+    _crf_q(13,"I understand that any 'Special Conditions' agreed by SY Comms Ltd representative may not be considered "
+             "valid by SY Comms Ltd unless stated on the Order Form and clearly initialled by their representative.")
+    _crf_q(14,"I understand that UK Local, UK National and UK Mobile call costs only have been accounted for on my "
+             "call cost proposal with SY Comms Ltd")
+    _crf_q(15,"I understand that if I do not take SY Comms Ltd mobiles after my current contract ends "
+             "SY Comms Ltd cannot guarantee the mobile savings.")
+    _crf_q(16,"I agree that the rentals due under the Rental Agreement have been calculated based on the full purchase "
+             "price of the Equipment. We agree and accept that our obligation to pay the Rentals in full on their due "
+             "dates without reduction, deduction, withholding, or offset whatsoever, shall apply notwithstanding any "
+             "failure on the part of the Supplier or the Equipment.")
+    _crf_q(17,"I fully understand that SY Comms Ltd will be and will at all times remain solely responsible for "
+             "providing any maintenance or service provision in respect of the Equipment in a separate agreement. "
+             "We are fully aware that if the Supplier stops providing maintenance for any reason we must fully "
+             "comply with all obligations under the Rental Agreement to keep the Equipment maintained.")
+    _crf_q(18,"I understand that due to the data protection act, SY Comms Ltd have no authority to cancel any "
+             "existing agreements with 3rd party suppliers. I am aware that (where applicable) it is my responsibility "
+             "to cancel any existing agreements.")
+    _crf_q(19,"Any settlement charges other than those on the Order Form can only be settled with supporting contracts "
+             "from existing providers which must be provided to SY Comms Ltd on request.")
+    _crf_q(20,"I understand that due to current trading climate SY Comms Ltd may require supportive additional "
+             "financial information prior to installation.")
+    _crf_q(22,"I have provided a copy of bills relevant to the new services to be provided by SY Comms Ltd.")
+    _crf_q(23,"I am fully aware that the CTI (screen popping) may not fully integrate with my current database "
+             "and that screen popping may not be possible.")
+
+    # Received forms checklist
+    pdf.ln(2)
+    pdf.set_font("Helvetica","I",8)
+    pdf.multi_cell(0,4,"I have been explained in detail the following forms and am in receipt of copies for: (tick as appropriate)",align="L")
+    pdf.ln(1)
+    _forms = [
+        ("This Form","\u2611"),("Order Form","\u2611"),("Terms & Conditions","\u2611"),
+        ("Quotation – inc. tariff","\u2611"),("Rental Document","\u2611"),("Network Service Agreement","\u2611"),
+        ("On Site Maintenance Agreement","\u2610"),("Line Rental Agreement","\u2610"),
+    ]
+    pdf.set_font("Helvetica","",8)
+    _fc = st.columns if False else None  # PDF only — use cells
+    for i in range(0,len(_forms),3):
+        for label,tick in _forms[i:i+3]:
+            pdf.cell(65,5,f"{tick}  {label}",ln=False)
+        pdf.ln(5)
+
+    # Declaration & signature
+    pdf.ln(3)
+    pdf.set_font("Helvetica","",8)
+    pdf.multi_cell(0,4,"I declare that, to the best of my knowledge, the above statements are true.",align="L")
+    pdf.ln(3)
+    pdf.set_font("Helvetica","B",9)
+    pdf.cell(0,5,"For & on Behalf of (The Customer)",ln=True)
+    pdf.ln(2)
+    pdf.set_font("Helvetica","",9)
+    pdf.cell(90,5,f"Name & Position: {s(_contact or '')} {s(_btype or '')}",ln=False)
+    pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
+    if sig_bytes:
+        try:
+            _sb_crf = io.BytesIO(sig_bytes); _sb_crf.seek(0)
+            pdf.image(_sb_crf, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            pdf.ln(16)
+        except Exception:
+            pdf.cell(0,14,"Signed: ________________",ln=True)
+    else:
+        pdf.cell(0,14,"Signed: ________________",ln=True)
+    pdf.ln(2)
+    pdf.set_font("Helvetica","I",7.5)
+    pdf.set_text_color(80,80,80)
+    pdf.multi_cell(0,3.8,"SY Comms Ltd confirm that any financial information given will be treated with utmost confidentiality.",align="C")
+    pdf.set_text_color(0,0,0)
+
     # ── TERMS & CONDITIONS PAGE ──────────────────────────────────────
     pdf.add_page()
     _add_header(pdf, "Terms & Conditions - Network Services")
@@ -4014,18 +4159,31 @@ with tab7:
             else:
                 with st.container(border=True):
                     st.caption("Draw with mouse, finger or stylus. Toolbar (top-right of box) to undo/clear.")
-                    canvas_result = st_canvas(
-                        fill_color="rgba(0,0,0,0)",
-                        stroke_width=3,
-                        stroke_color="#000000",
-                        background_color="#EAF4FB",
-                        update_streamlit=True,
-                        height=180,
-                        width=510,
-                        drawing_mode="freedraw",
-                        display_toolbar=True,
-                        key="sig_canvas",
-                    )
+                    try:
+                        canvas_result = st_canvas(
+                            fill_color="rgba(0,0,0,0)",
+                            stroke_width=3,
+                            stroke_color="#000000",
+                            background_color="#EAF4FB",
+                            update_streamlit=True,
+                            height=180,
+                            width=510,
+                            drawing_mode="freedraw",
+                            display_toolbar=True,
+                            key="sig_canvas",
+                        )
+                    except TypeError:
+                        canvas_result = st_canvas(
+                            fill_color="rgba(0,0,0,0)",
+                            stroke_width=3,
+                            stroke_color="#000000",
+                            background_color="#EAF4FB",
+                            update_streamlit=True,
+                            height=180,
+                            width=510,
+                            drawing_mode="freedraw",
+                            key="sig_canvas",
+                        )
                 if canvas_result.image_data is not None:
                     alpha = canvas_result.image_data[:, :, 3]
                     if alpha.sum() > 500:
