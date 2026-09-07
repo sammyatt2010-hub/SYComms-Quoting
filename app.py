@@ -1023,6 +1023,9 @@ with col_hw2:
     if st.session_state.get("q_sw_crm", 0) > 0:
         if "Call Scope AI Setup (one-off)" not in other_quantities:
             other_quantities["Call Scope AI Setup (one-off)"] = 1
+        # Ensure it's in the catalogue (may be missing from old config)
+        if "Call Scope AI Setup (one-off)" not in OTHER_HARDWARE:
+            OTHER_HARDWARE["Call Scope AI Setup (one-off)"] = {"buy": 1000.00, "sell": 2500.00}
 
     # Auto-add PBX Unit when total users >= 5 (pricebook rule)
     # total_voice_channels computed after this block - use desk phone count as proxy
@@ -1519,7 +1522,8 @@ def compute_hw_buy():
     for name, qty in headset_quantities.items():
         total += HEADSETS[name]["buy"] * qty
     for name, qty in other_quantities.items():
-        total += OTHER_HARDWARE[name]["buy"] * qty
+        _oh_info = OTHER_HARDWARE.get(name)
+        if _oh_info: total += _oh_info["buy"] * qty
     if not _no_switch:
         if switch_quantities:  # manual multi-switch
             for _sn, _sq in switch_quantities.items():
@@ -1553,9 +1557,10 @@ def compute_hw_sell():
         sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
         total += sell * qty
     for name, qty in other_quantities.items():
-        info = OTHER_HARDWARE[name]
-        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
-        total += sell * qty
+        _oh_info2 = OTHER_HARDWARE.get(name)
+        if _oh_info2:
+            sell = _oh_info2.get("sell", _oh_info2["buy"] * (1 + hw_uplift_override / 100))
+            total += sell * qty
     # Switch and router use uplift (no item-specific sell price stored)
     if not _no_switch:
         if switch_quantities:
