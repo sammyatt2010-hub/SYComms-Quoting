@@ -1881,14 +1881,18 @@ def build_proposal_pdf():
     p = FPDF()
     p.set_auto_page_break(True, margin=15)
 
+    # Load logo
+    _p_logo_bytes = base64.b64decode(SYCOMMS_LOGO_B64)
+    _p_logo_buf   = io.BytesIO(_p_logo_bytes)
+
     # ── PAGE 1: ABOUT SY COMMS ────────────────────────────────────────────────
     p.add_page()
     # Purple header
     p.set_fill_color(31,20,80)
     p.rect(0,0,210,70,"F")
-    if _logo_buf:
+    if _p_logo_buf:
         try:
-            p.image(_logo_buf, x=12, y=8, h=38); _logo_buf.seek(0)
+            p.image(_p_logo_buf, x=12, y=8, h=38); _p_logo_buf.seek(0)
         except Exception: pass
     p.set_text_color(255,255,255)
     p.set_font("Helvetica","B",26)
