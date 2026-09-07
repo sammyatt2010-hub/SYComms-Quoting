@@ -4292,7 +4292,7 @@ with tab7:
                             key="sig_canvas",
                         )
                 try:
-                    _img_data = canvas_result.image_data
+                    _img_data = canvas_result.image_data if canvas_result else None
                     if _img_data is not None:
                         alpha = _img_data[:, :, 3]
                         if alpha.sum() > 500:
@@ -4303,15 +4303,18 @@ with tab7:
                             sig_buf = io.BytesIO()
                             sig_pil.save(sig_buf, format="PNG")
                             st.session_state["_sig_bytes"] = sig_buf.getvalue()
-                            st.success("Signature captured")
                         else:
+                            # Canvas cleared — remove sig
                             st.session_state.pop("_sig_bytes", None)
-                except (RuntimeError, AttributeError):
-                    pass  # Canvas not yet drawn or data unavailable
+                except Exception:
+                    pass  # Canvas not yet ready
 
         sig_bytes = st.session_state.get("_sig_bytes")
+        # Clear status
         if sig_bytes:
-            st.success("Signature ready")
+            st.success("✅ Signature captured — ready to download")
+        else:
+            st.caption("👆 Draw your signature above, or switch to photo upload")
 
         # Confirm name typed
         sig_name = st.text_input("Customer full name (typed confirmation)",
@@ -4344,6 +4347,12 @@ with tab7:
 
         # ── Generate & download signed PDF ───────────────────────────────────
         st.markdown("**Signed Pack**")
+        # Status check
+        _missing = []
+        if not sig_bytes: _missing.append("signature")
+        if not sig_name:  _missing.append("customer name")
+        if _missing:
+            st.caption(f"Still needed: {', '.join(_missing)}")
         if sig_bytes and sig_name:
             from datetime import datetime as _dtnow
             _ts = _dtnow.now().strftime("%d/%m/%Y  %H:%M")
@@ -4503,12 +4512,12 @@ with tab7:
     # ── Setup checks ──────────────────────────────────────────────────────────
     setup_ok = True
     if not GITHUB_TOKEN_RS:
-        st.warning("**GitHub token not set.** Add `GITHUB_TOKEN` to your Streamlit Cloud secrets (Settings → Secrets).")
+        pass  # GitHub token not configured — remote signing unavailable
         st.code('GITHUB_TOKEN = "ghp_your_token_here"', language="toml")
         setup_ok = False
 
     if not SIGNING_PORTAL_URL:
-        st.warning("**Signing portal URL not set.** Add `SIGNING_PORTAL_URL` to your Streamlit Cloud secrets.")
+        pass  # Signing portal URL not configured — remote signing unavailable
         st.code('SIGNING_PORTAL_URL = "https://your-signing-portal.streamlit.app"', language="toml")
         setup_ok = False
 
