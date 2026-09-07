@@ -2618,6 +2618,116 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.multi_cell(pdf.epw,3.5,"I confirm that I am authorised to sign this agreement on behalf of the Customer.",align="C")
         pdf.set_text_color(0,0,0)
 
+    # ── ON-SITE WARRANTY FORM ─────────────────────────────────────────────────
+    pdf.add_page()
+    _add_header(pdf, "On-Site Warranty Agreement")
+
+    # Maintenance monthly charge from P&L: (hw_buy × 1.5 × 0.2) / 12
+    _maint_monthly = round(pl_data.get("maintenance_annual", 0) / 12, 2)
+
+    # Customer details
+    pdf.set_font("Helvetica","B",10)
+    pdf.set_fill_color(31,20,80); pdf.set_text_color(255,255,255)
+    pdf.cell(0,6,"  Customer Details",fill=True,ln=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Helvetica","",9)
+    pdf.set_fill_color(248,249,255)
+    def _w_row(lbl, val):
+        pdf.cell(60,5,f"  {lbl}:",fill=True,ln=False)
+        pdf.cell(0,5,f"  {s(val)}",fill=True,ln=True,border="B")
+    _w_row("Customer Name",   _comp or "")
+    _w_row("Address",         _addr or "")
+    _w_row("Date",            date.today().strftime("%d/%m/%Y"))
+    pdf.ln(4)
+
+    # Equipment list
+    pdf.set_fill_color(31,20,80); pdf.set_text_color(255,255,255)
+    pdf.set_font("Helvetica","B",10)
+    pdf.cell(0,6,"  Equipment Covered",fill=True,ln=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Helvetica","B",8)
+    pdf.set_fill_color(210,218,235)
+    pdf.cell(95,5,"  Item",fill=True,ln=False)
+    pdf.cell(45,5,"Qty",fill=True,ln=False,align="C")
+    pdf.cell(0,5,"Billing",fill=True,ln=True,align="C")
+    pdf.set_font("Helvetica","",8)
+    for _name, _qty, _billing in all_equip_pdf:
+        if _qty > 0:
+            pdf.set_fill_color(248,249,255)
+            pdf.cell(95,5,f"  {s(_name)}",fill=True,ln=False)
+            pdf.cell(45,5,str(_qty),fill=True,ln=False,align="C")
+            pdf.cell(0,5,s(_billing),fill=True,ln=True,align="C")
+    pdf.ln(4)
+
+    # Warranty terms
+    pdf.set_fill_color(31,20,80); pdf.set_text_color(255,255,255)
+    pdf.set_font("Helvetica","B",10)
+    pdf.cell(0,6,"  Warranty Terms",fill=True,ln=True)
+    pdf.set_text_color(0,0,0); pdf.set_font("Helvetica","",8.5)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw,4,
+        f"SY Comms Ltd agrees to provide on-site warranty cover including remote diagnostics "
+        f"and programming of faults to the equipment listed above for an agreement term of "
+        f"{LEASE_TERM_LABELS[lease_term]}. "
+        f"Faulty equipment will be repaired or replaced. Additional equipment added will be "
+        f"charged and warranty premium will be added to this agreement.",align="J")
+    pdf.ln(2)
+
+    # Inclusive period + monthly charge highlight
+    pdf.set_fill_color(0,181,163); pdf.set_text_color(255,255,255)
+    pdf.set_font("Helvetica","B",9)
+    pdf.cell(0,7,f"  Inclusive Period: 12 months  |  Monthly charge after inclusive period: £{_maint_monthly:.2f} + VAT",
+             fill=True,ln=True,align="C")
+    pdf.set_text_color(0,0,0)
+    pdf.ln(2)
+
+    # Tier level
+    pdf.set_font("Helvetica","B",9)
+    pdf.cell(0,5,"Tier 1 Support Includes:",ln=True)
+    pdf.set_font("Helvetica","",8.5)
+    pdf.cell(0,5,"  [X]  Remote diagnostics and programming",ln=True)
+    pdf.cell(0,5,"  [X]  Engineer call-outs for repair or replacement of equipment",ln=True)
+    pdf.set_font("Helvetica","I",8)
+    pdf.set_text_color(120,120,120)
+    pdf.cell(0,5,"  Note: Excludes additional equipment added to the system in future.",ln=True)
+    pdf.set_text_color(0,0,0)
+    pdf.ln(3)
+
+    # Declaration
+    pdf.set_fill_color(31,20,80); pdf.set_text_color(255,255,255)
+    pdf.set_font("Helvetica","B",10)
+    pdf.cell(0,6,"  Declaration",fill=True,ln=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Helvetica","",8)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw,4,
+        "SY Comms Ltd agrees to provide remote and on-site maintenance cover for the equipment above "
+        "at the tier level set out above and the customer agrees to pay the monthly charge as set out "
+        "above for the Agreement Term, subject to the terms and conditions. As a duly authorised "
+        "representative of the customer, I confirm that I have read, understood and accept the terms "
+        "and conditions of this agreement.",align="J")
+    pdf.ln(4)
+
+    # Signature
+    pdf.set_font("Helvetica","B",9)
+    pdf.cell(0,5,"On Behalf of (The Customer):",ln=True)
+    pdf.set_font("Helvetica","",9)
+    pdf.cell(80,5,f"Name & Position: {s(_contact or '')}",ln=False)
+    pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
+    if sig_bytes:
+        try:
+            _sb_w = io.BytesIO(sig_bytes); _sb_w.seek(0)
+            pdf.image(_sb_w, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            pdf.ln(16)
+        except Exception:
+            pdf.cell(0,14,"Signed: ________________",ln=True)
+    else:
+        pdf.cell(0,14,"Signed: ________________",ln=True)
+    pdf.ln(2)
+    pdf.set_font("Helvetica","I",7.5); pdf.set_text_color(80,80,80)
+    pdf.cell(0,4,"Annual price review applies after inclusive period. Subject to standard Terms & Conditions.",ln=True,align="C")
+    pdf.set_text_color(0,0,0)
+
     # ── CUSTOMER REQUIREMENT FORM ────────────────────────────────────────────
     pdf.add_page()
     # Header
@@ -4208,105 +4318,111 @@ with tab7:
                                  value=contact_name or "", key="sig_name_confirm",
                                  placeholder="e.g. Jane Smith - Director")
     with send_col:
-        st.markdown("### 📧 Email Proposal")
-
-        to_email = st.text_input("Send to (customer)",
-                                 value=director_email or billing_email or "",
-                                 key="send_to")
-        cc_email = st.text_input("CC (consultant / your address)",
-                                 value=em_cfg.get("reply_to", "") or em_cfg.get("username", ""),
-                                 key="send_cc")
-
-        st.markdown("")
-
+        st.markdown("### 📥 Download & Send")
         sig_bytes = st.session_state.get("_sig_bytes")
-        ready = bool(sig_bytes and sig_name and to_email)
+        safe = (comp_name or "quote").replace(" ","_")
 
-        # ── Generate signed PDF button ─────────────────────────────────────
-        if st.button("📄 Generate Signed PDF", use_container_width=True,
-                     type="secondary", disabled=not sig_bytes):
+        # ── Download unsigned PDF (always available) ─────────────────────────
+        st.markdown("**Unsigned Pack**")
+        st.caption("Full proposal pack without signature — for review or printing.")
+        _unsigned_bytes = build_pdf(
+            sig_bytes=None,
+            curr_total=current_total, curr_bb=current_bb,
+            curr_system=current_system, curr_calls=current_calls,
+            curr_mobile=current_mobile,
+        )
+        st.download_button(
+            "📥 Download Full Pack (Unsigned)",
+            data=_unsigned_bytes,
+            file_name=f"SYComms_{safe}_{date.today()}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="dl_unsigned",
+        )
+
+        st.divider()
+
+        # ── Generate & download signed PDF ───────────────────────────────────
+        st.markdown("**Signed Pack**")
+        if sig_bytes and sig_name:
+            from datetime import datetime as _dtnow
+            _ts = _dtnow.now().strftime("%d/%m/%Y  %H:%M")
+            _signed_bytes = build_pdf(
+                sig_bytes=sig_bytes,
+                sig_name=sig_name,
+                sig_company=comp_name or "",
+                sig_timestamp=_ts,
+                sig_ip=_client_ip,
+                curr_total=current_total, curr_bb=current_bb,
+                curr_system=current_system, curr_calls=current_calls,
+                curr_mobile=current_mobile,
+            )
+            st.session_state["_signed_pdf_bytes"]    = _signed_bytes
+            st.session_state["_signed_pdf_filename"] = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
+            st.download_button(
+                "✅ Download Signed Pack",
+                data=_signed_bytes,
+                file_name=f"SYComms_{safe}_SIGNED_{date.today()}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                type="primary",
+                key="dl_signed",
+            )
+        else:
+            st.info("Add signature and name on the left to enable the signed download.")
+            st.button("✅ Download Signed Pack", disabled=True,
+                      use_container_width=True, key="dl_signed_dis")
+
+        st.divider()
+
+        # ── Email signed PDF ─────────────────────────────────────────────────
+        st.markdown("**Email to Customer**")
+        to_email = st.text_input("Send to (customer)",
+                                  value=director_email or billing_email or "",
+                                  key="send_to")
+        cc_email = st.text_input("CC (your address)",
+                                  value=em_cfg.get("reply_to","") or em_cfg.get("username",""),
+                                  key="send_cc")
+        ready = bool(sig_bytes and sig_name and to_email)
+        if st.button("📨 Email Signed PDF", use_container_width=True,
+                     type="secondary", disabled=not ready, key="send_email_btn"):
             if not sig_name:
-                st.warning("Please type the customer name for confirmation.")
+                st.warning("Please type the customer name.")
+            elif not to_email:
+                st.warning("Enter a recipient email address.")
             else:
-                from datetime import datetime as _dtnow
-                _ts = _dtnow.now().strftime("%d/%m/%Y  %H:%M")
-                _pdf_bytes = build_pdf(
-                    sig_bytes=sig_bytes,
-                    sig_name=sig_name,
-                    sig_company=comp_name or "",
-                    sig_timestamp=_ts,
-                    sig_ip=_client_ip,
+                # Build signed PDF and send via SMTP
+                from datetime import datetime as _dtnow3
+                _ts3 = _dtnow3.now().strftime("%d/%m/%Y  %H:%M")
+                _email_pdf = st.session_state.get("_signed_pdf_bytes") or build_pdf(
+                    sig_bytes=sig_bytes, sig_name=sig_name,
+                    sig_company=comp_name or "", sig_timestamp=_ts3, sig_ip=_client_ip,
                     curr_total=current_total, curr_bb=current_bb,
                     curr_system=current_system, curr_calls=current_calls,
                     curr_mobile=current_mobile,
                 )
-                safe = (comp_name or "quote").replace(" ", "_")
-                st.session_state["_signed_pdf_bytes"]    = _pdf_bytes
-                st.session_state["_signed_pdf_filename"] = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
+                _fn = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
+                try:
+                    import smtplib, email.mime.multipart as _mp, email.mime.base as _mb
+                    import email.mime.text as _mt
+                    from email.encoders import encode_base64 as _eb
+                    _msg = _mp.MIMEMultipart()
+                    _msg["Subject"] = f"Your Signed Proposal — {comp_name}"
+                    _msg["From"]    = em_cfg.get("username","")
+                    _msg["To"]      = to_email
+                    if cc_email: _msg["Cc"] = cc_email
+                    _msg.attach(_mt.MIMEText(f"Please find your signed proposal attached.\n\nThank you,\nSY Comms Ltd", "plain"))
+                    _att = _mb.MIMEBase("application","pdf"); _att.set_payload(_email_pdf)
+                    _eb(_att); _att.add_header("Content-Disposition","attachment",filename=_fn)
+                    _msg.attach(_att)
+                    with smtplib.SMTP_SSL(em_cfg.get("smtp_host","smtp.gmail.com"), int(em_cfg.get("smtp_port",465))) as _srv:
+                        _srv.login(em_cfg.get("username",""), em_cfg.get("password",""))
+                        _recipients = [to_email] + ([cc_email] if cc_email else [])
+                        _srv.sendmail(em_cfg.get("username",""), _recipients, _msg.as_string())
+                    st.success(f"Signed PDF emailed to {to_email}")
+                except Exception as _e:
+                    st.error(f"Email failed: {_e}")
 
-        if st.session_state.get("_signed_pdf_bytes"):
-            st.download_button(
-                "📥 Download Signed PDF",
-                data=st.session_state["_signed_pdf_bytes"],
-                file_name=st.session_state["_signed_pdf_filename"],
-                mime="application/pdf",
-                use_container_width=True,
-                key="dl_signed",
-            )
-            st.markdown("")
-
-        # ── Email signed PDF button ───────────────────────────────────────
-        if st.button("📨 Email Signed PDF to Customer", use_container_width=True,
-                     type="primary", disabled=not ready):
-            if not sig_name:
-                st.warning("Please type the customer name for confirmation.")
-            elif not to_email:
-                st.warning("Enter a recipient email address.")
-            else:
-                from datetime import datetime as _dtnow2
-                _ts2 = _dtnow2.now().strftime("%d/%m/%Y  %H:%M")
-                _pdf_bytes = st.session_state.get("_signed_pdf_bytes") or build_pdf(
-                    sig_bytes=sig_bytes,
-                    sig_name=sig_name,
-                    sig_company=comp_name or "",
-                    sig_timestamp=_ts2,
-                    sig_ip=_client_ip,
-                )
-                safe = (comp_name or "quote").replace(" ", "_")
-                fn   = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
-                ok, msg = send_proposal_email(
-                    em_cfg, to_email, cc_email, _pdf_bytes, fn, comp_name, total_mo
-                )
-                if ok:
-                    st.success(msg)
-                    st.balloons()
-                else:
-                    st.error(msg)
-
-        if not em_cfg.get("username"):
-            st.markdown('<div class="info-box">⚙️ Configure SMTP in <strong>Admin Panel → Email</strong> to enable sending.</div>',
-                        unsafe_allow_html=True)
-        elif not ready:
-            st.markdown('<div class="info-box">✍️ Capture signature + type name to unlock email.</div>',
-                        unsafe_allow_html=True)
-
-        with st.expander("ℹ️ Gmail setup — click if email fails"):
-            st.markdown("""
-**One-time Gmail setup (2 minutes):**
-
-1. Sign in to the Gmail account at [myaccount.google.com](https://myaccount.google.com)
-2. Go to **Security** → turn on **2-Step Verification**
-3. Go to **myaccount.google.com/apppasswords**
-4. Create a new App Password - select *Mail* and *Windows Computer*
-5. Copy the 16-character password it gives you
-6. Go to **Admin Panel → 📧 Email** → paste it into *App Password* → Save
-
-The password you entered when setting up the account won't work - you must use an **App Password**.
-            """)
-
-# ── TAB 6: REMOTE SIGNING ─────────────────────────────────────────────────────
-with tab8:
-    st.markdown("### 📨 Send Documents for Remote Signing")
     st.caption("Upload PDFs and send the customer a secure signing link — no need for them to be in the room.")
 
     em_cfg_rs         = st.session_state.active_config.get("email", {})
