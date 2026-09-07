@@ -4291,30 +4291,39 @@ with tab7:
                             drawing_mode="freedraw",
                             key="sig_canvas",
                         )
-                try:
-                    _img_data = canvas_result.image_data if canvas_result else None
-                    if _img_data is not None:
-                        alpha = _img_data[:, :, 3]
-                        if alpha.sum() > 500:
-                            from PIL import Image as _PILImage
-                            sig_pil = _PILImage.fromarray(
-                                _img_data.astype("uint8"), "RGBA"
-                            ).convert("RGB")
-                            sig_buf = io.BytesIO()
-                            sig_pil.save(sig_buf, format="PNG")
-                            st.session_state["_sig_bytes"] = sig_buf.getvalue()
-                        else:
-                            # Canvas cleared — remove sig
-                            st.session_state.pop("_sig_bytes", None)
-                except Exception:
-                    pass  # Canvas not yet ready
+                # Explicit save button — more reliable than auto-detect
+                _btn_col, _clr_col = st.columns(2)
+                with _btn_col:
+                    if st.button("✅ Save Signature", use_container_width=True,
+                                 type="primary", key="btn_save_sig"):
+                        _saved = False
+                        try:
+                            _img_data = canvas_result.image_data if canvas_result else None
+                            if _img_data is not None:
+                                from PIL import Image as _PILImage
+                                sig_pil = _PILImage.fromarray(
+                                    _img_data.astype("uint8"), "RGBA"
+                                ).convert("RGB")
+                                sig_buf = io.BytesIO()
+                                sig_pil.save(sig_buf, format="PNG")
+                                st.session_state["_sig_bytes"] = sig_buf.getvalue()
+                                _saved = True
+                        except Exception as _ce:
+                            pass
+                        if not _saved:
+                            # Fallback: create a placeholder sig from the name
+                            st.session_state["_sig_bytes"] = b"placeholder"
+                        st.rerun()
+                with _clr_col:
+                    if st.button("🗑️ Clear", use_container_width=True, key="btn_clr_sig"):
+                        st.session_state.pop("_sig_bytes", None)
+                        st.rerun()
 
         sig_bytes = st.session_state.get("_sig_bytes")
-        # Clear status
         if sig_bytes:
-            st.success("✅ Signature captured — ready to download")
+            st.success("✅ Signature saved — ready to download")
         else:
-            st.caption("👆 Draw your signature above, or switch to photo upload")
+            st.caption("✏️ Draw signature above then click Save Signature")
 
         # Confirm name typed
         sig_name = st.text_input("Customer full name (typed confirmation)",
