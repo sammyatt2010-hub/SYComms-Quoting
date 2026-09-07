@@ -1983,7 +1983,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_x(30)
     pdf.multi_cell(150, 5.5,
         "SY Comms is a locally owned and operated telecoms and IT services company "
-        "serving businesses across the SY & TF postcode areas. We understand the "
+        "serving businesses across the UK. We understand the "
         "unique needs of our community and are committed to delivering solutions that "
         "work for you. Our experienced local engineers are always on hand to provide "
         "friendly, fast and personalised service.",
@@ -1998,7 +1998,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(1)
 
     values = [
-        (">  Local",    "Shropshire-based engineers serving SY & TF postcodes"),
         (">  Rapid",    "Response times within the hour to minimise downtime"),
         (">  Complete", "Full-stack: Telecoms, Mobile, Networking, IT & Payments"),
     ]
@@ -2304,8 +2303,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] / (1 - service_uplift_pct/100)
         svc_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
     if total_voice_channels > 0:
-        vc_sell_svc = round(3.49 * (1 + service_uplift_pct/100) * total_voice_channels, 2)
-        svc_items.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels, f"£{vc_sell_svc:.2f}/mo"))
+        svc_items.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
     if ooh_support:
         svc_items.append(("24/7 OOH Support", 1, "£25.00/mo"))
     if dark_web_mon:
@@ -2459,17 +2457,17 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     if bank_name or acc_no:
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 7, "Direct Debit Banking Mandate", ln=True)
+        pdf.cell(0, 6, "Direct Debit Banking Mandate", ln=True)
         row2("Bank Name:", _bank or "-", "Account Holder:", _holder or "-")
         row2("Account Number:", _accno or "-", "Sort Code:", _sort or "-")
-        pdf.ln(6)
+        pdf.ln(3)
         pdf.set_font("Helvetica", "", 8)
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 4.5,
         f"By signing this mandate you authorise {_CO} to collect payments by Direct Debit in "
         "accordance with the agreed terms. Payments will be collected on or around the 1st of each month."
         )
-        pdf.ln(6)
+        pdf.ln(3)
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(90, 5, "Authorised Signature:", ln=False)
         pdf.cell(0, 5, "Date:", ln=True)
@@ -2479,10 +2477,10 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.cell(90, 0.5, "", border="T", ln=False)
         pdf.cell(15, 0.5, "", ln=False)
         pdf.cell(75, 0.5, "", border="T", ln=True)
-        pdf.ln(4)
+        pdf.ln(2)
 
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "Customer Requirements Checklist", ln=True)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(0, 6, "Customer Requirements Checklist", ln=True)
     pdf.set_font("Helvetica", "", 9)
     checklist = [
         "I am aware there may be a delay in switching to the agreed carrier after installation.",
@@ -2494,13 +2492,12 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     ]
     for i, item in enumerate(checklist, 1):
         pdf.set_x(pdf.l_margin)
-        pdf.cell(8, 5, f"{i}.", ln=False)
-        pdf.multi_cell(pdf.epw - 8, 5, item)
-    pdf.ln(6)
+        pdf.cell(8, 4.5, f"{i}.", ln=False)
+        pdf.multi_cell(pdf.epw - 8, 4.5, item)
+    pdf.ln(3)
 
     pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(90, 5, f"For {_comp or '(Company Name)'}:", ln=False)
-    pdf.cell(0, 5, "Signed:", ln=True)
+    pdf.cell(0, 5, f"For {_comp or '(Company Name)'}:", ln=True)
     pdf.ln(2)
     _embed_sig(pdf, sig_bytes, signer_name=sig_name,
                company=sig_company, timestamp=sig_timestamp)
@@ -2796,9 +2793,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     _bb_desc = f"{bb_provider} {bb_package}" if svc["bb_sell"]>0 else "None / Customer Supplied"
     _vc_desc = str(total_voice_channels)
 
-    _crf_q(1,"I currently have a PDQ line that connects to a Bank or Post office",has_yn=True)
-    _crf_q(2,"I currently have a Redcare, or similar alarm system connected to a telephone line. I understand that "
-             "liaison with the alarm company is my responsibility.",has_yn=True,
+    _crf_q(1,"I currently have a PDQ line that connects to a Bank or Post office. (Yes / No)")
+    _crf_q(2,"I currently have a Redcare, or similar alarm system connected to a telephone line. "
+             "I understand that liaison with the alarm company is my responsibility. (Yes / No)",
              extra="If alarm works via the main system lines then a new standalone line may need to be added.")
     _crf_q(3,f"This agreement includes: {_vc_desc} voice channels and {_bb_desc} broadband service(s) as agreed. "
              "Additional services will be added at our standard tariffs.")
@@ -2856,7 +2853,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     _forms = [
         ("This Form","[X]"),("Order Form","[X]"),("Terms & Conditions","[X]"),
         ("Quotation - inc. tariff","[X]"),("Rental Document","[X]"),("Network Service Agreement","[X]"),
-        ("On Site Maintenance Agreement","[ ]"),("Line Rental Agreement","[ ]"),
+        ("On Site Maintenance Agreement","[X]"),
     ]
     pdf.set_font("Helvetica","",8)
     _fc = st.columns if False else None  # PDF only — use cells
