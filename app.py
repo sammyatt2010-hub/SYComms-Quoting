@@ -2022,16 +2022,33 @@ def build_proposal_pdf():
     _prop_row("TOTAL MONTHLY (excl VAT)",curr_tot_str,f"£{total_mo:.2f}/mo",bold=True)
     p.ln(5)
 
-    # Equipment
+    # Equipment — build inline from module-level quantities
     _prop_hdr("Equipment Included in Lease")
-    for _nm, _qty, _billing in all_equip_pdf:
-        if _qty > 0 and _nm and "Voice" not in str(_nm):
-            p.set_font("Helvetica","",8)
-            p.set_fill_color(255,255,255)
-            p.cell(130,5,f"  {s(_nm)}",fill=True,ln=False)
-            p.set_fill_color(245,247,255)
-            p.cell(30,5,str(_qty),fill=True,ln=False,align="C")
-            p.cell(0,5,s(_billing),fill=True,ln=True,align="C")
+    _hw_billing_p = "In Monthly Lease" if is_spread else "Paid Upfront"
+    _prop_equip = []
+    for _n, _q in desktop_quantities.items():
+        if _q > 0: _prop_equip.append((_n, _q))
+    for _n, _q in cordless_quantities.items():
+        if _q > 0: _prop_equip.append((_n, _q))
+    for _n, _q in other_quantities.items():
+        if _q > 0: _prop_equip.append((_n, _q))
+    if not _no_switch and switch_quantities:
+        for _n, _q in switch_quantities.items():
+            _prop_equip.append((f"Switch: {_n}", _q))
+    elif not _no_switch:
+        _prop_equip.append((f"Switch: {rec_switch['name']}", 1))
+    if router_quantities:
+        for _n, _q in router_quantities.items():
+            _prop_equip.append((_n, _q))
+    elif add_router and router_type != "None / Customer Supplied":
+        _prop_equip.append((router_type, 1))
+    for _nm, _qty in _prop_equip:
+        p.set_font("Helvetica","",8)
+        p.set_fill_color(255,255,255)
+        p.cell(130,5,f"  {_ps(_nm)}",fill=True,ln=False)
+        p.set_fill_color(245,247,255)
+        p.cell(30,5,str(_qty),fill=True,ln=False,align="C")
+        p.cell(0,5,_hw_billing_p,fill=True,ln=True,align="C")
     p.ln(5)
 
     # Agreement terms
