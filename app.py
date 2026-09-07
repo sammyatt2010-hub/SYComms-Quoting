@@ -153,6 +153,7 @@ def _default_config():
             {"name": "Broadband Router",             "buy": 65.00},
             {"name": "Bluetooth Headset",            "buy": 110.00},
             {"name": "Conference Unit (GAC250)",       "buy": 130.00, "sell": 390.00},
+            {"name": "Call Scope AI Setup (one-off)",  "buy": 1000.00,"sell": 2500.00},
             {"name": "TP Link NX200 (4G/5G Standalone)",  "buy": 210.00, "sell": 630.00},
             {"name": "HIK Vision Turret 8MP",          "buy": 125.00, "sell": 427.50},
             {"name": "HIK Vision Dome 8MP",            "buy": 125.00, "sell": 400.00},
@@ -351,7 +352,7 @@ PRODUCT_IMAGES = {
     "Mobile App / Softphone Users":  "images/mobile_app.jpg",
     "SY Comms Studio":               "images/sy_comms_studio.jpg",
     "Call Recording":                "images/call_recording.jpg",
-    "CRM AI Per User":               "images/crm_ai.jpg",
+    "Call Scope AI Agent":               "images/crm_ai.jpg",
     "ACD Light Agent":               "images/acd_light.jpg",
     "Teams Integration":             "images/teams_integration.jpg",
     "HTML Wallboard":                "images/html_wallboard.jpg",
@@ -818,7 +819,8 @@ hw_fund         = "None"
 is_recurring    = True
 # Software add-on defaults (overridden by sidebar widgets above)
 sw_studio_qty = sw_callrec_qty = sw_crm_qty = 0
-sw_acd_qty = sw_teams_qty = sw_wallboard_qty = 0
+sw_acd_qty = 0
+sw_teams_qty = sw_wallboard_qty = 0
 
 # ─── QUOTE SAVE / LOAD ───────────────────────────────────────────────────────
 with st.expander("💾 Save / Load Quote", expanded=False):
@@ -975,6 +977,7 @@ with col_hw2:
                 "Door Entry System", "Intercom System", "Loud Speaker",
                 "HIK Vision Turret 8MP", "HIK Vision Dome 8MP", "HIK Vision 24TB NVR",
                 "Broadband Router",
+                "Call Scope AI Setup (one-off)",
                 "Bluetooth Headset",
             ):
                 continue
@@ -1016,6 +1019,11 @@ with col_hw2:
     if _bb_auto_router:
         other_quantities["Broadband Router"] = 1
 
+    # Auto-add Call Scope AI Setup fee when agent is selected
+    if st.session_state.get("q_sw_crm", 0) > 0:
+        if "Call Scope AI Setup (one-off)" not in other_quantities:
+            other_quantities["Call Scope AI Setup (one-off)"] = 1
+
     # Auto-add PBX Unit when total users >= 5 (pricebook rule)
     # total_voice_channels computed after this block - use desk phone count as proxy
     _desk_total = sum(desktop_quantities.values())
@@ -1042,16 +1050,14 @@ with col_hw2:
         with _sw_col1:
             sw_studio_qty    = st.number_input("SY Comms Studio",   0, 50, 0, key="q_sw_studio",  help="sell £11.95/user")
             sw_callrec_qty   = st.number_input("Call Recording",    0, 50, 0, key="q_sw_callrec", help="sell £1.50/user")
-            sw_crm_qty       = st.number_input("CRM AI per User",   0, 50, 0, key="q_sw_crm",     help="sell £15.00/user")
+            sw_crm_qty       = st.number_input("Call Scope AI Agent",   0, 50, 0, key="q_sw_crm",     help="sell £15.00/user")
         with _sw_col2:
-            sw_acd_qty       = st.number_input("ACD Light Agent",   0, 50, 0, key="q_sw_acd",     help="sell £1.50/user")
             sw_teams_qty     = st.number_input("Teams Integration", 0, 50, 0, key="q_sw_teams",   help="sell £3.75/user")
             sw_wallboard_qty = st.number_input("HTML Wallboard",    0, 10, 0, key="q_sw_wb",      help="sell £99.00/instance")
     SW_ADDONS = [
         ("SY Comms Studio",   sw_studio_qty,    4.50, 11.95),
         ("Call Recording",    sw_callrec_qty,   0.01,  1.50),
-        ("CRM AI per User",   sw_crm_qty,       0.10, 15.00),
-        ("ACD Light Agent",   sw_acd_qty,       0.30,  1.50),
+        ("Call Scope AI Agent",   sw_crm_qty,       0.10, 15.00),
         ("Teams Integration", sw_teams_qty,     0.75,  3.75),
         ("HTML Wallboard",    sw_wallboard_qty, 5.00, 99.00),
     ]
@@ -1275,7 +1281,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 [d["name"] for d in cfg.get("other_hardware", []) if d.get("name")] +
                 [f"Switch: {d['name']}" for d in cfg.get("switches", []) if d.get("name")] +
                 [d["name"] for d in cfg.get("routers", []) if d.get("name")] +
-                ["SY Comms Studio", "Call Recording", "CRM AI Per User",
+                ["SY Comms Studio", "Call Recording", "Call Scope AI Agent",
                  "ACD Light Agent", "Teams Integration", "HTML Wallboard"]
             )
 
@@ -1997,9 +2003,15 @@ def build_proposal_pdf():
         if total:
             p.set_text_color(200,200,200)
         else:
-            p.set_text_color(180,40,40) if curr_val and curr_val != "-" else p.set_text_color(120,120,120)
+            if curr_val and curr_val != "-":
+                p.set_text_color(180,40,40)
+            else:
+                p.set_text_color(120,120,120)
         p.cell(50,6,_ps(curr_val or "-"),fill=True,ln=False,align="C")
-        p.set_text_color(0,200,120) if not total else p.set_text_color(0,220,160)
+        if not total:
+            p.set_text_color(0,200,120)
+        else:
+            p.set_text_color(0,220,160)
         p.set_font("Helvetica","B" if (bold or total) else "",8)
         p.cell(0,6,_ps(new_val or "-"),fill=True,ln=True,align="C")
         p.set_text_color(0,0,0)
@@ -2026,9 +2038,35 @@ def build_proposal_pdf():
                fill=True,ln=True,align="C")
         p.set_text_color(0,0,0)
 
-    # Equipment list
+    # Equipment list with thumbnails
     _section("Equipment Included in Agreement")
     _hw_billing_p = "In Monthly Lease" if is_spread else "Paid Upfront"
+
+    # Phone thumbnails row
+    _phone_items = [(n, q) for n, q in list(desktop_quantities.items()) + list(cordless_quantities.items()) if q > 0]
+    if _phone_items:
+        _thumb_x = p.l_margin
+        _thumb_y = p.get_y() + 1
+        _tw = 28  # thumbnail width
+        for _pname, _pqty in _phone_items[:6]:
+            _pb64, _pext = get_product_image_b64(_pname)
+            if _pb64:
+                try:
+                    import tempfile as _ptf, os as _pos
+                    _praw = base64.b64decode(_pb64)
+                    with _ptf.NamedTemporaryFile(suffix=f".{_pext}", delete=False) as _ptmp:
+                        _ptmp.write(_praw); _ptmp_path = _ptmp.name
+                    p.image(_ptmp_path, x=_thumb_x, y=_thumb_y, w=_tw-2, h=18)
+                    _pos.unlink(_ptmp_path)
+                except Exception:
+                    pass
+            p.set_xy(_thumb_x, _thumb_y + 19)
+            p.set_font("Helvetica","",6.5)
+            p.set_fill_color(245,247,255)
+            p.cell(_tw-2, 4, _ps(f"{_pname[:18]} x{_pqty}"), fill=True, ln=False, align="C")
+            _thumb_x += _tw
+        p.ln(6)
+
     _prop_equip = []
     for _n, _q in desktop_quantities.items():
         if _q > 0: _prop_equip.append((_n, _q))
