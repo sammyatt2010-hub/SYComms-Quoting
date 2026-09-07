@@ -1243,6 +1243,33 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
             edited_hs = st.data_editor(hs_df, num_rows="dynamic", use_container_width=True, key="de_headsets",
                 column_config={"buy": st.column_config.NumberColumn("Buy £", format="£%.2f")})
 
+            # ── Call Scope AI Setup cost ──────────────────────────────────
+            st.markdown("**Call Scope AI Setup (one-off lease cost)**")
+            _cs_item = next((i for i in cfg["other_hardware"]
+                             if i.get("name") == "Call Scope AI Setup (one-off)"), None)
+            _cs_buy  = float(_cs_item["buy"]) if _cs_item else 1000.0
+            _cs_sell = float(_cs_item.get("sell", 2500.0)) if _cs_item else 2500.0
+            cs_col1, cs_col2 = st.columns(2)
+            with cs_col1:
+                new_cs_buy  = st.number_input("Setup Cost to SY Comms (Buy £)", value=_cs_buy,
+                                               step=50.0, key="cs_buy_input")
+            with cs_col2:
+                new_cs_sell = st.number_input("Setup Price to Customer (Sell £)", value=_cs_sell,
+                                               step=50.0, key="cs_sell_input")
+            if st.button("Update Call Scope Setup Cost", key="cs_update"):
+                for item in st.session_state.active_config["other_hardware"]:
+                    if item.get("name") == "Call Scope AI Setup (one-off)":
+                        item["buy"]  = new_cs_buy
+                        item.setdefault("sell", new_cs_sell)
+                        item["sell"] = new_cs_sell
+                        break
+                else:
+                    st.session_state.active_config["other_hardware"].append(
+                        {"name": "Call Scope AI Setup (one-off)", "buy": new_cs_buy, "sell": new_cs_sell}
+                    )
+                st.success(f"Updated: Buy £{new_cs_buy:.2f} / Sell £{new_cs_sell:.2f}")
+                st.rerun()
+            st.markdown("---")
             st.markdown("**Other Hardware**")
             oh_df = pd.DataFrame(cfg["other_hardware"])
             edited_oh = st.data_editor(oh_df, num_rows="dynamic", use_container_width=True, key="de_other",
@@ -3804,11 +3831,15 @@ with tab4:
         # ── Selected Hardware ──────────────────────────────────────────────────
         st.markdown('<div class="cv-section">📦 Your New System</div>', unsafe_allow_html=True)
 
+        # Items hidden from customer view (backend/setup costs)
+        _CV_HIDE = {"Call Scope AI Setup (one-off)"}
         all_selected = (
             [(n, q, HANDSETS_DESKTOP[n])   for n, q in desktop_quantities.items() if q > 0]  +
             [(n, q, HANDSETS_CORDLESS[n])  for n, q in cordless_quantities.items() if q > 0] +
             [(n, q, HEADSETS[n])           for n, q in headset_quantities.items()   if q > 0] +
-            [(n, q, OTHER_HARDWARE[n])     for n, q in other_quantities.items()     if q > 0]
+            [(n, q, OTHER_HARDWARE.get(n, {"cat":"Other"}))
+             for n, q in other_quantities.items()
+             if q > 0 and n not in _CV_HIDE]
         )
 
         # Add switch card(s)
