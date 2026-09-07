@@ -86,7 +86,7 @@ if not st.session_state.app_authenticated:
                 st.session_state.app_authenticated = True
                 st.rerun()
             else:
-                st.error("Incorrect password — please try again.")
+                st.error("Incorrect password - please try again.")
         st.markdown("")
         st.caption(_CO_CAP)
 
@@ -256,11 +256,11 @@ if "uploaded_images" not in st.session_state:
 
 cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
-hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel — not visible to customer
-_no_switch = False  # default — overridden by sidebar switch radio button
+hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel - not visible to customer
+_no_switch = False  # default - overridden by sidebar switch radio button
 switch_quantities = {}  # for manual multi-switch mode
 cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
-mobile_rows = []   # default — overridden by sidebar
+mobile_rows = []   # default - overridden by sidebar
 # Current customer cost defaults (overridden by sidebar)
 current_calls = current_lines = current_bb = current_system = 0.0
 current_support = current_hosted = current_onhold = current_other = 0.0
@@ -269,7 +269,7 @@ commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
 commission_per_unit  = C.get("commission_per_unit", 1000)   # £ per unit
 B   = cfg.get("branding", {})     # shorthand for branding dict
-# Branding helpers — refresh from full config (overrides early load)
+# Branding helpers - refresh from full config (overrides early load)
 _CO       = B.get("company_name",    _CO)
 _CO_LEGAL = B.get("company_legal",   _CO_LEGAL)
 _CO_TAG   = B.get("company_tagline", _CO_TAG)
@@ -322,7 +322,7 @@ BUNDLED_IMAGES = {
 # Paste these lines inside your existing BUNDLED_IMAGES = { ... } dict,
 # just above the closing '}'. Keys match the exact product names used
 # in other_quantities / the Customer View cards, so they'll be picked up
-# automatically by get_product_image_b64() — no other code changes needed.
+# automatically by get_product_image_b64() - no other code changes needed.
 
     'PBX Unit': ('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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/2Q==', 'jpeg'),
     'Mobile App / Softphone Users': ('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', 'jpeg'),
@@ -332,7 +332,7 @@ BUNDLED_IMAGES = {
 
 # ─── PRODUCT IMAGE MAPPING ───────────────────────────────────────────────────
 # Place product images in an "images/" subfolder in the repo.
-# Filenames below — add matching files to unlock real photos.
+# Filenames below - add matching files to unlock real photos.
 PRODUCT_IMAGES = {
     # ── Switches ─────────────────────────────────────────────────────────────
     "Switch: 5-Port (4x POE)":       "images/switch_5port.jpg",
@@ -390,8 +390,8 @@ def _norm(s):
     return "".join(c for c in s.lower() if c.isalnum())
 
 def get_product_image_b64(name):
-    """Return (b64_data, ext) — checks bundled, then session upload, then images/ dir."""
-    # 1. Bundled images (Grandstream phones won't be here — falls through)
+    """Return (b64_data, ext) - checks bundled, then session upload, then images/ dir."""
+    # 1. Bundled images (Grandstream phones won't be here - falls through)
     if name in BUNDLED_IMAGES:
         return BUNDLED_IMAGES[name]
     # 2. Session-state uploaded images (fuzzy match)
@@ -436,7 +436,7 @@ def get_product_image_b64(name):
     return None, None
 
 def product_card_html(name, info, qty=0, show_qty=False, img_height=80):
-    """Render a product card — real image if available, styled placeholder if not."""
+    """Render a product card - real image if available, styled placeholder if not."""
     b64, ext = get_product_image_b64(name)
     if b64:
         img_html = f'<img src="data:image/{ext};base64,{b64}" style="width:100%;height:{img_height}px;object-fit:contain;border-radius:6px;margin-bottom:4px;">' 
@@ -455,7 +455,7 @@ def product_card_html(name, info, qty=0, show_qty=False, img_height=80):
 
 # ─── FULL PRODUCT CATALOGUE (from Excel NEW MECHANICS sheets) ────────────────
 
-# ─── PRODUCT CATALOGUES — loaded from config (editable via Admin Panel) ────────
+# ─── PRODUCT CATALOGUES - loaded from config (editable via Admin Panel) ────────
 def _build_catalogues(cfg):
     hd = {i["name"]: {k:v for k,v in i.items() if k!="name"} for i in cfg["handsets_desktop"]}
     hc = {i["name"]: {k:v for k,v in i.items() if k!="name"} for i in cfg["handsets_cordless"]}
@@ -471,7 +471,7 @@ def _build_catalogues(cfg):
         bb.setdefault(row["provider"], {})[row["package"]] = {
             "cost": row["cost"], "sell": row.get("sell", 0), "install": row["install"]
         }
-    # "None / Customer Supplied" — zero cost/sell, appears first in selector
+    # "None / Customer Supplied" - zero cost/sell, appears first in selector
     bb["None / Customer Supplied"] = {
         "Customer keeps existing broadband": {"cost": 0.0, "sell": 0.0, "install": 0.0}
     }
@@ -776,13 +776,13 @@ with st.sidebar:
         "Buyout / Termination Cost (£)",
         min_value=0.0, value=0.0, step=50.0,
         key="q_termination",
-        help="Cost to exit the customer's existing contract. Added to the lease spread — not shown to customer."
+        help="Cost to exit the customer's existing contract. Added to the lease spread - not shown to customer."
     )
 
     # SW Add-ons moved to Licences & Add-ons expander in right column
 
     with st.expander("📊 Current Customer Costs", expanded=False):
-        st.caption("Fill in what the customer currently pays — used in the comparison view.")
+        st.caption("Fill in what the customer currently pays - used in the comparison view.")
         curr_col1, curr_col2 = st.columns(2)
         with curr_col1:
             current_bb      = st.number_input("Broadband / Lines (£/mo)", 0.0, step=5.0, key="q_curr_bb")
@@ -800,11 +800,11 @@ with st.sidebar:
     acc_no     = st.text_input("Account Number", max_chars=8, key="q_acc_no")
     sort_code  = st.text_input("Sort Code", max_chars=6, key="q_sort_code")
 
-    # Promos removed — always recurring, no BOGOF or add-on promos
+    # Promos removed - always recurring, no BOGOF or add-on promos
 
 
 
-# Hardcoded values (features/promos removed — must stay defined for PDF/CV references)
+# Hardcoded values (features/promos removed - must stay defined for PDF/CV references)
 # Current customer cost defaults (0 unless consultant fills in)
 
 bogof_active    = False
@@ -826,7 +826,7 @@ with st.expander("💾 Save / Load Quote", expanded=False):
 
     with ql_col1:
         st.markdown("**💾 Save current quote**")
-        st.caption("Downloads a JSON file with all current inputs — share with manager or reload later.")
+        st.caption("Downloads a JSON file with all current inputs - share with manager or reload later.")
         if st.button("📥 Prepare Quote for Download", use_container_width=True, key="prep_save"):
             st.session_state["_quote_ready"] = True
         if st.session_state.get("_quote_ready"):
@@ -843,7 +843,7 @@ with st.expander("💾 Save / Load Quote", expanded=False):
             import json as _json
             quote_name = (st.session_state.get("q_comp_name") or "quote").replace(" ", "_")
             st.download_button(
-                f"📥 Download quote — {quote_name}.json",
+                f"📥 Download quote - {quote_name}.json",
                 data=_json.dumps(snapshot, indent=2, default=str),
                 file_name=f"{quote_name}_{date.today()}.json",
                 mime="application/json",
@@ -863,7 +863,7 @@ with st.expander("💾 Save / Load Quote", expanded=False):
                 for k, v in q_data.items():
                     st.session_state[k] = v
                 st.session_state["_quote_ready"] = False
-                st.success(f"✅ Quote loaded — {len(q_data)} fields restored. Page will refresh.")
+                st.success(f"✅ Quote loaded - {len(q_data)} fields restored. Page will refresh.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Could not load quote: {e}")
@@ -933,7 +933,7 @@ with col_hw1:
                 cordless_quantities[name] = qty
 
 with col_hw2:
-    # ── PBX & CCTV — prominent quick-select ───────────────────────────────────
+    # ── PBX & CCTV - prominent quick-select ───────────────────────────────────
     st.markdown("<div style='margin-top:2.6rem'></div>", unsafe_allow_html=True)
     with st.expander("📹 CCTV, Security & Access", expanded=False):
         _cctv_col1, _cctv_col2, _cctv_col3 = st.columns(3)
@@ -965,11 +965,11 @@ with col_hw2:
         other_quantities = {}
         for name, info in OTHER_HARDWARE.items():
             # Skip items handled elsewhere:
-            # — CCTV section: HIK Vision cameras/NVR
-            # — Router section: Broadband Router (auto-added)
-            # — CCTV section: Intercom, Loud Speaker, Door Entry
-            # — Headsets section: Bluetooth Headset
-            # — PBX: shown in desktop grid
+            # - CCTV section: HIK Vision cameras/NVR
+            # - Router section: Broadband Router (auto-added)
+            # - CCTV section: Intercom, Loud Speaker, Door Entry
+            # - Headsets section: Bluetooth Headset
+            # - PBX: shown in desktop grid
             if name in (
                 "PBX Unit",
                 "Door Entry System", "Intercom System", "Loud Speaker",
@@ -987,7 +987,7 @@ with col_hw2:
     if door_qty > 0:    other_quantities["Door Entry System"] = door_qty
     if cctv_int_qty > 0: other_quantities["Intercom System"] = cctv_int_qty
     if cctv_spk_qty > 0: other_quantities["Loud Speaker"] = cctv_spk_qty
-    # CCTV cameras — merge into other_quantities with pricebook pricing
+    # CCTV cameras - merge into other_quantities with pricebook pricing
     if cctv_turret_qty > 0: other_quantities["HIK Vision Turret 8MP"] = cctv_turret_qty
     if cctv_dome_qty   > 0: other_quantities["HIK Vision Dome 8MP"]   = cctv_dome_qty
     if cctv_nvr_qty    > 0: other_quantities["HIK Vision 24TB NVR"]   = cctv_nvr_qty
@@ -995,8 +995,8 @@ with col_hw2:
     # Auto-add Broadband Router when BB is selected.
     # Key insight: the "Other Hardware" expander widgets only appear in session_state
     # once the expander is opened. So get("oth_Broadband Router", 1) returns 1 (not 0)
-    # when the user has never opened the expander — meaning auto-add should fire.
-    # If the user opened the expander and explicitly set it to 0, it returns 0 — skip auto-add.
+    # when the user has never opened the expander - meaning auto-add should fire.
+    # If the user opened the expander and explicitly set it to 0, it returns 0 - skip auto-add.
     _router_user_val = st.session_state.get("oth_Broadband Router", 1)
     # Check via session state whether the router section will add a router
     _router_mode_val = st.session_state.get("router_mode", "Auto-select")
@@ -1017,7 +1017,7 @@ with col_hw2:
         other_quantities["Broadband Router"] = 1
 
     # Auto-add PBX Unit when total users >= 5 (pricebook rule)
-    # total_voice_channels computed after this block — use desk phone count as proxy
+    # total_voice_channels computed after this block - use desk phone count as proxy
     _desk_total = sum(desktop_quantities.values())
     _soft_total = st.session_state.get("standalone_softphones_key", 0)
     _total_users_preview = _desk_total + _soft_total
@@ -1034,7 +1034,7 @@ with col_hw2:
         standalone_softphones = st.number_input(
             "📱 Mobile App / Softphone-Only Users",
             min_value=0, value=0, step=1,
-            help="Users with no desk phone — mobile app or PC softphone. Each adds one hosted user licence.",
+            help="Users with no desk phone - mobile app or PC softphone. Each adds one hosted user licence.",
             key="standalone_softphones_key"
         )
         st.markdown("---")
@@ -1110,7 +1110,7 @@ with col_hw2:
             else:
                 router_type = "None / Customer Supplied"
                 add_router  = False
-        else:  # Manual select — qty grid like switches
+        else:  # Manual select - qty grid like switches
             add_router = False
             router_type = "None / Customer Supplied"
             st.caption("Set quantities for each router needed:")
@@ -1128,14 +1128,14 @@ with col_hw2:
             "Additional wired network ports", min_value=0,
             value=st.session_state.get("add_wired_ports", 0),
             step=1, key="add_wired_ports",
-            help="Extra POE ports needed beyond desk phones — affects switch auto-selection")
+            help="Extra POE ports needed beyond desk phones - affects switch auto-selection")
 
     with st.expander("📱 Mobiles", expanded=False):
         mobile_rows = []
         for net, pkgs in MOBILE_NETWORKS.items():
             for pkg, pricing in pkgs.items():
                 qty = st.number_input(
-                    f"{net} — {pkg}",
+                    f"{net} - {pkg}",
                     min_value=0, value=0, step=1, key=f"mob_{net}_{pkg}"
                 )
                 if qty > 0:
@@ -1161,7 +1161,7 @@ st.info(
 if total_voice_channels >= 5:
     _pbx_qty = sum(q for n, q in other_quantities.items() if "PBX" in n.upper() or "pbx" in n.lower())
     if _pbx_qty == 0:
-        st.warning("⚠️ 5+ users: a **PBX Unit** is required — add one from the Other Hardware section above.")
+        st.warning("⚠️ 5+ users: a **PBX Unit** is required - add one from the Other Hardware section above.")
     else:
         st.success(f"✅ PBX Unit included (×{_pbx_qty})")
 
@@ -1187,7 +1187,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
         override_upfront = 0.0; override_install_cost = 0.0
         credits_months = 0; credits_amount = 0.0; cashback_amount = 0.0
     else:
-        # ── UNLOCKED — show lock button + tabs ─────────────────────────────────
+        # ── UNLOCKED - show lock button + tabs ─────────────────────────────────
         lock_col, info_col = st.columns([1, 4])
         with lock_col:
             if st.button("🔒 Lock Panel", use_container_width=True):
@@ -1205,17 +1205,17 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 override_customer = st.text_input("Customer Name (for audit)", key="mgr_cust")
                 override_initials = st.text_input("Manager Initials", key="mgr_init")
                 override_monthly_lease = 0.0  # not used in recurring
-                override_bb_sell = st.number_input("Override BB Sell (£/mo) — 0 = auto", min_value=0.0, value=0.0, step=1.0)
+                override_bb_sell = st.number_input("Override BB Sell (£/mo) - 0 = auto", min_value=0.0, value=0.0, step=1.0)
             with mgr_col2:
-                override_upfront = st.number_input("Override Upfront Capital (£) — 0 = auto", min_value=0.0, value=0.0, step=10.0)
-                override_install_cost = st.number_input("Override Install Charge (£) — 0 = auto", min_value=0.0, value=0.0, step=50.0)
+                override_upfront = st.number_input("Override Upfront Capital (£) - 0 = auto", min_value=0.0, value=0.0, step=10.0)
+                override_install_cost = st.number_input("Override Install Charge (£) - 0 = auto", min_value=0.0, value=0.0, step=50.0)
                 credits_months = st.number_input("Introductory Credit Period (months)", min_value=0, value=0, step=1)
                 credits_amount = st.number_input("Monthly Credit Amount (£)", min_value=0.0, value=0.0, step=5.0)
                 cashback_amount = st.number_input("Cashback / Settlement Fund (£)", min_value=0.0, value=0.0, step=50.0)
 
         # ── TAB 2: Hardware Catalogue ──────────────────────────────────────────
         with panel_tabs[1]:
-            st.markdown("**System Desk Phones** — edit buy prices, add or remove rows")
+            st.markdown("**System Desk Phones** - edit buy prices, add or remove rows")
             desk_df = pd.DataFrame(cfg["handsets_desktop"])
             edited_desk = st.data_editor(desk_df, num_rows="dynamic", use_container_width=True, key="de_desktop",
                 column_config={"poe": st.column_config.CheckboxColumn("PoE"),
@@ -1264,7 +1264,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
             st.markdown("---")
             st.markdown("**🖼️ Product Image Assignment**")
-            st.caption("Assign an image to any product — saved directly in config.json "
+            st.caption("Assign an image to any product - saved directly in config.json "
                        "so it's always matched by exact name, no fuzzy logic needed.")
 
             # Build complete product list from all categories
@@ -1297,7 +1297,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     if "product_images" not in st.session_state.active_config:
                         st.session_state.active_config["product_images"] = {}
                     st.session_state.active_config["product_images"][selected_product] = _b64
-                    st.success(f"✅ Image assigned to '{selected_product}' — download config.json below to make permanent.")
+                    st.success(f"✅ Image assigned to '{selected_product}' - download config.json below to make permanent.")
 
             with img_col2:
                 _assigned = st.session_state.active_config.get("product_images", {})
@@ -1324,7 +1324,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
         # ── TAB 3: Broadband & Lease Rates ────────────────────────────────────
         with panel_tabs[2]:
-            st.markdown("**Broadband Packages** — edit wholesale costs and install charges")
+            st.markdown("**Broadband Packages** - edit wholesale costs and install charges")
             bb_df = pd.DataFrame(cfg["broadband"])
             edited_bb = st.data_editor(bb_df, num_rows="dynamic", use_container_width=True, key="de_bb",
                 column_config={
@@ -1341,7 +1341,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
         # ── TAB 4: Costs & Fees ───────────────────────────────────────────────
         with panel_tabs[3]:
-            st.markdown("**Fixed Deal Costs** — these feed directly into the lease capital calculation")
+            st.markdown("**Fixed Deal Costs** - these feed directly into the lease capital calculation")
             c = cfg["constants"]
             cc1, cc2 = st.columns(2)
             with cc1:
@@ -1356,7 +1356,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     help="Controls the hardware sell markup. Set before generating a quote. Not visible to customers.")
                 new_commission = st.slider("Commission per Unit (£)",
                     min_value=500, max_value=2000, value=int(c.get("commission_per_unit", 1000)), step=50,
-                    help="£ paid per unit of gross profit. 1 unit = £4,000 GP. Internal only — not visible to consultants.")
+                    help="£ paid per unit of gross profit. 1 unit = £4,000 GP. Internal only - not visible to consultants.")
 
             if st.button("✅ Apply Cost Changes", type="primary", key="apply_costs"):
                 st.session_state.active_config["constants"].update({
@@ -1371,7 +1371,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
         # ── TAB 5: Branding ───────────────────────────────────────────────────
         with panel_tabs[4]:
-            st.markdown("**Company Branding** — updates login screen, all PDF documents and customer view instantly")
+            st.markdown("**Company Branding** - updates login screen, all PDF documents and customer view instantly")
             br = cfg.get("branding", {})
             bc1, bc2 = st.columns(2)
             with bc1:
@@ -1399,12 +1399,12 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     "proposal_filename_prefix": new_co_file,
                     "pdf_footer":      new_co_foot,
                 }
-                st.success(f"✅ Branding updated to '{new_co_name}' — takes effect immediately!")
+                st.success(f"✅ Branding updated to '{new_co_name}' - takes effect immediately!")
                 st.rerun()
 
         # ── TAB 6: Email Settings ────────────────────────────────────────────
         with panel_tabs[5]:
-            st.markdown("**Email / SMTP Configuration** — used to send signed proposals to customers")
+            st.markdown("**Email / SMTP Configuration** - used to send signed proposals to customers")
             em = cfg.get("email", {})
             ecol1, ecol2 = st.columns(2)
             with ecol1:
@@ -1431,8 +1431,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
 
         # ── TAB 7: Product Images ─────────────────────────────────────────────
         with panel_tabs[6]:
-            st.markdown("**Upload product images** — filenames are matched to product names automatically")
-            st.caption("Tip: name files like `fanvil_v66_pro.jpg` or `v66pro.png` — the app fuzzy-matches the name")
+            st.markdown("**Upload product images** - filenames are matched to product names automatically")
+            st.caption("Tip: name files like `fanvil_v66_pro.jpg` or `v66pro.png` - the app fuzzy-matches the name")
             uploaded_files = st.file_uploader(
                 "Drag & drop product images here",
                 type=["jpg", "jpeg", "png", "webp"],
@@ -1482,7 +1482,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
             key="dl_config"
         )
 
-# ─── CALCULATIONS ENGINE (Recurring model — hardware upfront, services monthly) ─
+# ─── CALCULATIONS ENGINE (Recurring model - hardware upfront, services monthly) ─
 
 def compute_poe_needed():
     poe = 0
@@ -1531,7 +1531,7 @@ def compute_hw_buy():
     return total
 
 def compute_hw_sell():
-    """Hardware sell price — uses per-item sell price from catalogue if available,
+    """Hardware sell price - uses per-item sell price from catalogue if available,
     falls back to buy × (1 + hw_uplift_override/100) for items without a sell price."""
     total = 0.0
     for name, qty in desktop_quantities.items():
@@ -1589,12 +1589,12 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
         bb_cost2 = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
         bb_sell += bb_cost2 * (1.0 + uplift)
 
-    # Voice channels — fixed sell price from pricebook (Professional Bundle)
+    # Voice channels - fixed sell price from pricebook (Professional Bundle)
     vc_sell_per_seat = C.get("vc_sell_per_seat", 12.00)
     vc_cost_per_seat = C.get("vc_cost_per_seat", 2.95)
     lic_monthly      = total_voice_channels * vc_sell_per_seat
 
-    # Wallboard — computed here to avoid global scope issues
+    # Wallboard - computed here to avoid global scope issues
     wallboard_mo_val = wallboard_users * C.get("wallboard_sell", 99.00)
 
     mobile_sell      = sum(r["sell"] * r["qty"] for r in mobile_rows)
@@ -1645,7 +1645,7 @@ def compute_pricebook_pl():
     }
 
 def compute_pat(svc):
-    """Legacy — returns gross_profit from pricebook P&L formula as PAT proxy."""
+    """Legacy - returns gross_profit from pricebook P&L formula as PAT proxy."""
     return compute_pricebook_pl()["gross_profit"]
 
 # ── Compute everything ────────────────────────────────────────────────────────
@@ -1681,10 +1681,10 @@ if is_spread:
     # Use pricebook lease rental formula:
     # rental = (sales_lease_rate / 1000) × sub_total
     # Install cost is already embedded in cos_ex which drives the rental
-    # Customer pays NOTHING upfront in lease mode — rental covers everything
+    # Customer pays NOTHING upfront in lease mode - rental covers everything
     hw_monthly_spread = pl_data["rental"]
     total_mo   = svc["total_sell"] + hw_monthly_spread
-    upfront    = 0.0   # no upfront in lease — install baked into rental
+    upfront    = 0.0   # no upfront in lease - install baked into rental
     pat        = pat_base
 else:
     hw_monthly_spread = 0.0
@@ -1692,7 +1692,7 @@ else:
     total_mo   = svc["total_sell"]
     pat        = pat_base
 
-# ── Consultant desired rental — adjusts lease amount and commission ───────────
+# ── Consultant desired rental - adjusts lease amount and commission ───────────
 deal_type = "Hardware Lease (spread over term)" if is_spread else "Upfront Purchase"
 base_rental   = pl_data["rental"]      # the calculated lease rental (floor/reference)
 true_rate     = pl_data["true_rate"]
@@ -1710,7 +1710,7 @@ _adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
 commission_units       = _adjusted_gp / 4000
 commission             = round(commission_units * 1000, 2)
 
-# Rental adjustment (vs calculated) — can be positive (premium) or negative (discount)
+# Rental adjustment (vs calculated) - can be positive (premium) or negative (discount)
 rental_adjustment = _desired_rental - base_rental
 
 # In lease mode, use desired_rental as the actual hw_monthly_spread
@@ -1727,7 +1727,7 @@ kit_cost    = hw_buy
 lease_mo    = hw_monthly_spread  # used in PDF as "Hardware Monthly" when spread
 rec_upfront = upfront
 
-# Pure connectivity cost — broadband + mobile only (for Commercial Summary card)
+# Pure connectivity cost - broadband + mobile only (for Commercial Summary card)
 pure_connectivity = round(svc["bb_sell"] + svc["mobile_sell"], 2)
 
 # SGP / sales comms
@@ -1785,19 +1785,19 @@ else:
         </div>""", unsafe_allow_html=True)
 
 # ── Internal financials
-# ── Internal financials — collapsed by default, hidden from customer ────────
+# ── Internal financials - collapsed by default, hidden from customer ────────
 pc = pat_class(pat)
 pat_warn = ""
 if pat < 250:
-    pat_warn = "⚠️ Below £250 — must go to office"
+    pat_warn = "⚠️ Below £250 - must go to office"
 elif pat < 500:
-    pat_warn = "⚠️ Low PAT — consider manager review"
+    pat_warn = "⚠️ Low PAT - consider manager review"
 
-with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False):
+with st.expander("🔐 Internal Deal Financials - Admin Only", expanded=False):
     if not st.session_state.admin_unlocked:
         st.info("🔒 Unlock the Admin Panel above to view deal financials.")
     else:
-        # Row 1 — 4 original cards
+        # Row 1 - 4 original cards
         fi1, fi2, fi3, fi4 = st.columns(4)
         with fi1:
             st.markdown(f'''<div class="metric-card">
@@ -1824,7 +1824,7 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
               <div class="metric-sub">£{commission_per_unit:.0f}/unit · £{commission_unit_size:.0f} GP = 1 unit</div>
             </div>''', unsafe_allow_html=True)
         st.markdown("---")
-        # Row 2 — Profit breakdown cards
+        # Row 2 - Profit breakdown cards
         _svc_cost_pm    = svc["bb_cost"] + total_voice_channels * C.get("vc_cost_per_seat",2.95) + sw_cost_total + svc.get("mobile_cost",0.0)
         _svc_sell_pm    = svc["total_sell"]
         _svc_margin_pm  = _svc_sell_pm - _svc_cost_pm
@@ -1851,7 +1851,7 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
             </div>''', unsafe_allow_html=True)
         if termination_cost > 0:
             st.markdown(
-                f'<div class="info-box">🔒 Termination / Buyout: <strong>£{termination_cost:.2f}</strong> — '
+                f'<div class="info-box">🔒 Termination / Buyout: <strong>£{termination_cost:.2f}</strong> - '
                 f'{"spread at £" + str(round(termination_cost/lease_term,2)) + "/mo over " + LEASE_TERM_LABELS[lease_term] if is_spread else "included in upfront cost"}</div>',
                 unsafe_allow_html=True
             )
@@ -1862,7 +1862,7 @@ with st.expander("🔐 Internal Deal Financials — Admin Only", expanded=False)
 # ─── TABS ─────────────────────────────────────────────────────────────────────
 
 def s(text):
-    """Sanitise text for fpdf2 — replaces/strips characters outside latin-1."""
+    """Sanitise text for fpdf2 - replaces/strips characters outside latin-1."""
     if not text:
         return ""
     replacements = {
@@ -1878,6 +1878,10 @@ def s(text):
 def build_proposal_pdf():
     """Two-page marketing proposal: Page 1 = About SY Comms, Page 2 = Deal breakdown."""
     from fpdf import FPDF
+    def _ps(text):
+        """Sanitise text to Latin-1 safe for Helvetica."""
+        return str(text or "").encode("latin-1", errors="replace").decode("latin-1")
+
     p = FPDF()
     p.set_auto_page_break(True, margin=15)
 
@@ -1917,11 +1921,11 @@ def build_proposal_pdf():
     p.set_font("Helvetica","",9)
     p.set_text_color(60,60,60)
     p.set_x(p.l_margin)
-    p.multi_cell(p.epw, 4.5,
+    p.multi_cell(p.epw, 4.5, _ps(
         "SY Comms Ltd is a trusted UK telecoms reseller providing businesses with "
         "end-to-end communication solutions. We design, supply, install and support "
-        "fully managed telephone systems, broadband, mobile and networking — all under "
-        "one agreement, one monthly cost, and one dedicated support team.",
+        "fully managed telephone systems, broadband, mobile and networking - all under "
+        "one agreement, one monthly cost, and one dedicated support team."),
         align="J")
     p.ln(6)
 
@@ -1930,12 +1934,12 @@ def build_proposal_pdf():
     p.cell(0,7,"Why Choose SY Comms?",ln=True)
     p.ln(2)
     vals = [
-        ("🚀","All-Inclusive","One monthly cost covers hardware, support, licences and broadband"),
-        ("🔧","Fully Managed","Installation, programming and on-site warranty included"),
-        ("📞","UK Support","Dedicated helpdesk and remote diagnostics from day one"),
-        ("📡","Flexible Connectivity","FTTP, SoGEA, leased line and 4G/5G solutions"),
-        ("💼","Business Focus","Tailored for SMEs — solutions that scale with you"),
-        ("✅","Transparent Pricing","No hidden costs — all terms stated upfront"),
+        (">>","All-Inclusive","One monthly cost covers hardware, support, licences and broadband"),
+        (">>","Fully Managed","Installation, programming and on-site warranty included"),
+        (">>","UK Support","Dedicated helpdesk and remote diagnostics from day one"),
+        (">>","Flexible Connectivity","FTTP, SoGEA, leased line and 4G/5G solutions"),
+        (">>","Business Focus","Tailored for SMEs - solutions that scale with you"),
+        (">>","Transparent Pricing","No hidden costs - all terms stated upfront"),
     ]
     _vc = p.l_margin
     for n, (icon, title, desc) in enumerate(vals):
@@ -1947,7 +1951,7 @@ def build_proposal_pdf():
         p.rect(col_x, p.get_y(), 90, 24, "F")
         p.set_font("Helvetica","B",10); p.set_text_color(0,181,163)
         p.set_xy(col_x+3, p.get_y()+3)
-        p.cell(84,5,f"{icon}  {title}",ln=True)
+        p.cell(84,5,f"{icon} {title}",ln=True)
         p.set_font("Helvetica","",8); p.set_text_color(80,80,80)
         p.set_x(col_x+3)
         p.multi_cell(84,3.8,desc)
@@ -1975,7 +1979,7 @@ def build_proposal_pdf():
     p.set_font("Helvetica","B",13)
     p.set_y(4); p.cell(0,7,"Your Personalised Proposal",ln=True,align="C")
     p.set_font("Helvetica","",8)
-    p.cell(0,5,f"Prepared for: {s(comp_name or 'Your Company')}  |  {date.today().strftime('%d %B %Y')}",ln=True,align="C")
+    p.cell(0,5,_ps(f"Prepared for: {s(comp_name or 'Your Company')}  |  {date.today().strftime('%d %B %Y')}"),ln=True,align="C")
     p.set_fill_color(0,181,163); p.rect(0,22,210,2,"F")
     p.set_text_color(0,0,0); p.set_y(28)
 
@@ -2357,7 +2361,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     # Voice Channel Licences
     if total_voice_channels > 0:
-        vc_billing_pdf = f"£{svc['lic_monthly']:.2f}/mo"  # always monthly — not part of lease
+        vc_billing_pdf = f"£{svc['lic_monthly']:.2f}/mo"  # always monthly - not part of lease
         all_equip_pdf.append((f"User / Voice Licences x{total_voice_channels}",
                                total_voice_channels, vc_billing_pdf))
 
@@ -2422,7 +2426,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 9)
     pdf.set_x(pdf.l_margin)
     if is_spread:
-        # Note: hw_monthly_spread includes termination cost if applicable — do not
+        # Note: hw_monthly_spread includes termination cost if applicable - do not
         # expose the raw hw_sell figure as the maths would not reconcile for the customer
         pdf.multi_cell(pdf.epw, 5,
             f"Your system investment of £{hw_monthly_spread:.2f} + VAT per month covers all hardware, "
@@ -3032,7 +3036,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         ("On Site Maintenance Agreement","[X]"),
     ]
     pdf.set_font("Helvetica","",8)
-    _fc = st.columns if False else None  # PDF only — use cells
+    _fc = st.columns if False else None  # PDF only - use cells
     for i in range(0,len(_forms),3):
         for label,tick in _forms[i:i+3]:
             pdf.cell(65,5,f"{tick}  {label}",ln=False)
@@ -3098,7 +3102,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.multi_cell(pdf.epw, 3.5, "This is a summary. Full Terms & Conditions: https://sycomms.co.uk/terms-conditions", align="C")
     pdf.set_text_color(0, 0, 0)
 
-    # ── AUDIT CERTIFICATE PAGE — DocuSign-style ─────────────────────────────
+    # ── AUDIT CERTIFICATE PAGE - DocuSign-style ─────────────────────────────
     if sig_bytes and sig_timestamp:
         import uuid as _uuid, hashlib as _hl
         from datetime import datetime as _dt
@@ -3139,7 +3143,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
         pdf.add_page()
 
-        # ── Page header (light — no logo for certificate page) ────────────────
+        # ── Page header (light - no logo for certificate page) ────────────────
         pdf.set_fill_color(31, 20, 80)
         pdf.rect(0, 0, 210, 22, "F")
         pdf.set_font("Helvetica", "B", 13)
@@ -3307,9 +3311,9 @@ def _embed_sig(pdf_obj, sig_bytes, x=15, w=65, h=20,
                 finally:
                     _os.unlink(_tmp_sig_path)
             except Exception:
-                pass  # image unreadable — skip, show name only
+                pass  # image unreadable - skip, show name only
 
-        # Metadata — always in left column (x=15), max 90mm wide
+        # Metadata - always in left column (x=15), max 90mm wide
         pdf_obj.set_font("Helvetica", "I", 8)
         pdf_obj.set_text_color(80, 80, 80)
         for line in [
@@ -3449,19 +3453,19 @@ with tab1:
         st.caption("Ongoing monthly service charges")
         net_items = []
         if svc["bb_sell"] > 0:
-            net_items.append((f"{bb_provider} — {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo"))
-        # Voice Channel Licences — always show with monthly amount
+            net_items.append((f"{bb_provider} - {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo"))
+        # Voice Channel Licences - always show with monthly amount
         if total_voice_channels > 0:
             net_items.append((f"Hosted User Licences x{total_voice_channels} (Professional Bundle)",
                               total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
-        # SW Add-ons — monthly amounts
+        # SW Add-ons - monthly amounts
         for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
             if addon_qty > 0:
                 net_items.append((addon_name, addon_qty, f"£{addon_sell * addon_qty:.2f}/mo"))
         # 2nd line BB
         if second_fttp and second_fttp_pkg:
             bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
-            net_items.append((f"{bb_provider} — {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
+            net_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
         # Mobile rows
 
         net_df = pd.DataFrame(net_items, columns=["Service", "Qty", "Charge"])
@@ -3470,7 +3474,7 @@ with tab1:
 
     with prop_col2:
         st.markdown("#### Commercial Summary")
-        # Build commercial summary cards — content varies by payment model
+        # Build commercial summary cards - content varies by payment model
         _hw_card = "" if is_spread else f"""
         <div class="metric-card" style="text-align:left; margin-bottom:1rem">
           <div class="metric-label">Upfront Hardware Cost</div>
@@ -3585,7 +3589,7 @@ with tab2:
             "No. of Sites":    str(num_sites),
         }
         if svc["bb_sell"] > 0:
-            config_fields["Broadband"] = f"{bb_provider} — {bb_package}"
+            config_fields["Broadband"] = f"{bb_provider} - {bb_package}"
         if is_spread:
             config_fields["Hardware Rental"] = f"£{hw_monthly_spread:.2f}/mo (lease)"
             config_fields["Note"] = "Install & setup included in lease rental"
@@ -3646,11 +3650,11 @@ with tab3:
     with doc_col2:
         st.markdown("#### 📋 Deal Summary")
         summary = [
-            f"Customer: {comp_name or '—'}",
+            f"Customer: {comp_name or '-'}",
             f"Agreement Term: {LEASE_TERM_LABELS[lease_term]}",
             f"Payment Model: {payment_model}",
             f"Monthly Total: £{total_mo:.2f} + VAT",
-            f"Broadband: {bb_provider} — {bb_package}",
+            f"Broadband: {bb_provider} - {bb_package}",
             f"Voice Channels: {total_voice_channels}",
             f"Install Type: {install_type}",
         ]
@@ -3667,20 +3671,20 @@ with tab3:
         pdf_bytes = build_pdf()
         safe_name = s(comp_name).replace(" ", "_").replace("/", "-")
         st.download_button(
-            label=f"📥 Download Full Proposal Pack — {comp_name}",
+            label=f"📥 Download Full Proposal Pack - {comp_name}",
             data=pdf_bytes,
             file_name=f"SYComms_Proposal_{safe_name}_{date.today()}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
-        st.markdown('<div class="success-box">✅ PDF ready — 4 sections: Proposal, Order Form, Network Agreement, Mandate & Checklist.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="success-box">✅ PDF ready - 4 sections: Proposal, Order Form, Network Agreement, Mandate & Checklist.</div>', unsafe_allow_html=True)
         st.markdown("")
         st.markdown("---")
         st.markdown("#### 📋 One-Page Proposal")
         st.caption("Clean two-page summary: About SY Comms + deal breakdown. Great for emailing to a prospect before the full paperwork.")
         proposal_bytes = build_proposal_pdf()
         st.download_button(
-            label=f"📋 Download Proposal Summary — {comp_name}",
+            label=f"📋 Download Proposal Summary - {comp_name}",
             data=proposal_bytes,
             file_name=f"SYComms_Proposal_Summary_{safe_name}_{date.today()}.pdf",
             mime="application/pdf",
@@ -3749,7 +3753,7 @@ with tab4:
             sw_name = rec_switch["name"]
             all_selected.append((f"Switch: {sw_name}", 1, {"cat": "Switch"}))
 
-        # Add router card(s) — iterate router_quantities for multi-router support
+        # Add router card(s) - iterate router_quantities for multi-router support
         if add_router:
             if router_quantities:
                 for _rn, _rq in router_quantities.items():
@@ -3854,7 +3858,7 @@ with tab4:
         elif sw_sell_total > 0:
             comp_rows.append(("Software Charges", 0.0, sw_sell_total))
 
-        # Comparison table — built as a flat string to avoid markdown code-block indentation
+        # Comparison table - built as a flat string to avoid markdown code-block indentation
         _saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
         _saving_col = "#1a7a40" if saving_mo >= 0 else "#c0392b"
         _saving_lbl = "Monthly Saving" if saving_mo >= 0 else "Monthly Increase"
@@ -3909,11 +3913,11 @@ with tab4:
     with cv_col1:
         st.markdown('<div class="cv-section">🌐 Your Services</div>', unsafe_allow_html=True)
         svc_lines = [
-            (f"Business Broadband — {bb_provider} {bb_package}", f"£{svc['bb_sell']:.2f}/mo"),
+            (f"Business Broadband - {bb_provider} {bb_package}", f"£{svc['bb_sell']:.2f}/mo"),
         ]
         if second_fttp and second_fttp_pkg:
             bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
-            svc_lines.append((f"2nd Line — {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
+            svc_lines.append((f"2nd Line - {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
         if total_voice_channels > 0:
             svc_lines.append((f"User / Voice Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
         if ooh_support:
@@ -3946,7 +3950,7 @@ with tab4:
         for item in includes:
             st.markdown(f'<div class="cv-include-item">✅ {item}</div>', unsafe_allow_html=True)
 
-        # Software add-on images — show if any selected
+        # Software add-on images - show if any selected
         active_addons = [(name, qty) for name, qty, _, _ in SW_ADDONS if qty > 0]
         if active_addons:
             st.markdown('<div class="cv-section">💻 Software &amp; Add-ons</div>', unsafe_allow_html=True)
@@ -4041,7 +4045,7 @@ with tab5:
              padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;
              justify-content:space-between;align-items:center;color:#fff">
           <div><div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">CUSTOMER</div>
-               <div style="font-size:1rem;font-weight:700">{comp_name or "—"}</div></div>
+               <div style="font-size:1rem;font-weight:700">{comp_name or "-"}</div></div>
           <div style="text-align:center">
                <div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">BASE MONTHLY</div>
                <div style="font-size:1.4rem;font-weight:800;color:#00b5a3">£{total_mo:.2f}</div></div>
@@ -4098,7 +4102,7 @@ with tab5:
             """, unsafe_allow_html=True)
 
 
-        # Row 1 — Lease-only comparison
+        # Row 1 - Lease-only comparison
         r1a, r1b, r1c = st.columns(3)
         with r1a:
             if current_system > 0:
@@ -4158,7 +4162,7 @@ with tab5:
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Row 2 — Full monthly total
+        # Row 2 - Full monthly total
         # Use adjusted values from breakdown if consultant has made changes
         _c_adj_total = (
             float(st.session_state.get("c_adj_calls", 0.0)) +
@@ -4171,8 +4175,8 @@ with tab5:
         )
         _diff_total    = current_total - _c_adj_total
         _diff_col      = "#1a7a40" if _diff_total >= 0 else "#c0392b"
-        _curr_total_str = f"£{current_total:.2f}" if current_total > 0 else "—"
-        _curr_sys_str   = f"£{current_system:.2f}" if current_system > 0 else "—"
+        _curr_total_str = f"£{current_total:.2f}" if current_total > 0 else "-"
+        _curr_sys_str   = f"£{current_system:.2f}" if current_system > 0 else "-"
         st.markdown(f"""
         <div style="background:#f0f4ff;border:1px solid #c0cce0;border-radius:10px;
              padding:0.8rem 1.2rem;margin-top:0.5rem">
@@ -4199,7 +4203,7 @@ with tab5:
 
         st.markdown("")
 
-        # Row 2 — Commission (full width, prominent)
+        # Row 2 - Commission (full width, prominent)
         st.markdown(f"""
         <div style="background:linear-gradient(135deg,#0d4a2a,#1a7a40);border-radius:12px;
              padding:1.4rem 2rem;margin-top:0.5rem;display:flex;
@@ -4208,7 +4212,7 @@ with tab5:
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
                  letter-spacing:.1em;color:rgba(255,255,255,0.6)">Your Estimated Commission</div>
             <div style="font-size:2.2rem;font-weight:800;color:#fff">£{est_earnings:.2f}</div>
-          <div style="font-size:0.82rem;color:rgba(255,255,255,0.55)">{commission_units:.2f} units × £{commission_per_unit:.0f} — {LEASE_TERM_LABELS[lease_term]}</div>\n          </div>
+          <div style="font-size:0.82rem;color:rgba(255,255,255,0.55)">{commission_units:.2f} units × £{commission_per_unit:.0f} - {LEASE_TERM_LABELS[lease_term]}</div>\n          </div>
           {"<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5);'>Rate Uplift Applied</div><div style='font-size:1.3rem;font-weight:700;color:#7fe8a0'>+£" + f"{rate_uplift:.2f}" + "/mo</div></div>" if rate_uplift > 0 else "<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5)'>Tip</div><div style='font-size:0.88rem;color:rgba(255,255,255,0.7)'>Increase the monthly<br>rate above to earn more</div></div>"}
         </div>
         """, unsafe_allow_html=True)
@@ -4218,7 +4222,7 @@ with tab5:
         st.markdown("### 📋 Monthly Charge Breakdown")
         st.caption("Adjust any line to price-match or offer a discount. Commission recalculates automatically.")
 
-        # No persistent keys — resets to live calculated values each run
+        # No persistent keys - resets to live calculated values each run
         # Equipment Rental is handled by the Lease Rental Adjustment above
         _vc_default   = float(round(svc["lic_monthly"], 2))
         _sw_default   = float(round(sw_sell_total, 2))
@@ -4252,7 +4256,7 @@ with tab5:
         _f_col  = "#1a7a40" if _settle_ok else "#c0392b"
         _f_bg   = "#e8f8f0" if _settle_ok else "#fdf0f0"
         _f_icon = "✅" if _settle_ok else "🔴"
-        _f_msg  = "Settlement feasible" if _settle_ok else "Settlement exceeds 70% — review"
+        _f_msg  = "Settlement feasible" if _settle_ok else "Settlement exceeds 70% - review"
         _f_diff = _feas_max_settle - termination_cost
 
         st.markdown(f"""
@@ -4260,7 +4264,7 @@ with tab5:
              border-radius:10px;display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:{_f_col}">
-              {_f_icon} Feasibility — Max Settlement (70%)</div>
+              {_f_icon} Feasibility - Max Settlement (70%)</div>
             <div style="font-size:1.2rem;font-weight:800;color:{_f_col}">£{_feas_max_settle:.2f}</div>
             <div style="font-size:0.78rem;color:{_f_col}">{_f_msg} &nbsp;·&nbsp;
               {"£" + f"{abs(_f_diff):.2f}" + " headroom" if _settle_ok else "£" + f"{abs(_f_diff):.2f}" + " over limit"}
@@ -4381,7 +4385,7 @@ with tab6:
         _col  = '#1a7a40' if _settlement_ok else '#c0392b'
         _bg   = '#e8f8f0' if _settlement_ok else '#fdf0f0'
         _icon = '✅' if _settlement_ok else '🔴'
-        _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% — Review Required'
+        _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% - Review Required'
         _diff = _max_settlement - termination_cost
         st.markdown(f"""
         <div style='background:{_bg};border:2px solid {_col};border-radius:12px;padding:1.4rem;text-align:center'>
@@ -4507,7 +4511,7 @@ with tab7:
                             drawing_mode="freedraw",
                             key="sig_canvas",
                         )
-                # Explicit save button — more reliable than auto-detect
+                # Explicit save button - more reliable than auto-detect
                 _btn_col, _clr_col = st.columns(2)
                 with _btn_col:
                     if st.button("✅ Save Signature", use_container_width=True,
@@ -4516,7 +4520,7 @@ with tab7:
                             _img_data = canvas_result.image_data if canvas_result else None
                             if _img_data is not None:
                                 from PIL import Image as _PILImage
-                                # Save as RGBA PNG — fpdf2 temp file handles transparency
+                                # Save as RGBA PNG - fpdf2 temp file handles transparency
                                 sig_pil = _PILImage.fromarray(
                                     _img_data.astype("uint8"), "RGBA"
                                 )
@@ -4529,7 +4533,7 @@ with tab7:
                                 st.session_state["_sig_bytes"] = sig_buf.getvalue()
                                 st.rerun()
                             else:
-                                st.warning("Canvas returned no data — please try Upload photo.")
+                                st.warning("Canvas returned no data - please try Upload photo.")
                         except Exception as _ce:
                             st.warning(f"Canvas capture failed ({type(_ce).__name__}: {_ce}). Use Upload photo.")
                 with _clr_col:
@@ -4550,7 +4554,7 @@ with tab7:
 
         sig_bytes = st.session_state.get("_sig_bytes")
         if sig_bytes:
-            st.success("✅ Signature saved — ready to download")
+            st.success("✅ Signature saved - ready to download")
         else:
             st.caption("✏️ Draw signature above then click Save Signature")
 
@@ -4565,7 +4569,7 @@ with tab7:
 
         # ── Download unsigned PDF (always available) ─────────────────────────
         st.markdown("**Unsigned Pack**")
-        st.caption("Full proposal pack without signature — for review or printing.")
+        st.caption("Full proposal pack without signature - for review or printing.")
         _unsigned_bytes = build_pdf(
             sig_bytes=None,
             curr_total=current_total, curr_bb=current_bb,
@@ -4654,7 +4658,7 @@ with tab7:
                     import email.mime.text as _mt
                     from email.encoders import encode_base64 as _eb
                     _msg = _mp.MIMEMultipart()
-                    _msg["Subject"] = f"Your Signed Proposal — {comp_name}"
+                    _msg["Subject"] = f"Your Signed Proposal - {comp_name}"
                     _msg["From"]    = em_cfg.get("username","")
                     _msg["To"]      = to_email
                     if cc_email: _msg["Cc"] = cc_email
@@ -4670,7 +4674,7 @@ with tab7:
                 except Exception as _e:
                     st.error(f"Email failed: {_e}")
 
-    st.caption("Upload PDFs and send the customer a secure signing link — no need for them to be in the room.")
+    st.caption("Upload PDFs and send the customer a secure signing link - no need for them to be in the room.")
 
     em_cfg_rs         = st.session_state.active_config.get("email", {})
     GITHUB_TOKEN_RS   = st.secrets.get("GITHUB_TOKEN", "") if hasattr(st, "secrets") else ""
@@ -4750,12 +4754,12 @@ with tab7:
     # ── Setup checks ──────────────────────────────────────────────────────────
     setup_ok = True
     if not GITHUB_TOKEN_RS:
-        pass  # GitHub token not configured — remote signing unavailable
+        pass  # GitHub token not configured - remote signing unavailable
         st.code('GITHUB_TOKEN = "ghp_your_token_here"', language="toml")
         setup_ok = False
 
     if not SIGNING_PORTAL_URL:
-        pass  # Signing portal URL not configured — remote signing unavailable
+        pass  # Signing portal URL not configured - remote signing unavailable
         st.code('SIGNING_PORTAL_URL = "https://your-signing-portal.streamlit.app"', language="toml")
         setup_ok = False
 
