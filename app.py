@@ -1995,7 +1995,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(1)
 
     values = [
-        (">  Flexible", "12-month rolling contracts — no lengthy commitments"),
         (">  Local",    "Shropshire-based engineers serving SY & TF postcodes"),
         (">  Rapid",    "Response times within the hour to minimise downtime"),
         (">  Complete", "Full-stack: Telecoms, Mobile, Networking, IT & Payments"),
@@ -2165,14 +2164,14 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     # Voice Channel Licences
     if total_voice_channels > 0:
-        vc_billing_pdf = _pdf_hw_billing if is_spread else f"£{svc['lic_monthly']:.2f}/mo"
-        all_equip_pdf.append((f"Voice Channel Licences x{total_voice_channels}",
+        vc_billing_pdf = f"£{svc['lic_monthly']:.2f}/mo"  # always monthly — not part of lease
+        all_equip_pdf.append((f"User / Voice Licences x{total_voice_channels}",
                                total_voice_channels, vc_billing_pdf))
 
     # Software add-ons
     for addon_name, addon_qty, addon_cost, addon_sell in SW_ADDONS:
         if addon_qty > 0:
-            addon_billing_pdf = _pdf_hw_billing if is_spread else f"£{addon_sell * addon_qty:.2f}/mo"
+            addon_billing_pdf = f"£{addon_sell * addon_qty:.2f}/mo"  # SW always monthly
             all_equip_pdf.append((addon_name, addon_qty, addon_billing_pdf))
 
     # Network & Connectivity
@@ -2271,19 +2270,14 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 7, "Signatures", ln=True)
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(90, 5, "For (Company Name):", ln=False)
-    pdf.cell(0, 5, f"For {_CO}:", ln=True)
+    pdf.cell(0, 5, "For (Company Name):", ln=True)
     pdf.ln(2)
     _embed_sig(pdf, sig_bytes, signer_name=sig_name,
                company=sig_company, timestamp=sig_timestamp)
-    pdf.cell(90, 0.5, "", border="T", ln=False)
-    pdf.cell(15, 0.5, "", ln=False)
-    pdf.cell(75, 0.5, "", border="T", ln=True)
+    pdf.cell(0, 0.5, "", border="T", ln=True)
     pdf.ln(3)
-    pdf.cell(90, 5, f"Name & Position: {_contact or '___________________________'}", ln=False)
-    pdf.cell(0, 5, "Name & Position: ___________________________", ln=True)
-    pdf.cell(90, 5, f"Date: {date.today()}", ln=False)
-    pdf.cell(0, 5, "Date: ___________________________", ln=True)
+    pdf.cell(0, 5, f"Name & Position: {_contact or '___________________________'}", ln=True)
+    pdf.cell(0, 5, f"Date: {date.today()}", ln=True)
     pdf.ln(6)
 
     # -- PAGE 3: NETWORK SERVICES AGREEMENT --
@@ -2305,7 +2299,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         svc_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
     if total_voice_channels > 0:
         vc_sell_svc = round(3.49 * (1 + service_uplift_pct/100) * total_voice_channels, 2)
-        svc_items.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels, f"£{vc_sell_svc:.2f}/mo"))
+        svc_items.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels, f"£{vc_sell_svc:.2f}/mo"))
     if ooh_support:
         svc_items.append(("24/7 OOH Support", 1, "£25.00/mo"))
     if dark_web_mon:
@@ -2332,6 +2326,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "B", 9)
     pdf.cell(130, 6, "  TOTAL MONTHLY SERVICE CHARGES", fill=True, ln=False)
     pdf.cell(60, 6, f"£{svc['total_sell']:.2f}/mo", fill=True, ln=True, align="C")
+    pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
+    pdf.multi_cell(pdf.epw,3.5,"* Monthly service charges are subject to standard annual price adjustment in accordance with contractual terms.",align="L")
+    pdf.set_text_color(0,0,0)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
 
@@ -2354,18 +2351,13 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 5, f"For {_CO}:", ln=True)
     pdf.ln(2)
     _embed_sig(pdf, sig_bytes, signer_name=sig_name,
-               company=sig_company, timestamp=sig_timestamp)
-    pdf.cell(90, 0.5, "", border="T", ln=False)
-    pdf.cell(15, 0.5, "", ln=False)
-    pdf.cell(75, 0.5, "", border="T", ln=True)
+    company=sig_company, timestamp=sig_timestamp)
+    pdf.cell(0, 0.5, "", border="T", ln=True)
     pdf.ln(3)
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(90, 5, f"Name & Position: {_contact or '___________________________'}", ln=False)
-    pdf.cell(0, 5, "Name & Position: ___________________________", ln=True)
-    pdf.cell(90, 5, f"Date: {date.today()}", ln=False)
-    pdf.cell(0, 5, "Date: ___________________________", ln=True)
+    pdf.cell(0, 5, f"Name & Position: {_contact or '___________________________'}", ln=True)
+    pdf.cell(0, 5, f"Date: {date.today()}", ln=True)
     pdf.ln(4)
-
     # -- PAGE 4: LEASE AGREEMENT / QUOTATION SUMMARY --
     pdf.add_page()
     _add_header(pdf, "Equipment Lease Agreement")
@@ -2410,11 +2402,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 8)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw, 4.5,
-        f"Monthly services (hosted licences, broadband, calls) of £{svc['total_sell']:.2f} + VAT "
-        f"will be billed separately by {_CO} Ltd under a separate agreement. "
-        f"Total monthly commitment: £{total_mo:.2f} + VAT. "
-        f"*Fair usage policy applies, subject to terms and conditions.",
-        align="J"
+    f"Monthly services (hosted licences, broadband, calls) of £{svc['total_sell']:.2f} + VAT "
+    f"will be billed separately by {_CO} Ltd under a separate agreement. "
+    f"Total monthly commitment: £{total_mo:.2f} + VAT. "
+    f"*Fair usage policy applies, subject to terms and conditions.",
+    align="J"
     )
     pdf.ln(6)
 
@@ -2423,12 +2415,12 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "", 8)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw, 4.5,
-        f"I confirm that the above figures are representative of our current average expenditure "
-        f"and I understand that I will be billed in line with {_CO} Ltd's current Terms and Conditions. "
-        f"I understand that I will be billed separately for the system rental by a 3rd party funder "
-        f"and lines, calls, maintenance and broadband by {_CO} Ltd under a separate agreement. "
-        f"*Fair usage policy applies, subject to terms and conditions.",
-        align="J"
+    f"I confirm that the above figures are representative of our current average expenditure "
+    f"and I understand that I will be billed in line with {_CO} Ltd's current Terms and Conditions. "
+    f"I understand that I will be billed separately for the system rental by a 3rd party funder "
+    f"and lines, calls, maintenance and broadband by {_CO} Ltd under a separate agreement. "
+    f"*Fair usage policy applies, subject to terms and conditions.",
+    align="J"
     )
     pdf.ln(8)
 
@@ -2439,26 +2431,21 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(3)
 
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(95, 5, f"Company Name: {s(_comp or '')}", ln=False)
-    pdf.cell(0, 5, "Company Name: SY Comms Ltd", ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 5, f"Company Name: {s(_comp or '')}", ln=True)
 
     if sig_bytes:
         try:
             _sig_buf2 = io.BytesIO(sig_bytes); _sig_buf2.seek(0)
             pdf.image(_sig_buf2, x=pdf.l_margin, y=pdf.get_y(), h=14)
+            pdf.ln(16)
         except Exception:
-            pdf.cell(95, 14, "Signed: ________________", ln=False)
+            pdf.cell(0, 14, "Signed: ________________", ln=True)
     else:
-        pdf.cell(95, 14, "Signed: ________________", ln=False)
-    pdf.cell(0, 14, "Signed: ________________", ln=True)
-
+        pdf.cell(0, 14, "Signed: ________________", ln=True)
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(95, 5, f"Name: {s(sig_name or '')}", ln=False)
-    pdf.cell(0, 5, "Name & Position: ___________________________", ln=True)
-    pdf.cell(95, 5, f"Date: {date.today().strftime('%d/%m/%Y')}", ln=False)
-    pdf.cell(0, 5, "Date: ______________________________", ln=True)
-
-    # -- PAGE 5: BANK DETAILS & CHECKLIST --
+    pdf.cell(0, 5, f"Name: {s(sig_name or '')}", ln=True)
+    pdf.cell(0, 5, f"Date: {date.today().strftime('%d/%m/%Y')}", ln=True)
     pdf.add_page()
     _add_header(pdf, "Direct Debit Mandate & Customer Checklist")
 
@@ -2471,8 +2458,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_font("Helvetica", "", 8)
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 4.5,
-            f"By signing this mandate you authorise {_CO} to collect payments by Direct Debit in "
-            "accordance with the agreed terms. Payments will be collected on or around the 1st of each month."
+        f"By signing this mandate you authorise {_CO} to collect payments by Direct Debit in "
+        "accordance with the agreed terms. Payments will be collected on or around the 1st of each month."
         )
         pdf.ln(6)
         pdf.set_font("Helvetica", "B", 9)
@@ -3305,7 +3292,7 @@ with tab2:
             elif router_type not in ("None / Customer Supplied", ""):
                 all_equip.append((router_type, 1))
         if total_voice_channels > 0:
-            all_equip.append((f"Voice Channel Licences x{total_voice_channels}", total_voice_channels))
+            all_equip.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels))
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
                 all_equip.append((addon_name, addon_qty))
@@ -3594,7 +3581,7 @@ with tab4:
             bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
             svc_lines.append((f"2nd Line — {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
         if total_voice_channels > 0:
-            svc_lines.append((f"Voice Channel Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
+            svc_lines.append((f"User / Voice Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
         if ooh_support:
             svc_lines.append(("24/7 Out-of-Hours Support", "£25.00/mo"))
         if dark_web_mon:
