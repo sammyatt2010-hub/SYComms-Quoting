@@ -2017,69 +2017,71 @@ def build_proposal_pdf():
     _hdr("Personalised Proposal",
          f"Prepared for: {s(comp_name or 'Your Company')}  |  {date.today().strftime('%d %B %Y')}")
 
-    # Cost comparison table with colour coding
-    p.set_font("Helvetica","B",8); p.set_fill_color(210,218,235); p.set_text_color(31,20,80)
-    p.cell(90,6,"  Cost Breakdown",fill=True,ln=False)
-    p.cell(50,6,"Current",fill=True,ln=False,align="C")
-    p.cell(0,6,"SY Comms",fill=True,ln=True,align="C")
+    # ── CURRENT vs SY COMMS COST CARDS ────────────────────────────────────────
+    def _card(x, y, w, h, bg, txt_col, label, main_val, sub_val="", accent=False):
+        p.set_fill_color(*bg)
+        p.rect(x, y, w, h, "F")
+        if accent:
+            p.set_fill_color(0,181,163)
+            p.rect(x, y, w, 1.5, "F")
+        p.set_font("Helvetica","",6.5); p.set_text_color(*txt_col)
+        p.set_xy(x+3, y+3)
+        p.cell(w-6, 4, _ps(label), ln=True)
+        p.set_font("Helvetica","B",13); p.set_text_color(*txt_col)
+        p.set_x(x+3)
+        p.cell(w-6, 7, _ps(main_val), ln=True)
+        if sub_val:
+            p.set_font("Helvetica","",6.5)
+            p.set_text_color(*(140,140,140) if bg==(255,255,255) else tuple(min(c+60,255) for c in txt_col))
+            p.set_x(x+3)
+            p.cell(w-6, 4, _ps(sub_val), ln=True)
+
+    # Row 1: Lease comparison cards
+    _cw, _ch, _gap = 61, 34, 3
+    _row1_y = p.get_y()
+
+    curr_hw_disp  = f"GBP {current_system:.2f}/mo" if current_system > 0 else "Not provided"
+    curr_tot_disp = f"GBP {current_total:.2f}/mo"  if current_total  > 0 else "Not provided"
+    saving        = current_total - total_mo if current_total > 0 else 0
+
+    _card(p.l_margin,       _row1_y, _cw, _ch, (255,255,255),  (60,60,60),
+          "CURRENT LEASE / PHONE SYSTEM", curr_hw_disp, "per month inc. VAT")
+    _card(p.l_margin+_cw+_gap, _row1_y, _cw, _ch, (31,20,80), (255,255,255),
+          "NEW MONTHLY LEASE WITH SY COMMS",
+          f"GBP {hw_monthly_spread:.2f}/mo", f"{LEASE_TERM_LABELS[lease_term]}", accent=True)
+    if current_system > 0:
+        _sv = current_system - hw_monthly_spread
+        _sv_bg = (232,248,240) if _sv >= 0 else (255,240,240)
+        _sv_tc = (20,130,60)   if _sv >= 0 else (180,30,30)
+        _sv_lbl = "LEASE SAVING" if _sv >= 0 else "LEASE INCREASE"
+        _card(p.l_margin+(_cw+_gap)*2, _row1_y, _cw, _ch, _sv_bg, _sv_tc,
+              _sv_lbl, f"{'- ' if _sv>=0 else '+ '}GBP {abs(_sv):.2f}/mo",
+              f"GBP {abs(_sv*12):.0f} per year")
+
+    p.set_y(_row1_y + _ch + 3)
+
+    # Row 2: Full monthly total bar
+    _bar_y = p.get_y()
+    p.set_fill_color(31,20,80); p.rect(p.l_margin, _bar_y, 189, 14, "F")
+    p.set_fill_color(0,181,163); p.rect(p.l_margin, _bar_y, 189, 1.5, "F")
+
+    p.set_xy(p.l_margin+4, _bar_y+3)
+    p.set_font("Helvetica","",7); p.set_text_color(160,160,200)
+    p.cell(80, 4, "FULL MONTHLY TOTAL (LEASE + SERVICES + VAT)", ln=False)
+    p.set_font("Helvetica","B",11); p.set_text_color(0,220,180)
+    p.set_x(p.l_margin + 4)
+    p.set_y(_bar_y + 6)
+    p.cell(189-8, 6, f"GBP {total_mo:.2f} / month  +  VAT", ln=True, align="R")
     p.set_text_color(0,0,0)
+    p.set_y(_bar_y + 16)
 
-    def _cmp_row(lbl, curr_val, new_val, bold=False, total=False):
-        if total:
-            p.set_fill_color(31,20,80); p.set_text_color(255,255,255)
-        else:
-            p.set_fill_color(248,249,255); p.set_text_color(0,0,0)
-        p.set_font("Helvetica","B" if (bold or total) else "",8)
-        p.cell(90,6,f"  {_ps(lbl)}",fill=True,ln=False)
-        p.set_font("Helvetica","",8)
-        if total:
-            p.set_text_color(200,200,200)
-        else:
-            if curr_val and curr_val != "-":
-                p.set_text_color(180,40,40)
-            else:
-                p.set_text_color(120,120,120)
-        p.cell(50,6,_ps(curr_val or "-"),fill=True,ln=False,align="C")
-        if not total:
-            p.set_text_color(0,200,120)
-        else:
-            p.set_text_color(0,220,160)
-        p.set_font("Helvetica","B" if (bold or total) else "",8)
-        p.cell(0,6,_ps(new_val or "-"),fill=True,ln=True,align="C")
-        p.set_text_color(0,0,0)
-
-    curr_hw  = f"GBP{current_system:.2f}/mo"  if current_system > 0 else "-"
-    curr_svc = f"GBP{(current_bb+current_calls):.2f}/mo" if (current_bb+current_calls) > 0 else "-"
-    curr_tot = f"GBP{current_total:.2f}/mo"   if current_total > 0 else "-"
-    # Use GBP prefix to avoid encoding issues with pound sign
-    def _gbp(v): return f"GBP {v:.2f}/mo" if v else "-"
-    _cmp_row("Hardware / Equipment Lease", curr_hw,  _gbp(hw_monthly_spread))
-    _cmp_row(f"User / Voice Licences ({total_voice_channels} users)", "-", _gbp(svc["lic_monthly"]))
-    _cmp_row("Broadband & Connectivity",   curr_svc, _gbp(svc["bb_sell"]))
-    if sw_sell_total > 0:
-        _cmp_row("Software Add-ons", "-", _gbp(sw_sell_total))
-    _cmp_row("TOTAL MONTHLY (excl. VAT)",  curr_tot, _gbp(total_mo), total=True)
-
-    # Saving callout
-    if current_total > 0 and total_mo < current_total:
-        _saving = current_total - total_mo
-        p.ln(2)
-        p.set_fill_color(0,181,163); p.set_text_color(255,255,255)
-        p.set_font("Helvetica","B",11)
-        p.cell(0,8,_ps(f"Estimated Monthly Saving: GBP {_saving:.2f}  (GBP {_saving*12:.0f} per year)"),
-               fill=True,ln=True,align="C")
-        p.set_text_color(0,0,0)
-
-    # Equipment list with thumbnails
-    _section("Equipment Included in Agreement")
-    _hw_billing_p = "In Monthly Lease" if is_spread else "Paid Upfront"
-
-    # Phone thumbnails row
+    # ── PHONE THUMBNAILS ────────────────────────────────────────────────────────
     _phone_items = [(n, q) for n, q in list(desktop_quantities.items()) + list(cordless_quantities.items()) if q > 0]
     if _phone_items:
-        _thumb_x = p.l_margin
-        _thumb_y = p.get_y() + 1
-        _tw = 28  # thumbnail width
+        p.ln(2)
+        p.set_font("Helvetica","B",8); p.set_text_color(31,20,80)
+        p.cell(0,5,"Your New Phone System",ln=True)
+        _thumb_x = p.l_margin; _thumb_y = p.get_y()+1; _tw = 30
         for _pname, _pqty in _phone_items[:6]:
             _pb64, _pext = get_product_image_b64(_pname)
             if _pb64:
@@ -2088,76 +2090,75 @@ def build_proposal_pdf():
                     _praw = base64.b64decode(_pb64)
                     with _ptf.NamedTemporaryFile(suffix=f".{_pext}", delete=False) as _ptmp:
                         _ptmp.write(_praw); _ptmp_path = _ptmp.name
-                    p.image(_ptmp_path, x=_thumb_x, y=_thumb_y, w=_tw-2, h=18)
+                    p.image(_ptmp_path, x=_thumb_x, y=_thumb_y, w=_tw-3, h=20)
                     _pos.unlink(_ptmp_path)
                 except Exception:
                     pass
-            p.set_xy(_thumb_x, _thumb_y + 19)
-            p.set_font("Helvetica","",6.5)
-            p.set_fill_color(245,247,255)
-            p.cell(_tw-2, 4, _ps(f"{_pname[:18]} x{_pqty}"), fill=True, ln=False, align="C")
+            p.set_xy(_thumb_x, _thumb_y+21)
+            p.set_font("Helvetica","",6.5); p.set_fill_color(245,247,255)
+            _short = _pname.split("(")[0].strip()[:16]
+            p.cell(_tw-3,4,_ps(f"{_short} x{_pqty}"),fill=True,ln=False,align="C")
             _thumb_x += _tw
-        p.ln(6)
+        p.set_y(_thumb_y + 27)
 
-    _prop_equip = []
-    for _n, _q in desktop_quantities.items():
-        if _q > 0: _prop_equip.append((_n, _q))
-    for _n, _q in cordless_quantities.items():
-        if _q > 0: _prop_equip.append((_n, _q))
-    for _n, _q in other_quantities.items():
-        if _q > 0: _prop_equip.append((_n, _q))
-    if not _no_switch and switch_quantities:
-        for _n, _q in switch_quantities.items():
-            _prop_equip.append((f"Switch: {_n}", _q))
-    elif not _no_switch and rec_switch:
-        _prop_equip.append((f"Switch: {rec_switch['name']}", 1))
-    if router_quantities:
-        for _n, _q in router_quantities.items():
-            _prop_equip.append((_n, _q))
-    elif add_router and router_type not in ("None / Customer Supplied",""):
-        _prop_equip.append((router_type, 1))
+    # ── SERVICES BREAKDOWN ──────────────────────────────────────────────────────
+    p.ln(2)
+    p.set_fill_color(0,181,163); p.set_text_color(255,255,255)
+    p.set_font("Helvetica","B",8)
+    p.cell(0,5.5,"  MONTHLY SERVICES INCLUDED",fill=True,ln=True)
+    p.set_text_color(0,0,0)
 
-    # 2-col equipment grid
-    eq_cols = [_prop_equip[i:i+2] for i in range(0,len(_prop_equip),2)]
-    for pair in eq_cols:
-        for j, (_nm, _qty) in enumerate(pair):
-            col_x = p.l_margin + j * 95
-            p.set_xy(col_x, p.get_y())
-            p.set_fill_color(248,249,255)
-            p.cell(45,5,_ps(_nm),fill=True,ln=False)
-            p.cell(45,5,f"Qty: {_qty}  |  {_hw_billing_p}",fill=True,ln=False)
-        p.ln(5)
+    svc_rows = []
+    if svc["bb_sell"]   > 0: svc_rows.append((f"Broadband — {bb_provider} {bb_package}", f"GBP {svc['bb_sell']:.2f}/mo"))
+    if svc["lic_monthly"]>0: svc_rows.append((f"Hosted User Licences ({total_voice_channels} users)", f"GBP {svc['lic_monthly']:.2f}/mo"))
+    if sw_sell_total    > 0: svc_rows.append(("Software Add-ons", f"GBP {sw_sell_total:.2f}/mo"))
 
-    # Agreement terms — 2-col
-    _section("Agreement Terms")
-    terms = [
-        ("Term",         LEASE_TERM_LABELS[lease_term]),
-        ("Installation", install_type),
-        ("Warranty",     "12 months inclusive on-site"),
-        ("Support",      "Remote diagnostics included"),
-        ("Broadband",    f"{bb_provider} - {bb_package}" if svc["bb_sell"] > 0 else "Customer supplied"),
-        ("Billing",      "Monthly direct debit in advance"),
-    ]
-    for i in range(0, len(terms), 2):
-        for j, (lbl, val) in enumerate(terms[i:i+2]):
-            col_x = p.l_margin + j * 95
-            p.set_xy(col_x, p.get_y())
-            p.set_fill_color(248,249,255)
-            p.set_font("Helvetica","B",8); p.cell(28,5,_ps(lbl+":")  ,fill=True,ln=False)
-            p.set_font("Helvetica","",8);  p.cell(67,5,_ps(val)      ,fill=True,ln=False)
-        p.ln(5)
+    for i, (lbl, val) in enumerate(svc_rows):
+        p.set_fill_color(245,247,255) if i%2==0 else p.set_fill_color(255,255,255)
+        p.set_font("Helvetica","",8)
+        p.cell(140,5,_ps(f"  {lbl}"),fill=True,ln=False)
+        p.set_font("Helvetica","B",8); p.set_text_color(31,20,80)
+        p.cell(0,5,_ps(val),fill=True,ln=True,align="R")
+        p.set_text_color(0,0,0)
 
-    # Bottom CTA strip
+    # ── AGREEMENT TERMS ─────────────────────────────────────────────────────────
     p.ln(3)
     p.set_fill_color(31,20,80); p.set_text_color(255,255,255)
-    p.set_font("Helvetica","B",9)
-    p.cell(0,7,"  Ready to proceed? Contact us today.",fill=True,ln=False,align="L")
-    p.set_font("Helvetica","",9)
-    p.cell(0,7,"hello@sycomms.co.uk  |  01743 667419",fill=True,ln=True,align="R")
+    p.set_font("Helvetica","B",8)
+    p.cell(0,5.5,"  AGREEMENT AT A GLANCE",fill=True,ln=True)
+    p.set_text_color(0,0,0)
+    terms = [
+        ("Agreement Term", LEASE_TERM_LABELS[lease_term]),
+        ("Installation",   install_type),
+        ("Warranty",       "12 months inclusive on-site"),
+        ("Support",        "Remote diagnostics included"),
+    ]
+    for i, (lbl, val) in enumerate(terms):
+        p.set_fill_color(245,247,255) if i%2==0 else p.set_fill_color(255,255,255)
+        p.set_font("Helvetica","B",7.5)
+        p.cell(55,5,_ps(f"  {lbl}:"),fill=True,ln=False)
+        p.set_font("Helvetica","",7.5)
+        p.cell(0,5,_ps(val),fill=True,ln=True)
+
+    # ── SAVING CALLOUT ──────────────────────────────────────────────────────────
+    if saving > 0:
+        p.ln(3)
+        p.set_fill_color(0,181,163); p.set_text_color(255,255,255)
+        p.set_font("Helvetica","B",10)
+        p.cell(0,8,_ps(f"Estimated Total Monthly Saving:  GBP {saving:.2f}  (GBP {saving*12:.0f} per year)"),
+               fill=True,ln=True,align="C")
+        p.set_text_color(0,0,0)
+
+    # ── BOTTOM CTA ──────────────────────────────────────────────────────────────
+    p.ln(4)
+    p.set_fill_color(31,20,80); p.set_text_color(255,255,255)
+    p.set_font("Helvetica","B",8)
+    p.cell(95,6,"  Ready to proceed? Contact us today.",fill=True,ln=False)
+    p.set_font("Helvetica","",8)
+    p.cell(0,6,"hello@sycomms.co.uk   |   01743 667419",fill=True,ln=True,align="R")
     p.set_text_color(0,0,0)
 
     return bytes(p.output())
-
 
 def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip='',
               curr_total=0.0, curr_bb=0.0, curr_system=0.0, curr_calls=0.0,
