@@ -4184,19 +4184,23 @@ with tab7:
                             drawing_mode="freedraw",
                             key="sig_canvas",
                         )
-                if canvas_result.image_data is not None:
-                    alpha = canvas_result.image_data[:, :, 3]
-                    if alpha.sum() > 500:
-                        from PIL import Image as _PILImage
-                        sig_pil = _PILImage.fromarray(
-                            canvas_result.image_data.astype("uint8"), "RGBA"
-                        ).convert("RGB")
-                        sig_buf = io.BytesIO()
-                        sig_pil.save(sig_buf, format="PNG")
-                        st.session_state["_sig_bytes"] = sig_buf.getvalue()
-                        st.success("Signature captured")
-                    else:
-                        st.session_state.pop("_sig_bytes", None)
+                try:
+                    _img_data = canvas_result.image_data
+                    if _img_data is not None:
+                        alpha = _img_data[:, :, 3]
+                        if alpha.sum() > 500:
+                            from PIL import Image as _PILImage
+                            sig_pil = _PILImage.fromarray(
+                                _img_data.astype("uint8"), "RGBA"
+                            ).convert("RGB")
+                            sig_buf = io.BytesIO()
+                            sig_pil.save(sig_buf, format="PNG")
+                            st.session_state["_sig_bytes"] = sig_buf.getvalue()
+                            st.success("Signature captured")
+                        else:
+                            st.session_state.pop("_sig_bytes", None)
+                except (RuntimeError, AttributeError):
+                    pass  # Canvas not yet drawn or data unavailable
 
         sig_bytes = st.session_state.get("_sig_bytes")
         if sig_bytes:
