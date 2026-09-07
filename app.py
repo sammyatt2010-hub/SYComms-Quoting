@@ -1984,10 +1984,10 @@ def build_proposal_pdf():
     ]
     COL = 3; BW = (PW - 20 - (COL-1)*3) / COL; BH = 28
     bx0 = p.l_margin
+    by  = p.get_y()  # initialise before loop
     for n, (title, desc) in enumerate(vals3):
         col = n % COL; row = n // COL
-        bx = bx0 + col * (BW + 3)
-        by = p.get_y() if col == 0 and row == 0 else by
+        bx  = bx0 + col * (BW + 3)
         if col == 0 and row > 0: by += BH + 3
         # Card bg
         p.set_fill_color(245, 247, 255)
@@ -2054,7 +2054,11 @@ def build_proposal_pdf():
         p.set_fill_color(*bg); p.rect(cx, cy, cw, ch, "F")
         p.set_fill_color(*accent_col); p.rect(cx, cy, cw, 2.5, "F")
         p.set_xy(cx + 3, cy + 5)
-        p.set_font("Helvetica", "", 6); p.set_text_color(160, 160, 180) if bg==(31,20,80) else p.set_text_color(100,100,100)
+        p.set_font("Helvetica", "", 6)
+        if bg == (31, 20, 80):
+            p.set_text_color(160, 160, 180)
+        else:
+            p.set_text_color(100, 100, 100)
         p.cell(cw - 6, 3.5, _ps(label), ln=True)
         p.set_x(cx + 3)
         p.set_font("Helvetica", "B", 13)
@@ -2064,7 +2068,10 @@ def build_proposal_pdf():
         if sub:
             p.set_x(cx + 3)
             p.set_font("Helvetica", "", 6.5)
-            p.set_text_color(130, 140, 160) if bg==(31,20,80) else p.set_text_color(100,100,100)
+            if bg == (31, 20, 80):
+                p.set_text_color(130, 140, 160)
+            else:
+                p.set_text_color(100, 100, 100)
             p.cell(cw - 6, 4, _ps(sub), ln=True)
         p.set_text_color(0, 0, 0)
 
@@ -2072,18 +2079,18 @@ def build_proposal_pdf():
     new_lease = f"GBP {hw_monthly_spread:.2f}"
     _sv = current_system - hw_monthly_spread if current_system > 0 else 0
 
-    _big_card(cx1, cy, CW, CH, (248, 248, 252), (200, 200, 210),
-              "CURRENT LEASE / SYSTEM", curr_hw, "per month")
-    _big_card(cx2, cy, CW, CH, (31, 20, 80), (0, 181, 163),
-              f"NEW MONTHLY LEASE  ({LEASE_TERM_LABELS[lease_term]})", new_lease + "/mo", "hardware spread over term")
+    _ = _big_card(cx1, cy, CW, CH, (248, 248, 252), (200, 200, 210),
+              "CURRENT LEASE / SYSTEM", curr_hw, "per month"); _ = None
+    _ = _big_card(cx2, cy, CW, CH, (31, 20, 80), (0, 181, 163),
+              f"NEW MONTHLY LEASE  ({LEASE_TERM_LABELS[lease_term]})", new_lease + "/mo", "hardware spread over term"); _ = None
     if current_system > 0:
         sv_bg = (232, 250, 240) if _sv >= 0 else (255, 240, 240)
         sv_ac = (0, 160, 80)   if _sv >= 0 else (180, 30, 30)
         sv_lb = "MONTHLY LEASE SAVING" if _sv >= 0 else "MONTHLY INCREASE"
-        _big_card(cx3, cy, CW, CH, sv_bg, sv_ac, sv_lb,
+        _ = _big_card(cx3, cy, CW, CH, sv_bg, sv_ac, sv_lb,
                   f"{'GBP ' + f'{abs(_sv):.2f}' + '/mo'}", f"GBP {abs(_sv*12):.0f} per year")
     else:
-        _big_card(cx3, cy, CW, CH, (248,248,252), (0,181,163), "FULL MONTHLY TOTAL", f"GBP {total_mo:.2f}/mo", "all services + lease")
+        _ = _big_card(cx3, cy, CW, CH, (248,248,252), (0,181,163), "FULL MONTHLY TOTAL", f"GBP {total_mo:.2f}/mo", "all services + lease")
 
     p.set_y(cy + CH + 3)
 
@@ -2105,14 +2112,15 @@ def build_proposal_pdf():
         p.cell(0, 5, "Your New Phone System", ln=True)
         p.set_fill_color(0, 181, 163); p.rect(p.l_margin, p.get_y(), 40, 1, "F")
         p.ln(4)
-        _thumb_start_y = p.get_y()
-        _tw = 35; _th = 26; _tgap = 4
+        _tw = 32; _th_fixed = 24; _tgap = 3
         _tx = p.l_margin
+        _thumb_start_y = p.get_y()
         for idx, (_pname, _pqty) in enumerate(_phone_items[:5]):
             _pb64, _pext = get_product_image_b64(_pname)
-            # Card bg
+            _card_h = _th_fixed + 8
+            # Card background
             p.set_fill_color(245, 247, 255)
-            p.rect(_tx, _thumb_start_y, _tw, _th + 8, "F")
+            p.rect(_tx, _thumb_start_y, _tw, _card_h, "F")
             p.set_fill_color(0, 181, 163)
             p.rect(_tx, _thumb_start_y, _tw, 1.5, "F")
             if _pb64:
@@ -2121,17 +2129,19 @@ def build_proposal_pdf():
                     _praw = base64.b64decode(_pb64)
                     with _ptf.NamedTemporaryFile(suffix=f".{_pext}", delete=False) as _ptmp:
                         _ptmp.write(_praw); _ptmp_path = _ptmp.name
-                    p.image(_ptmp_path, x=_tx+2, y=_thumb_start_y+3, w=_tw-4)
+                    p.image(_ptmp_path, x=_tx+2, y=_thumb_start_y+3,
+                            w=_tw-4, h=_th_fixed-2)
                     _pos.unlink(_ptmp_path)
                 except Exception: pass
-            p.set_xy(_tx, _thumb_start_y + _th + 2)
-            p.set_font("Helvetica", "B", 6); p.set_text_color(31, 20, 80)
-            _short = _pname.split("(")[0].strip()
-            p.cell(_tw, 3.5, _ps(f"{_short} x{_pqty}"), ln=False, align="C")
+            # Label below image inside card
+            p.set_xy(_tx, _thumb_start_y + _th_fixed + 2)
+            p.set_font("Helvetica", "B", 5.5); p.set_text_color(31, 20, 80)
+            _short = _pname.split("(")[0].strip()[:18]
+            p.cell(_tw, 4, _ps(f"{_short} x{_pqty}"), ln=False, align="C")
             _tx += _tw + _tgap
         p.set_text_color(0, 0, 0)
-        p.set_y(_thumb_start_y + _th + 10)
-        p.ln(2)
+        # Always advance past image cards before next section
+        p.set_y(_thumb_start_y + _th_fixed + 12)
 
     # ── SERVICES TABLE ───────────────────────────────────────────────────────────
     p.set_fill_color(31, 20, 80); p.set_text_color(255, 255, 255)
