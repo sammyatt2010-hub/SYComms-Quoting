@@ -286,6 +286,9 @@ QUOTE_KEYS = [
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
+    "q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
+    "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
+    "q_rep_name","q_rep_position",
 ]
 # Hardware quantity keys added dynamically after catalogues load
 def _hw_quote_keys():
@@ -2347,8 +2350,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(6)
 
     pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(90, 5, "For (Company Name):", ln=False)
-    pdf.cell(0, 5, f"For {_CO}:", ln=True)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.ln(2)
     _embed_sig(pdf, sig_bytes, signer_name=sig_name,
     company=sig_company, timestamp=sig_timestamp)
@@ -2426,8 +2428,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     # ── Signature section ─────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(95, 5, f"For {s(_comp or 'Company Name')}:", ln=False)
-    pdf.cell(0, 5, f"For {_CO}:", ln=True)
+    pdf.cell(0, 5, f"For {s(_comp or 'Company Name')}:", ln=True)
     pdf.ln(3)
 
     pdf.set_font("Helvetica", "", 9)
@@ -2635,11 +2636,14 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_font("Helvetica","",7.5)
         pdf.set_x(pdf.l_margin+8)
         if has_yn:
-            pdf.multi_cell(pdf.epw-30,4,s(text))
-            _y = pdf.get_y()-4
-            pdf.set_xy(pdf.w-pdf.r_margin-25,_y)
-            pdf.cell(12,4,f"Yes {_crf_tick(yn==True)}",ln=False,align="C")
-            pdf.cell(12,4,f"No  {_crf_tick(yn==False)}",ln=True,align="C")
+            _yn_start_y = pdf.get_y()
+            pdf.multi_cell(pdf.epw-28,3.5,s(text))
+            _yn_end_y = pdf.get_y()
+            # Place Yes/No at the top-right aligned with question start
+            pdf.set_xy(pdf.w - pdf.r_margin - 26, _yn_start_y)
+            pdf.cell(13,3.5,f"Yes {_crf_tick(yn==True)}",ln=False,align="C")
+            pdf.cell(13,3.5,f"No  {_crf_tick(yn==False)}",ln=False,align="C")
+            pdf.set_y(_yn_end_y)
         else:
             pdf.multi_cell(pdf.epw-8,4,s(text))
         if extra:
