@@ -2639,7 +2639,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
     # Helper functions
     def _crf_tick(checked=False):
-        return "\u2611" if checked else "\u2610"
+        return "[X]" if checked else "[ ]"
 
     def _crf_q(num, text, has_yn=False, yn=None, extra=""):
         pdf.set_font("Helvetica","B",8)
@@ -2732,9 +2732,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.multi_cell(0,4,"I have been explained in detail the following forms and am in receipt of copies for: (tick as appropriate)",align="L")
     pdf.ln(1)
     _forms = [
-        ("This Form","\u2611"),("Order Form","\u2611"),("Terms & Conditions","\u2611"),
-        ("Quotation – inc. tariff","\u2611"),("Rental Document","\u2611"),("Network Service Agreement","\u2611"),
-        ("On Site Maintenance Agreement","\u2610"),("Line Rental Agreement","\u2610"),
+        ("This Form","[X]"),("Order Form","[X]"),("Terms & Conditions","[X]"),
+        ("Quotation - inc. tariff","[X]"),("Rental Document","[X]"),("Network Service Agreement","[X]"),
+        ("On Site Maintenance Agreement","[ ]"),("Line Rental Agreement","[ ]"),
     ]
     pdf.set_font("Helvetica","",8)
     _fc = st.columns if False else None  # PDF only — use cells
