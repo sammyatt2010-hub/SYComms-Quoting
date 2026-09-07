@@ -2097,16 +2097,20 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     if is_spread:
         curr_hw  = f"£{current_system:.2f}/mo" if current_system > 0 else "-"
         curr_svc = f"£{(current_bb + current_calls + current_mobile):.2f}/mo" if (current_bb + current_calls + current_mobile) > 0 else "-"
+        _curr_hosted = f"£{current_hosted:.2f}/mo" if current_hosted > 0 else "-"
         rows = [
             ("Hardware (spread over term)", curr_hw,  f"£{hw_monthly_spread:.2f}/mo"),
+            ("User / Voice Licences", _curr_hosted, f"£{svc['lic_monthly']:.2f}/mo"),
             ("Network & Connectivity (BB, Mobile)", curr_svc, f"£{pure_connectivity:.2f}/mo"),
             ("Installation / Setup", "-", "Included in lease rental"),
         ]
     else:
         curr_hw  = f"£{current_system:.2f}/mo" if current_system > 0 else "-"
         curr_svc = f"£{(current_bb + current_calls + current_mobile):.2f}/mo" if (current_bb + current_calls + current_mobile) > 0 else "-"
+        _curr_hosted = f"£{current_hosted:.2f}/mo" if current_hosted > 0 else "-"
         rows = [
             ("Upfront Hardware (one-off)", curr_hw,  f"£{upfront:.2f}"),
+            ("User / Voice Licences", _curr_hosted, f"£{svc['lic_monthly']:.2f}/mo"),
             ("Network & Connectivity (BB, Mobile)", curr_svc, f"£{pure_connectivity:.2f}/mo"),
             ("Installation", "-", f"£{compute_install_cost():.2f}"),
         ]
@@ -2577,9 +2581,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         ]:
             pdf.set_font("Helvetica","",8)
             pdf.set_font("Helvetica","",8)
-            _init_w = pdf.epw - 30
-            pdf.cell(30,5,"  Initials ______",ln=False)
-            pdf.multi_cell(_init_w,5,s(item))
+            pdf.set_x(pdf.l_margin)
+            pdf.cell(32, 5, "  Initials ______", ln=False)
+            pdf.set_x(pdf.l_margin + 32)
+            pdf.multi_cell(pdf.epw - 32, 5, s(item))
+            pdf.set_x(pdf.l_margin)
         pdf.ln(2)
         _eca_hdr("Final Declaration")
         pdf.set_font("Helvetica","",7.5); pdf.set_x(pdf.l_margin)
