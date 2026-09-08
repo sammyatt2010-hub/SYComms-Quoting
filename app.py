@@ -264,7 +264,7 @@ cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
 mobile_rows = []   # default - overridden by sidebar
 # Current customer cost defaults (overridden by sidebar)
 current_calls = current_lines = current_bb = current_system = 0.0
-current_support = current_hosted = current_onhold = current_other = 0.0
+current_support = current_hosted = current_onhold = current_other = current_it = 0.0
 current_mobile = current_total = 0.0
 commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
@@ -811,11 +811,12 @@ with st.sidebar:
             current_bb      = st.number_input("Broadband / Lines (£/mo)", 0.0, step=5.0, key="q_curr_bb")
             current_system  = st.number_input("Phone System (£/mo)",      0.0, step=5.0, key="q_curr_system")
             current_calls   = st.number_input("Call Charges (£/mo)",      0.0, step=5.0, key="q_curr_calls")
+            current_it      = st.number_input("IT Services / M365 (£/mo)", 0.0, step=5.0, key="q_curr_it")
         with curr_col2:
             current_mobile  = st.number_input("Mobile (£/mo)",            0.0, step=5.0, key="q_curr_mobile")
             current_support = st.number_input("Support / Maintenance (£/mo)", 0.0, step=5.0, key="q_curr_support")
             current_other   = st.number_input("Other / Misc (£/mo)",      0.0, step=5.0, key="q_curr_other")
-        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other
+        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other + current_it
 
     st.markdown("### 🏦 Bank Details")
     bank_name  = st.text_input("Bank Name", key="q_bank_name")
@@ -4039,10 +4040,11 @@ with tab4:
             sys_new = hw_monthly_spread if is_spread else 0
             comp_rows.append(("Equipment Rental", current_system, sys_new))
         if current_support > 0:
-            if current_it > 0 or _it_sell_total > 0:
+            _cv_it_sell = sum(r["sell"]*r["qty"] for r in it_rows) if it_rows else 0.0
+            if current_it > 0 or _cv_it_sell > 0:
                 comp_rows.append(("IT Services / M365",
                                    current_it if current_it > 0 else 0.0,
-                                   _it_sell_total if _it_sell_total > 0 else 0.0))
+                                   _cv_it_sell if _cv_it_sell > 0 else 0.0))
             comp_rows.append(("Maintenance & Support", current_support, 0.0))
         if current_hosted > 0:
             comp_rows.append(("Hosted System / User Licences", current_hosted, svc["lic_monthly"]))
