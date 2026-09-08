@@ -3723,7 +3723,6 @@ with tab1:
 
 
     # summary banner removed
-# ── TAB 2: ORDER FORM PREVIEW ─────────────────────────────────────────────────
 with tab2:
     st.markdown('<div class="tab-content"></div>', unsafe_allow_html=True)
     missing = []
@@ -3958,6 +3957,10 @@ with tab4:
             if addon_qty > 0:
                 all_selected.append((addon_name, addon_qty, {"cat": "Software"}))
 
+        # IT service cards
+        for _ir in it_rows:
+            all_selected.append((_ir["service"], _ir["qty"], {"cat": "IT"}))
+
 
         # Add Mobile App / Softphone users as a card
         if standalone_softphones > 0:
@@ -3986,7 +3989,7 @@ with tab4:
                         img_html = f'<img src="data:image/{ext_cv};base64,{b64_cv}" style="width:100%;height:100px;object-fit:contain;border-radius:8px;">'
                     else:
                         cat = info.get("cat", "Desktop")
-                        icon_map = {"Desktop":"📱","DECT":"📞","Wi-Fi":"📡","Switch":"🔌","Router":"🌐","Software":"💻","Headset":"🎧"}
+                        icon_map = {"Desktop":"📱","DECT":"📞","Wi-Fi":"📡","Switch":"🔌","Router":"🌐","Software":"💻","IT":"🖥️","Mobile":"📱","Headset":"🎧"}
                         icon = icon_map.get(cat, PRODUCT_ICONS.get(cat, "📱"))
                         img_html = f'<div style="height:100px;background:linear-gradient(135deg,#2d1f6e,#3b2882);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2.8rem">{icon}</div>'
 
@@ -4130,6 +4133,9 @@ with tab4:
               <span class="cv-price-val">{val}</span>
             </div>""", unsafe_allow_html=True)
 
+            for _ir in it_rows:
+                if _ir["qty"] > 0:
+                    all_equip.append((f"IT: {_ir['service']}", _ir["qty"]))
         st.markdown('<div class="cv-section">✅ What\'s Included</div>', unsafe_allow_html=True)
         includes = [
             "Manufacturer hardware warranty",
