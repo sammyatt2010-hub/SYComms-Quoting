@@ -725,6 +725,13 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Apply any pending quote load (must happen before widgets render) ────────────
+if "_pending_quote" in st.session_state:
+    _pq = st.session_state.pop("_pending_quote")
+    for _k, _v in _pq.items():
+        st.session_state[_k] = _v
+    st.session_state["_quote_ready"] = False
+
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -862,10 +869,9 @@ with st.expander("💾 Save / Load Quote", expanded=False):
             try:
                 import json as _json
                 q_data = _json.load(loaded_quote_file)
-                for k, v in q_data.items():
-                    st.session_state[k] = v
-                st.session_state["_quote_ready"] = False
-                st.success(f"✅ Quote loaded - {len(q_data)} fields restored. Page will refresh.")
+                # Store in temp key — applied BEFORE widgets render on next run
+                st.session_state["_pending_quote"] = q_data
+                st.success(f"✅ Quote loaded - {len(q_data)} fields. Refreshing...")
                 st.rerun()
             except Exception as e:
                 st.error(f"Could not load quote: {e}")
