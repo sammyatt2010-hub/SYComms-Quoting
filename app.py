@@ -498,6 +498,21 @@ MOBILE_NETWORKS = {
         "O2 Data Only (300GB)":       {"cost": 11.25, "sell": 15.00},
     },
 }
+
+IT_SERVICES = {
+    "Microsoft 365": {
+        "M365 Business Premium":             {"cost": 17.24},
+        "M365 Business Standard + Copilot":  {"cost": 18.47},
+        "M365 Business Premium + Copilot":   {"cost": 25.10},
+    },
+    "Exclaimer": {
+        "Exclaimer Starter":  {"cost": 0.60},
+        "Exclaimer Standard": {"cost": 0.71},
+        "Exclaimer Pro":      {"cost": 0.73},
+    },
+}
+IT_UPLIFT_PCT = 15.0  # % markup on cost price
+
 HARDWARE_FUNDS = {"Bronze": 500, "Silver": 1000, "Gold": 1500}
 SERVICE_UPLIFT = 0.40
 
@@ -1159,6 +1174,21 @@ with col_hw2:
                 if qty > 0:
                     mobile_rows.append({"network": net, "package": pkg, "qty": qty, **pricing})
 
+
+    with st.expander("💻 IT Services", expanded=False):
+        st.caption("Per-user monthly licences — billed separately to the hardware lease")
+        it_rows = []
+        for it_cat, it_pkgs in IT_SERVICES.items():
+            st.markdown(f"**{it_cat}**")
+            for pkg_name, pkg_info in it_pkgs.items():
+                _it_sell = round(pkg_info["cost"] * (1 + IT_UPLIFT_PCT / 100), 2)
+                qty = st.number_input(
+                    f"{pkg_name}  (£{_it_sell:.2f}/user/mo)",
+                    min_value=0, value=0, step=1, key=f"it_{pkg_name}"
+                )
+                if qty > 0:
+                    it_rows.append({"service": pkg_name, "qty": qty,
+                                    "cost": pkg_info["cost"], "sell": _it_sell})
 # ─── MANAGER OVERRIDE SECTION ────────────────────────────────────────────────
 
 # --- AUTO-CALCULATE VOICE CHANNELS -----------------------------------
