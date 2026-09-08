@@ -3721,6 +3721,16 @@ with tab1:
             ])
             st.dataframe(mob_df, use_container_width=True, hide_index=True)
 
+        if it_rows:
+            st.markdown("#### 💻 IT Services")
+            it_df = pd.DataFrame([
+                {"Service": r["service"], "Qty": r["qty"],
+                 "Monthly": f"£{r['sell']*r['qty']:.2f}/mo"}
+                for r in it_rows
+            ])
+            st.dataframe(it_df, use_container_width=True, hide_index=True)
+
+
 
 
     # summary banner removed
@@ -3807,10 +3817,12 @@ with tab2:
                 all_equip.append((router_type, 1))
         if total_voice_channels > 0:
             all_equip.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels))
+        for _ir in it_rows:
+            if _ir["qty"] > 0:
+                all_equip.append((f"IT: {_ir['service']} x{_ir['qty']}", _ir["qty"]))
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
                 all_equip.append((addon_name, addon_qty))
-        for name, qty in all_equip:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:#555'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
 
