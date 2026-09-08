@@ -863,15 +863,18 @@ with st.expander("💾 Save / Load Quote", expanded=False):
     with ql_col2:
         st.markdown("**📂 Load previous quote**")
         st.caption("Upload a previously saved quote JSON to restore all inputs.")
+        _qu_key = f"quote_uploader_{st.session_state.get('_qu_reset', 0)}"
         loaded_quote_file = st.file_uploader("Upload quote JSON", type=["json"],
-                                             key="quote_uploader", label_visibility="collapsed")
+                                             key=_qu_key, label_visibility="collapsed")
         if loaded_quote_file:
             try:
                 import json as _json
                 q_data = _json.load(loaded_quote_file)
                 # Store in temp key — applied BEFORE widgets render on next run
+                # Increment reset counter to force file uploader to clear
+                st.session_state["_qu_reset"] = st.session_state.get("_qu_reset", 0) + 1
                 st.session_state["_pending_quote"] = q_data
-                st.success(f"✅ Quote loaded - {len(q_data)} fields. Refreshing...")
+                st.success(f"✅ Quote loaded — refreshing...")
                 st.rerun()
             except Exception as e:
                 st.error(f"Could not load quote: {e}")
