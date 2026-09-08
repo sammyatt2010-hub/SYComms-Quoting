@@ -4039,6 +4039,10 @@ with tab4:
             sys_new = hw_monthly_spread if is_spread else 0
             comp_rows.append(("Equipment Rental", current_system, sys_new))
         if current_support > 0:
+            if current_it > 0 or _it_sell_total > 0:
+                comp_rows.append(("IT Services / M365",
+                                   current_it if current_it > 0 else 0.0,
+                                   _it_sell_total if _it_sell_total > 0 else 0.0))
             comp_rows.append(("Maintenance & Support", current_support, 0.0))
         if current_hosted > 0:
             comp_rows.append(("Hosted System / User Licences", current_hosted, svc["lic_monthly"]))
