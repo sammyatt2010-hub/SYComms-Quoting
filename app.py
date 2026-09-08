@@ -2537,6 +2537,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         if r["qty"] > 0:
             all_equip_pdf.append((f"{r['network']} - {r['package']}", r["qty"],
                                    f"£{r['sell']*r['qty']:.2f}/mo"))
+    for r in it_rows:
+        if r["qty"] > 0:
+            all_equip_pdf.append((f"IT: {r['service']} x{r['qty']}", r["qty"],
+                                   f"£{r['sell']*r['qty']:.2f}/mo"))
+
 
     for i, (name, qty, charge) in enumerate(all_equip_pdf):
         bg = (248, 249, 255) if i % 2 == 0 else (255, 255, 255)
