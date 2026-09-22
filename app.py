@@ -785,6 +785,12 @@ with st.sidebar:
     _bb_providers = ["None / Customer Supplied"] + [k for k in BROADBAND.keys() if k != "None / Customer Supplied"]
     bb_provider  = st.selectbox("Provider", _bb_providers, key="q_bb_provider")
     bb_package   = st.selectbox("Package", list(BROADBAND[bb_provider].keys()), key="q_bb_package")
+    if bb_provider != "None / Customer Supplied":
+        bb_free_year = st.checkbox("\U0001f381 Free for first 12 months",
+                                   key="q_bb_free_year",
+                                   help="Shows £0/mo on customer docs then full price from month 13")
+    else:
+        bb_free_year = False
     bb_care      = st.selectbox("Care Level", ["Standard (FOC)", "Business (+£8/mo)"], key="q_bb_care")
     second_fttp  = st.checkbox("Add 2nd Broadband Line", key="q_second_fttp")
     second_fttp_pkg = None
@@ -1122,14 +1128,12 @@ with col_hw2:
         with _sw_col1:
             sw_studio_qty    = st.number_input("SY Comms Studio",   0, 50, 0, key="q_sw_studio",  help="sell £11.95/user")
             sw_callrec_qty   = st.number_input("Call Recording",    0, 50, 0, key="q_sw_callrec", help="sell £1.50/user")
-            sw_crm_qty       = st.number_input("Call Scope AI Agent",   0, 50, 0, key="q_sw_crm",     help="sell £15.00/user")
         with _sw_col2:
             sw_teams_qty     = st.number_input("Teams Integration", 0, 50, 0, key="q_sw_teams",   help="sell £3.75/user")
             sw_wallboard_qty = st.number_input("HTML Wallboard",    0, 10, 0, key="q_sw_wb",      help="sell £99.00/instance")
     SW_ADDONS = [
         ("SY Comms Studio",   sw_studio_qty,    4.50, 11.95),
         ("Call Recording",    sw_callrec_qty,   0.01,  1.50),
-        ("Call Scope AI Agent",   sw_crm_qty,       0.10, 15.00),
         ("Teams Integration", sw_teams_qty,     0.75,  3.75),
         ("HTML Wallboard",    sw_wallboard_qty, 5.00, 99.00),
     ]
@@ -4138,11 +4142,13 @@ with tab4:
         for _ir in it_rows:
             all_selected.append((_ir["service"], _ir["qty"], {"cat": "IT"}))
 
-            for r in cs_svc_rows:
-                all_equip.append((f"Call Scope: {r['name']} x{r['qty']}", r["qty"]))
-            for r in sec_rows:
-                all_equip.append((f"Security: {r['name']} x{r['qty']}", r["qty"]))
 
+        # Call Scope service cards
+        for _ir in cs_svc_rows:
+            all_selected.append((f"Call Scope: {_ir['name']}", _ir["qty"], {"cat": "Call Scope"}))
+        # Security cards
+        for _ir in sec_rows:
+            all_selected.append((_ir["name"], _ir["qty"], {"cat": "Security"}))
         # Add Mobile App / Softphone users as a card
         if standalone_softphones > 0:
             all_selected.append((
