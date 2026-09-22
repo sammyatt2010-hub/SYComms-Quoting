@@ -980,6 +980,13 @@ with col_hw1:
                 f"{_cs['name']}  £{_cs['sell']:.2f}/mo",
                 min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
             )
+            # Conditional minutes bundle when AI Integration is selected
+            if "AI Integration" in _cs["name"] and st.session_state.get(f"cs_{_cs['name']}", 0) > 0:
+                st.selectbox(
+                    f"Minutes bundle for {_cs['name']}",
+                    ["None", "500 mins  — £25/mo", "1000 mins — £35/mo", "1500 mins — £45/mo"],
+                    key=f"cs_mins_{_cs['name']}"
+                )
         st.checkbox("Call Answer (500 mins) — £149", key="cs_call_answer")
     with _cs_col2:
         for _cs in _cs_main_cfg[2:]:
@@ -1243,11 +1250,19 @@ cs_cfg_mod = st.session_state.active_config.get("call_scope_services", [
     {"name": "Manager Dashboard", "buy": 40.00, "sell": 59.00},
     {"name": "Call Score", "buy": 20.00, "sell": 29.00},
 ])
+_CS_MINS_COSTS = {"500 mins  — £25/mo": 25.0, "1000 mins — £35/mo": 35.0, "1500 mins — £45/mo": 45.0}
 cs_svc_rows = []
 for _cs in cs_cfg_mod:
     qty = st.session_state.get(f"cs_{_cs['name']}", 0)
     if qty > 0:
         cs_svc_rows.append({"name": _cs["name"], "qty": qty, "buy": _cs["buy"], "sell": _cs["sell"]})
+        # Add minutes bundle cost if selected for AI Integration modules
+        if "AI Integration" in _cs["name"]:
+            _mins_sel = st.session_state.get(f"cs_mins_{_cs['name']}", "None")
+            _mins_cost = _CS_MINS_COSTS.get(_mins_sel, 0.0)
+            if _mins_cost > 0:
+                cs_svc_rows.append({"name": f"{_cs['name']} — {_mins_sel.split('—')[0].strip()}",
+                                    "qty": 1, "buy": _mins_cost * 0.7, "sell": _mins_cost})
 cs_call_answer = bool(st.session_state.get("cs_call_answer", False))
 cs_website     = bool(st.session_state.get("cs_website", False))
 cs_any_selected = bool(cs_svc_rows or cs_call_answer or cs_website)
