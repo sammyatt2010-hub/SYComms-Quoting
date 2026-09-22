@@ -513,6 +513,9 @@ IT_SERVICES = {
         "Exclaimer Standard": {"cost": 0.71},
         "Exclaimer Pro":      {"cost": 0.73},
     },
+    "Support": {
+        "Support (per user)": {"cost": 25.00, "sell": 35.00},
+    },
 }
 IT_UPLIFT_PCT = 15.0  # % markup on cost price
 
@@ -1223,7 +1226,7 @@ with col_hw2:
         for it_cat, it_pkgs in IT_SERVICES.items():
             st.markdown(f"**{it_cat}**")
             for pkg_name, pkg_info in it_pkgs.items():
-                _it_sell = round(pkg_info["cost"] * (1 + IT_UPLIFT_PCT / 100), 2)
+                _it_sell = round(pkg_info.get("sell") or pkg_info["cost"] * (1 + IT_UPLIFT_PCT / 100), 2)
                 qty = st.number_input(
                     f"{pkg_name}  (£{_it_sell:.2f}/user/mo)",
                     min_value=0, value=0, step=1, key=f"it_{pkg_name}"
@@ -1430,6 +1433,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     column_config={
                         "buy": st.column_config.NumberColumn("Buy £/user/mo", format="£%.2f"),
                         "sell": st.column_config.NumberColumn("Sell £/user/mo", format="£%.2f")})
+
                 if st.button("Apply Call Scope Service Pricing", key="cs_svc_apply"):
                     st.session_state.active_config["call_scope_services"] = edited_cs.to_dict("records")
                     st.success("Call Scope service pricing updated"); st.rerun()
