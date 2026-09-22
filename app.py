@@ -154,6 +154,9 @@ def _default_config():
             {"name": "Bluetooth Headset",            "buy": 110.00},
             {"name": "Conference Unit (GAC250)",       "buy": 130.00, "sell": 390.00},
             {"name": "Call Scope AI Setup (one-off)",  "buy": 1000.00,"sell": 2500.00},
+            {"name": "Call Answer (500 mins)",            "buy": 100.00, "sell": 149.00},
+            {"name": "Website Widget",                    "buy": 30.00,  "sell": 50.00},
+            {"name": "Call Scope Platform Setup",         "buy": 300.00, "sell": 500.00},
             {"name": "TP Link NX200 (4G/5G Standalone)",  "buy": 210.00, "sell": 630.00},
             {"name": "HIK Vision Turret 8MP",          "buy": 125.00, "sell": 427.50},
             {"name": "HIK Vision Dome 8MP",            "buy": 125.00, "sell": 400.00},
@@ -1190,6 +1193,74 @@ with col_hw2:
                 if qty > 0:
                     it_rows.append({"service": pkg_name, "qty": qty,
                                     "cost": pkg_info["cost"], "sell": _it_sell})
+
+    # ── Call Scope expander ──────────────────────────────────────────────────
+    with st.expander("🔮 Call Scope", expanded=False):
+        st.caption("Call Scope platform modules — monthly service charges unless noted")
+        cs_cfg = st.session_state.active_config.get("call_scope_services", [])
+        _cs_svc_rows = []
+        for _cs in cs_cfg:
+            qty = st.number_input(f"{_cs['name']}  (£{_cs['sell']:.2f}/user/mo)",
+                                   min_value=0, value=0, step=1, key=f"cs_{_cs['name']}")
+            if qty > 0:
+                _cs_svc_rows.append({"name": _cs["name"], "qty": qty,
+                                     "buy": _cs["buy"], "sell": _cs["sell"]})
+        st.markdown("**Lease Add-ons (one-off cost in lease)**")
+        _cs_call_answer = st.checkbox("Call Answer (500 mins)  — £149 in lease", key="cs_call_answer")
+        _cs_website     = st.checkbox("Website Widget  — £50 in lease",          key="cs_website")
+        # Auto setup fee
+        _cs_any = bool(_cs_svc_rows or _cs_call_answer or _cs_website)
+        if _cs_any:
+            _setup_cost = next((i["sell"] for i in st.session_state.active_config.get("other_hardware",[])
+                                if i["name"] == "Call Scope Platform Setup"), 500.0)
+            st.info(f"Call Scope Platform Setup fee of £{_setup_cost:.0f} will be added to the lease.")
+
+    # ── System Security expander ─────────────────────────────────────────────
+    with st.expander("🛡️ System Security", expanded=False):
+        st.caption("Managed security tiers — per instance per month")
+        sec_cfg = st.session_state.active_config.get("system_security", [])
+        _sec_rows = []
+        for _sc in sec_cfg:
+            qty = st.number_input(f"{_sc['name']}  (£{_sc['sell']:.2f}/instance/mo)",
+                                   min_value=0, value=0, step=1, key=f"sec_{_sc['name']}")
+            if qty > 0:
+                _sec_rows.append({"name": _sc["name"], "qty": qty,
+                                  "buy": _sc["buy"], "sell": _sc["sell"]})
+
+# ─── POST-EXPANDER REBUILDS (session state → module-level lists) ─────────────
+# Call Scope services
+cs_cfg_mod = st.session_state.active_config.get("call_scope_services", [])
+cs_svc_rows = []
+for _cs in cs_cfg_mod:
+    qty = st.session_state.get(f"cs_{_cs['name']}", 0)
+    if qty > 0:
+        cs_svc_rows.append({"name": _cs["name"], "qty": qty, "buy": _cs["buy"], "sell": _cs["sell"]})
+cs_call_answer = bool(st.session_state.get("cs_call_answer", False))
+cs_website     = bool(st.session_state.get("cs_website", False))
+cs_any_selected = bool(cs_svc_rows or cs_call_answer or cs_website)
+
+# System Security
+sec_cfg_mod = st.session_state.active_config.get("system_security", [])
+sec_rows = []
+for _sc in sec_cfg_mod:
+    qty = st.session_state.get(f"sec_{_sc['name']}", 0)
+    if qty > 0:
+        sec_rows.append({"name": _sc["name"], "qty": qty, "buy": _sc["buy"], "sell": _sc["sell"]})
+
+# Auto-add Call Scope lease items to other_quantities
+if cs_call_answer and "Call Answer (500 mins)" not in other_quantities:
+    if "Call Answer (500 mins)" not in OTHER_HARDWARE:
+        OTHER_HARDWARE["Call Answer (500 mins)"] = {"buy": 100.00, "sell": 149.00}
+    other_quantities["Call Answer (500 mins)"] = 1
+if cs_website and "Website Widget" not in other_quantities:
+    if "Website Widget" not in OTHER_HARDWARE:
+        OTHER_HARDWARE["Website Widget"] = {"buy": 30.00, "sell": 50.00}
+    other_quantities["Website Widget"] = 1
+if cs_any_selected and "Call Scope Platform Setup" not in other_quantities:
+    if "Call Scope Platform Setup" not in OTHER_HARDWARE:
+        OTHER_HARDWARE["Call Scope Platform Setup"] = {"buy": 300.00, "sell": 500.00}
+    other_quantities["Call Scope Platform Setup"] = 1
+
 # ─── MANAGER OVERRIDE SECTION ────────────────────────────────────────────────
 
 # --- AUTO-CALCULATE VOICE CHANNELS -----------------------------------
@@ -1311,6 +1382,45 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 st.rerun()
             st.markdown("---")
             st.markdown("**Other Hardware**")
+            st.markdown("**Call Scope Platform — Service Pricing**")
+            cs_svc_df = pd.DataFrame(cfg.get("call_scope_services", []))
+            if not cs_svc_df.empty:
+                edited_cs = st.data_editor(cs_svc_df, num_rows="dynamic",
+                    use_container_width=True, key="de_cs_svc",
+                    column_config={
+                        "buy": st.column_config.NumberColumn("Buy £/user/mo", format="£%.2f"),
+                        "sell": st.column_config.NumberColumn("Sell £/user/mo", format="£%.2f")})
+                if st.button("Apply Call Scope Service Pricing", key="cs_svc_apply"):
+                    st.session_state.active_config["call_scope_services"] = edited_cs.to_dict("records")
+                    st.success("Call Scope service pricing updated"); st.rerun()
+            st.markdown("**Call Scope Lease Items (incl. Platform Setup Fee)**")
+            _cs_lease_items = [i for i in cfg.get("other_hardware", [])
+                               if i.get("name","") in ("Call Answer (500 mins)", "Website Widget", "Call Scope Platform Setup")]
+            cs_lease_df = pd.DataFrame(_cs_lease_items)
+            if not cs_lease_df.empty:
+                edited_csl = st.data_editor(cs_lease_df, num_rows="fixed",
+                    use_container_width=True, key="de_cs_lease",
+                    column_config={
+                        "buy": st.column_config.NumberColumn("Buy £", format="£%.2f"),
+                        "sell": st.column_config.NumberColumn("Sell £", format="£%.2f")})
+                if st.button("Apply Call Scope Lease Pricing", key="csl_apply"):
+                    names_to_update = {r["name"]: r for r in edited_csl.to_dict("records")}
+                    for item in st.session_state.active_config["other_hardware"]:
+                        if item.get("name") in names_to_update:
+                            item.update(names_to_update[item["name"]])
+                    st.success("Call Scope lease pricing updated"); st.rerun()
+            st.markdown("**System Security Tier Pricing**")
+            sec_df_admin = pd.DataFrame(cfg.get("system_security", []))
+            if not sec_df_admin.empty:
+                edited_sec = st.data_editor(sec_df_admin, num_rows="fixed",
+                    use_container_width=True, key="de_security",
+                    column_config={
+                        "buy": st.column_config.NumberColumn("Buy £/instance/mo", format="£%.2f"),
+                        "sell": st.column_config.NumberColumn("Sell £/instance/mo", format="£%.2f")})
+                if st.button("Apply Security Pricing", key="sec_apply"):
+                    st.session_state.active_config["system_security"] = edited_sec.to_dict("records")
+                    st.success("Security tier pricing updated"); st.rerun()
+            st.markdown("---")
             oh_df = pd.DataFrame(cfg["other_hardware"])
             edited_oh = st.data_editor(oh_df, num_rows="dynamic", use_container_width=True, key="de_other",
                 column_config={"buy": st.column_config.NumberColumn("Buy £", format="£%.2f")})
@@ -3730,6 +3840,16 @@ with tab1:
             ])
             st.dataframe(it_df, use_container_width=True, hide_index=True)
 
+        if cs_svc_rows:
+            st.markdown("#### 🔮 Call Scope Services")
+            cs_df = pd.DataFrame([{"Service": r["name"], "Qty": r["qty"],
+                                   "Monthly": f"£{r['sell']*r['qty']:.2f}/mo"} for r in cs_svc_rows])
+            st.dataframe(cs_df, use_container_width=True, hide_index=True)
+        if sec_rows:
+            st.markdown("#### 🛡️ System Security")
+            sec_df = pd.DataFrame([{"Tier": r["name"], "Qty": r["qty"],
+                                    "Monthly": f"£{r['sell']*r['qty']:.2f}/mo"} for r in sec_rows])
+            st.dataframe(sec_df, use_container_width=True, hide_index=True)
 
 
 
@@ -3974,6 +4094,10 @@ with tab4:
         for _ir in it_rows:
             all_selected.append((_ir["service"], _ir["qty"], {"cat": "IT"}))
 
+            for r in cs_svc_rows:
+                all_equip.append((f"Call Scope: {r['name']} x{r['qty']}", r["qty"]))
+            for r in sec_rows:
+                all_equip.append((f"Security: {r['name']} x{r['qty']}", r["qty"]))
 
         # Add Mobile App / Softphone users as a card
         if standalone_softphones > 0:
