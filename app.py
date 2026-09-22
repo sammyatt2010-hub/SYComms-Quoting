@@ -1221,38 +1221,19 @@ with col_hw2:
                     it_rows.append({"service": pkg_name, "qty": qty,
                                     "cost": pkg_info["cost"], "sell": _it_sell})
 
-    # ── Call Scope expander ──────────────────────────────────────────────────
-    with st.expander("🔮 Call Scope", expanded=False):
-        st.caption("Call Scope platform modules — monthly service charges unless noted")
-        cs_cfg = st.session_state.active_config.get("call_scope_services", [])
-        _cs_svc_rows = []
-        for _cs in cs_cfg:
-            qty = st.number_input(f"{_cs['name']}  (£{_cs['sell']:.2f}/user/mo)",
-                                   min_value=0, value=0, step=1, key=f"cs_{_cs['name']}")
-            if qty > 0:
-                _cs_svc_rows.append({"name": _cs["name"], "qty": qty,
-                                     "buy": _cs["buy"], "sell": _cs["sell"]})
-        # Checkboxes are on the main page above — just compute any here
-        _cs_call_answer = st.session_state.get("cs_call_answer", False)
-        _cs_website     = st.session_state.get("cs_website", False)
-        # Auto setup fee
-        _cs_any = bool(_cs_svc_rows or _cs_call_answer or _cs_website)
-        if _cs_any:
-            _setup_cost = next((i["sell"] for i in st.session_state.active_config.get("other_hardware",[])
-                                if i["name"] == "Call Scope Platform Setup"), 500.0)
-            st.info(f"Call Scope Platform Setup fee of £{_setup_cost:.0f} will be added to the lease.")
-
     # ── System Security expander ─────────────────────────────────────────────
     with st.expander("🛡️ System Security", expanded=False):
         st.caption("Managed security tiers — per instance per month")
+        if "system_security" not in st.session_state.active_config:
+            st.session_state.active_config["system_security"] = [
+                {"name": "Bronze Security", "buy": 7.00,  "sell": 10.00},
+                {"name": "Silver Security", "buy": 10.00, "sell": 15.00},
+                {"name": "Gold Security",   "buy": 14.00, "sell": 20.00},
+            ]
         sec_cfg = st.session_state.active_config.get("system_security", [])
-        _sec_rows = []
         for _sc in sec_cfg:
-            qty = st.number_input(f"{_sc['name']}  (£{_sc['sell']:.2f}/instance/mo)",
-                                   min_value=0, value=0, step=1, key=f"sec_{_sc['name']}")
-            if qty > 0:
-                _sec_rows.append({"name": _sc["name"], "qty": qty,
-                                  "buy": _sc["buy"], "sell": _sc["sell"]})
+            st.number_input(f"{_sc['name']}  (£{_sc['sell']:.2f}/instance/mo)",
+                            min_value=0, value=0, step=1, key=f"sec_{_sc['name']}")
 
 # ─── POST-EXPANDER REBUILDS (session state → module-level lists) ─────────────
 # Call Scope services
