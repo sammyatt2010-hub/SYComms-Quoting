@@ -987,14 +987,18 @@ with col_hw1:
                     ["None", "500 mins  — £25/mo", "1000 mins — £35/mo", "1500 mins — £45/mo"],
                     key=f"cs_mins_{_cs['name']}"
                 )
-        st.checkbox("Call Answer (500 mins) — £149", key="cs_call_answer")
+        st.selectbox("Call Answer - My PA",
+                     ["None", "500 mins — £149/mo", "1000 mins — £199/mo", "2000 mins — £249/mo"],
+                     key="cs_mypa")
     with _cs_col2:
         for _cs in _cs_main_cfg[2:]:
             st.number_input(
                 f"{_cs['name']}  £{_cs['sell']:.2f}/mo",
                 min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
             )
-        st.checkbox("Website Widget — £50", key="cs_website")
+        st.selectbox("Website Widget",
+                     ["None", "Include — £50/mo"],
+                     key="cs_website")
 
 with col_hw2:
     # ── PBX & CCTV - prominent quick-select ───────────────────────────────────
@@ -1263,9 +1267,20 @@ for _cs in cs_cfg_mod:
             if _mins_cost > 0:
                 cs_svc_rows.append({"name": f"{_cs['name']} — {_mins_sel.split('—')[0].strip()}",
                                     "qty": 1, "buy": _mins_cost * 0.7, "sell": _mins_cost})
-cs_call_answer = bool(st.session_state.get("cs_call_answer", False))
-cs_website     = bool(st.session_state.get("cs_website", False))
+_cs_mypa_sel  = st.session_state.get("cs_mypa", "None")
+_cs_web_sel   = st.session_state.get("cs_website", "None")
+cs_call_answer = _cs_mypa_sel != "None"
+cs_website     = _cs_web_sel != "None"
 cs_any_selected = bool(cs_svc_rows or cs_call_answer or cs_website)
+_CS_MYPA_COSTS = {"500 mins — £149/mo": 149.0, "1000 mins — £199/mo": 199.0, "2000 mins — £249/mo": 249.0}
+_mypa_sel = st.session_state.get("cs_mypa", "None")
+if _mypa_sel != "None":
+    _mypa_cost = _CS_MYPA_COSTS.get(_mypa_sel, 0.0)
+    cs_svc_rows.append({"name": f"Call Answer - My PA ({_mypa_sel.split(' —')[0]})",
+                        "qty": 1, "buy": _mypa_cost * 0.7, "sell": _mypa_cost})
+_web_sel = st.session_state.get("cs_website", "None")
+if _web_sel != "None":
+    cs_svc_rows.append({"name": "Website Widget", "qty": 1, "buy": 35.0, "sell": 50.0})
 
 # System Security
 sec_cfg_mod = st.session_state.active_config.get("system_security", [
@@ -1280,14 +1295,7 @@ for _sc in sec_cfg_mod:
         sec_rows.append({"name": _sc["name"], "qty": qty, "buy": _sc["buy"], "sell": _sc["sell"]})
 
 # Auto-add Call Scope lease items to other_quantities
-if cs_call_answer and "Call Answer (500 mins)" not in other_quantities:
-    if "Call Answer (500 mins)" not in OTHER_HARDWARE:
-        OTHER_HARDWARE["Call Answer (500 mins)"] = {"buy": 100.00, "sell": 149.00}
-    other_quantities["Call Answer (500 mins)"] = 1
-if cs_website and "Website Widget" not in other_quantities:
-    if "Website Widget" not in OTHER_HARDWARE:
-        OTHER_HARDWARE["Website Widget"] = {"buy": 30.00, "sell": 50.00}
-    other_quantities["Website Widget"] = 1
+# Call Answer - My PA and Website Widget are monthly services, not lease items
 if cs_any_selected and "Call Scope Platform Setup" not in other_quantities:
     if "Call Scope Platform Setup" not in OTHER_HARDWARE:
         OTHER_HARDWARE["Call Scope Platform Setup"] = {"buy": 300.00, "sell": 500.00}
