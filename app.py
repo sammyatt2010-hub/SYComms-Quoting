@@ -1197,6 +1197,20 @@ with col_hw2:
     # ── Call Scope expander ──────────────────────────────────────────────────
     with st.expander("🔮 Call Scope", expanded=False):
         st.caption("Call Scope platform modules — monthly service charges unless noted")
+        # Seed defaults if key missing from loaded config
+        if "call_scope_services" not in st.session_state.active_config:
+            st.session_state.active_config["call_scope_services"] = [
+                {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
+                {"name": "AI Integration - CRM",    "buy": 25.00, "sell": 35.00},
+                {"name": "Manager Dashboard",        "buy": 40.00, "sell": 59.00},
+                {"name": "Call Score",               "buy": 20.00, "sell": 29.00},
+            ]
+        if "system_security" not in st.session_state.active_config:
+            st.session_state.active_config["system_security"] = [
+                {"name": "Bronze Security", "buy": 7.00,  "sell": 10.00},
+                {"name": "Silver Security", "buy": 10.00, "sell": 15.00},
+                {"name": "Gold Security",   "buy": 14.00, "sell": 20.00},
+            ]
         cs_cfg = st.session_state.active_config.get("call_scope_services", [])
         _cs_svc_rows = []
         for _cs in cs_cfg:
@@ -1205,9 +1219,9 @@ with col_hw2:
             if qty > 0:
                 _cs_svc_rows.append({"name": _cs["name"], "qty": qty,
                                      "buy": _cs["buy"], "sell": _cs["sell"]})
-        st.markdown("**Lease Add-ons (one-off cost in lease)**")
-        _cs_call_answer = st.checkbox("Call Answer (500 mins)  — £149 in lease", key="cs_call_answer")
-        _cs_website     = st.checkbox("Website Widget  — £50 in lease",          key="cs_website")
+        st.markdown("---")
+        _cs_call_answer = st.checkbox("Call Answer (500 mins) — £149", key="cs_call_answer")
+        _cs_website     = st.checkbox("Website Widget — £50",           key="cs_website")
         # Auto setup fee
         _cs_any = bool(_cs_svc_rows or _cs_call_answer or _cs_website)
         if _cs_any:
@@ -1229,7 +1243,12 @@ with col_hw2:
 
 # ─── POST-EXPANDER REBUILDS (session state → module-level lists) ─────────────
 # Call Scope services
-cs_cfg_mod = st.session_state.active_config.get("call_scope_services", [])
+cs_cfg_mod = st.session_state.active_config.get("call_scope_services", [
+    {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
+    {"name": "AI Integration - CRM", "buy": 25.00, "sell": 35.00},
+    {"name": "Manager Dashboard", "buy": 40.00, "sell": 59.00},
+    {"name": "Call Score", "buy": 20.00, "sell": 29.00},
+])
 cs_svc_rows = []
 for _cs in cs_cfg_mod:
     qty = st.session_state.get(f"cs_{_cs['name']}", 0)
@@ -1240,7 +1259,11 @@ cs_website     = bool(st.session_state.get("cs_website", False))
 cs_any_selected = bool(cs_svc_rows or cs_call_answer or cs_website)
 
 # System Security
-sec_cfg_mod = st.session_state.active_config.get("system_security", [])
+sec_cfg_mod = st.session_state.active_config.get("system_security", [
+    {"name": "Bronze Security", "buy": 7.00, "sell": 10.00},
+    {"name": "Silver Security", "buy": 10.00, "sell": 15.00},
+    {"name": "Gold Security", "buy": 14.00, "sell": 20.00},
+])
 sec_rows = []
 for _sc in sec_cfg_mod:
     qty = st.session_state.get(f"sec_{_sc['name']}", 0)
