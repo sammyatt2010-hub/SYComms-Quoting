@@ -820,14 +820,10 @@ with st.sidebar:
         "Service Discount %", 0, 40,
         value=int(st.session_state.get("c_svc_disc", 0)),
         step=5,
-        help="Syncs with Consultant tab. Broadband is protected at wholesale floor. At 35-40% margin becomes very thin — use with care.",
+        help="Syncs with Consultant tab. Floor protection keeps minimum 5% uplift on all items.",
         key="q_svc_discount", on_change=_sync_sidebar_to_cons
     )
-    if service_discount_pct >= 35:
-        st.warning(f"⚠️ {service_discount_pct}% discount — check margin in Admin › Service Pricing before proceeding.")
-    elif service_discount_pct >= 20:
-        st.caption(f"ℹ️ {service_discount_pct}% discount applied — broadband protected at wholesale floor.")
-    # Convert service discount → effective uplift (base 40%, min 5% to protect margin)
+    # Silent floor: effective uplift never drops below 5% regardless of discount level
     service_uplift_pct = max(40 - service_discount_pct, 5)
 
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
