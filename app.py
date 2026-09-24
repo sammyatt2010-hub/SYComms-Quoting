@@ -1381,7 +1381,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
         with info_col:
             st.markdown('<span class="override-badge">🔓 Admin Unlocked</span>', unsafe_allow_html=True)
 
-        panel_tabs = st.tabs(["📋 Per-Deal Overrides", "🖥️ Hardware", "🌐 Broadband & Rates", "💰 Costs & Fees", "🎨 Branding", "📧 Email", "📸 Images", "🔒 Security"])
+        panel_tabs = st.tabs(["📋 Per-Deal Overrides", "🖥️ Hardware", "💳 Service Pricing", "🌐 Broadband & Rates", "💰 Costs & Fees", "🎨 Branding", "📧 Email", "📸 Images", "🔒 Security"])
 
         # ── TAB 1: Per-Deal Overrides (existing functionality) ────────────────
         with panel_tabs[0]:
@@ -1574,8 +1574,155 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     st.info("No product images assigned yet. Upload one on the left.")
 
 
-        # ── TAB 3: Broadband & Lease Rates ────────────────────────────────────
+        # ── TAB 3: Service Pricing ────────────────────────────────────────────
         with panel_tabs[2]:
+            st.markdown("### 💳 Service Pricing")
+            st.caption("Edit wholesale (buy) and customer (sell) prices for all monthly service items. Changes apply immediately to new deals.")
+
+            # ── Call Scope — Monthly Services ─────────────────────────────────
+            st.markdown("#### 🔮 Call Scope — Monthly Services")
+            st.caption("Per-user per-month charges. Buy = SY Comms wholesale cost. Sell = customer price.")
+            cs_svc_cfg = st.session_state.active_config.get("call_scope_services", [
+                {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
+                {"name": "AI Integration - CRM",    "buy": 25.00, "sell": 35.00},
+                {"name": "Manager Dashboard",        "buy": 40.00, "sell": 59.00},
+                {"name": "Call Score",               "buy": 20.00, "sell": 29.00},
+            ])
+            cs_svc_cols = st.columns(4)
+            cs_svc_new = []
+            for _ci, _cs in enumerate(cs_svc_cfg):
+                with cs_svc_cols[_ci % 4]:
+                    st.markdown(f"**{_cs['name']}**")
+                    _b = st.number_input(f"Buy £/mo", value=float(_cs["buy"]), step=0.50,
+                                         key=f"adm_cs_buy_{_ci}", format="£%.2f")
+                    _s = st.number_input(f"Sell £/mo", value=float(_cs.get("sell", _cs["buy"]*1.45)), step=0.50,
+                                         key=f"adm_cs_sell_{_ci}", format="£%.2f")
+                    _margin = round((_s - _b) / _s * 100, 1) if _s > 0 else 0
+                    st.caption(f"Margin: {_margin:.1f}%")
+                    cs_svc_new.append({"name": _cs["name"], "buy": _b, "sell": _s})
+            if st.button("💾 Save Call Scope Service Pricing", key="adm_cs_svc_save"):
+                st.session_state.active_config["call_scope_services"] = cs_svc_new
+                st.success("Call Scope service pricing saved"); st.rerun()
+
+            st.markdown("---")
+
+            # ── Call Scope — My PA Minute Bundles ─────────────────────────────
+            st.markdown("#### 📞 Call Answer - My PA Bundles")
+            st.caption("Flat monthly fee per bundle. These are service charges (not lease).")
+            _mypa_defaults = [
+                {"name": "My PA 500 mins", "buy": 100.0, "sell": 149.0},
+                {"name": "My PA 1000 mins","buy": 140.0, "sell": 199.0},
+                {"name": "My PA 2000 mins","buy": 180.0, "sell": 249.0},
+            ]
+            _mypa_cfg = st.session_state.active_config.get("mypa_bundles", _mypa_defaults)
+            mypa_cols = st.columns(3)
+            mypa_new = []
+            for _mi, _mp in enumerate(_mypa_cfg):
+                with mypa_cols[_mi]:
+                    st.markdown(f"**{_mp['name']}**")
+                    _mb = st.number_input("Buy £/mo", value=float(_mp["buy"]), step=5.0,
+                                          key=f"adm_mypa_buy_{_mi}", format="£%.2f")
+                    _ms = st.number_input("Sell £/mo", value=float(_mp.get("sell", _mp["buy"]*1.5)), step=5.0,
+                                          key=f"adm_mypa_sell_{_mi}", format="£%.2f")
+                    _mm = round((_ms - _mb) / _ms * 100, 1) if _ms > 0 else 0
+                    st.caption(f"Margin: {_mm:.1f}%")
+                    mypa_new.append({"name": _mp["name"], "buy": _mb, "sell": _ms})
+            if st.button("💾 Save My PA Bundle Pricing", key="adm_mypa_save"):
+                st.session_state.active_config["mypa_bundles"] = mypa_new
+                st.success("My PA pricing saved"); st.rerun()
+
+            st.markdown("---")
+
+            # ── Call Scope — Lease Add-ons ─────────────────────────────────────
+            st.markdown("#### 🏷️ Call Scope — Lease Add-ons")
+            st.caption("One-off items added to the hardware lease (Website Widget, Platform Setup).")
+            _cs_lease_names = ("Website Widget", "Call Scope Platform Setup", "Call Scope AI Setup (one-off)")
+            _cs_lease_items = [i for i in cfg.get("other_hardware", [])
+                                if i.get("name","") in _cs_lease_names]
+            if _cs_lease_items:
+                cl_cols = st.columns(len(_cs_lease_items))
+                cl_new_vals = {}
+                for _li, _li_item in enumerate(_cs_lease_items):
+                    with cl_cols[_li]:
+                        st.markdown(f"**{_li_item['name']}**")
+                        _lb = st.number_input("Buy £", value=float(_li_item["buy"]), step=5.0,
+                                              key=f"adm_cl_buy_{_li}", format="£%.2f")
+                        _ls = st.number_input("Sell £", value=float(_li_item.get("sell", _li_item["buy"]*1.5)), step=5.0,
+                                              key=f"adm_cl_sell_{_li}", format="£%.2f")
+                        _lm = round((_ls - _lb) / _ls * 100, 1) if _ls > 0 else 0
+                        st.caption(f"Margin: {_lm:.1f}%")
+                        cl_new_vals[_li_item["name"]] = {"buy": _lb, "sell": _ls}
+                if st.button("💾 Save Lease Add-on Pricing", key="adm_cl_save"):
+                    for item in st.session_state.active_config["other_hardware"]:
+                        if item.get("name") in cl_new_vals:
+                            item.update(cl_new_vals[item["name"]])
+                    st.success("Lease add-on pricing saved"); st.rerun()
+
+            st.markdown("---")
+
+            # ── System Security ────────────────────────────────────────────────
+            st.markdown("#### 🛡️ System Security Tiers")
+            st.caption("Per-instance per-month. Buy = SY Comms cost. Sell = customer price.")
+            _sec_defaults = [
+                {"name": "Bronze Security", "buy": 7.00,  "sell": 10.00},
+                {"name": "Silver Security", "buy": 10.00, "sell": 15.00},
+                {"name": "Gold Security",   "buy": 14.00, "sell": 20.00},
+            ]
+            _sec_cfg = st.session_state.active_config.get("system_security", _sec_defaults)
+            sec_adm_cols = st.columns(3)
+            sec_new = []
+            for _si, _sc in enumerate(_sec_cfg):
+                with sec_adm_cols[_si]:
+                    st.markdown(f"**{_sc['name']}**")
+                    _sb = st.number_input("Buy £/mo", value=float(_sc["buy"]), step=0.50,
+                                          key=f"adm_sec_buy_{_si}", format="£%.2f")
+                    _ss = st.number_input("Sell £/mo", value=float(_sc.get("sell", _sc["buy"]*1.43)), step=0.50,
+                                          key=f"adm_sec_sell_{_si}", format="£%.2f")
+                    _sm = round((_ss - _sb) / _ss * 100, 1) if _ss > 0 else 0
+                    st.caption(f"Margin: {_sm:.1f}%")
+                    sec_new.append({"name": _sc["name"], "buy": _sb, "sell": _ss})
+            if st.button("💾 Save Security Tier Pricing", key="adm_sec_save"):
+                st.session_state.active_config["system_security"] = sec_new
+                st.success("Security tier pricing saved"); st.rerun()
+
+            st.markdown("---")
+
+            # ── IT Services ────────────────────────────────────────────────────
+            st.markdown("#### 💻 IT Services")
+            st.caption("Per-user per-month. Buy = wholesale cost. Sell = customer price (explicit sell overrides IT uplift %).")
+            _it_svc_all = []
+            for _cat, _pkgs in IT_SERVICES.items():
+                for _pname, _pinfo in _pkgs.items():
+                    _it_svc_all.append({"category": _cat, "name": _pname,
+                                        "buy": _pinfo.get("cost", 0),
+                                        "sell": round(_pinfo.get("sell") or _pinfo.get("cost", 0) * (1 + IT_UPLIFT_PCT/100), 2)})
+            if _it_svc_all:
+                it_df = pd.DataFrame(_it_svc_all)
+                edited_it = st.data_editor(it_df, num_rows="dynamic", use_container_width=True,
+                    key="adm_it_svc",
+                    column_config={
+                        "category": st.column_config.TextColumn("Category"),
+                        "name":     st.column_config.TextColumn("Service"),
+                        "buy":      st.column_config.NumberColumn("Buy £/user/mo", format="£%.2f"),
+                        "sell":     st.column_config.NumberColumn("Sell £/user/mo", format="£%.2f"),
+                    })
+                st.caption("Note: updating IT pricing here updates the live catalogue for the current session.")
+                if st.button("💾 Apply IT Services Pricing", key="adm_it_save"):
+                    # Rebuild IT_SERVICES from edited data
+                    for row in edited_it.to_dict("records"):
+                        cat, name, buy, sell = row["category"], row["name"], row["buy"], row["sell"]
+                        if cat in IT_SERVICES and name in IT_SERVICES[cat]:
+                            IT_SERVICES[cat][name]["cost"] = buy
+                            IT_SERVICES[cat][name]["sell"] = sell
+                        else:
+                            if cat not in IT_SERVICES:
+                                IT_SERVICES[cat] = {}
+                            IT_SERVICES[cat][name] = {"cost": buy, "sell": sell}
+                    st.success("IT Services pricing updated for this session"); st.rerun()
+
+        # ── TAB 3: Broadband & Lease Rates ────────────────────────────────────
+
+        with panel_tabs[3]:
             st.markdown("**Broadband Packages** - edit wholesale costs and install charges")
             bb_df = pd.DataFrame(cfg["broadband"])
             edited_bb = st.data_editor(bb_df, num_rows="dynamic", use_container_width=True, key="de_bb",
@@ -1592,7 +1739,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 st.rerun()
 
         # ── TAB 4: Costs & Fees ───────────────────────────────────────────────
-        with panel_tabs[3]:
+        with panel_tabs[4]:
             st.markdown("**Fixed Deal Costs** - these feed directly into the lease capital calculation")
             c = cfg["constants"]
             cc1, cc2 = st.columns(2)
@@ -1622,7 +1769,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 st.success("Costs updated!")
 
         # ── TAB 5: Branding ───────────────────────────────────────────────────
-        with panel_tabs[4]:
+        with panel_tabs[5]:
             st.markdown("**Company Branding** - updates login screen, all PDF documents and customer view instantly")
             br = cfg.get("branding", {})
             bc1, bc2 = st.columns(2)
@@ -1655,7 +1802,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 st.rerun()
 
         # ── TAB 6: Email Settings ────────────────────────────────────────────
-        with panel_tabs[5]:
+        with panel_tabs[6]:
             st.markdown("**Email / SMTP Configuration** - used to send signed proposals to customers")
             em = cfg.get("email", {})
             ecol1, ecol2 = st.columns(2)
@@ -1682,7 +1829,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 st.success("✅ Email settings saved! Download config.json below to make permanent.")
 
         # ── TAB 7: Product Images ─────────────────────────────────────────────
-        with panel_tabs[6]:
+        with panel_tabs[7]:
             st.markdown("**Upload product images** - filenames are matched to product names automatically")
             st.caption("Tip: name files like `fanvil_v66_pro.jpg` or `v66pro.png` - the app fuzzy-matches the name")
             uploaded_files = st.file_uploader(
@@ -1705,7 +1852,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     st.rerun()
 
         # ── TAB 6: Security ───────────────────────────────────────────────────
-        with panel_tabs[7]:
+        with panel_tabs[8]:
             st.markdown("**Change Admin Password**")
             pw1 = st.text_input("New password", type="password", key="new_pw1")
             pw2 = st.text_input("Confirm new password", type="password", key="new_pw2")
