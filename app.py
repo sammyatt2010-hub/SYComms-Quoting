@@ -1579,6 +1579,15 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
             st.markdown("### 💳 Service Pricing")
             st.caption("Edit wholesale (buy) and customer (sell) prices for all monthly service items. Changes apply immediately to new deals.")
 
+            # Show current deal discount impact
+            _adm_disc = svc_disc_pct  # from consultant slider
+            if _adm_disc > 0:
+                st.info(f"ℹ️ Consultant has applied a **{_adm_disc:.0f}% service discount** on this deal. "
+                        f"Effective sell prices and margins shown below reflect this.")
+            else:
+                st.caption("No service discount active — prices shown are list prices.")
+            _adm_mult = 1.0 - _adm_disc / 100.0
+
             # ── Call Scope — Monthly Services ─────────────────────────────────
             st.markdown("#### 🔮 Call Scope — Monthly Services")
             st.caption("Per-user per-month charges. Buy = SY Comms wholesale cost. Sell = customer price.")
@@ -1597,8 +1606,10 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                                          key=f"adm_cs_buy_{_ci}", format="%.2f")
                     _s = st.number_input(f"Sell £/mo", value=float(_cs.get("sell", _cs["buy"]*1.45)), step=0.50,
                                          key=f"adm_cs_sell_{_ci}", format="%.2f")
-                    _margin = round((_s - _b) / _s * 100, 1) if _s > 0 else 0
-                    st.caption(f"Margin: {_margin:.1f}%")
+                    _eff_s  = round(_s * _adm_mult, 2)
+                    _margin = round((_eff_s - _b) / _eff_s * 100, 1) if _eff_s > 0 else 0
+                    _disc_note = f" → £{_eff_s:.2f}/mo after discount" if _adm_disc > 0 else ""
+                    st.caption(f"Margin: {_margin:.1f}%{_disc_note}")
                     cs_svc_new.append({"name": _cs["name"], "buy": _b, "sell": _s})
             if st.button("💾 Save Call Scope Service Pricing", key="adm_cs_svc_save"):
                 st.session_state.active_config["call_scope_services"] = cs_svc_new
@@ -1624,8 +1635,10 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                                           key=f"adm_mypa_buy_{_mi}", format="%.2f")
                     _ms = st.number_input("Sell £/mo", value=float(_mp.get("sell", _mp["buy"]*1.5)), step=5.0,
                                           key=f"adm_mypa_sell_{_mi}", format="%.2f")
-                    _mm = round((_ms - _mb) / _ms * 100, 1) if _ms > 0 else 0
-                    st.caption(f"Margin: {_mm:.1f}%")
+                    _eff_ms = round(_ms * _adm_mult, 2)
+                    _mm = round((_eff_ms - _mb) / _eff_ms * 100, 1) if _eff_ms > 0 else 0
+                    _mypa_note = f" → £{_eff_ms:.2f}/mo" if _adm_disc > 0 else ""
+                    st.caption(f"Margin: {_mm:.1f}%{_mypa_note}")
                     mypa_new.append({"name": _mp["name"], "buy": _mb, "sell": _ms})
             if st.button("💾 Save My PA Bundle Pricing", key="adm_mypa_save"):
                 st.session_state.active_config["mypa_bundles"] = mypa_new
@@ -1678,8 +1691,10 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                                           key=f"adm_sec_buy_{_si}", format="%.2f")
                     _ss = st.number_input("Sell £/mo", value=float(_sc.get("sell", _sc["buy"]*1.43)), step=0.50,
                                           key=f"adm_sec_sell_{_si}", format="%.2f")
-                    _sm = round((_ss - _sb) / _ss * 100, 1) if _ss > 0 else 0
-                    st.caption(f"Margin: {_sm:.1f}%")
+                    _eff_ss = round(_ss * _adm_mult, 2)
+                    _sm = round((_eff_ss - _sb) / _eff_ss * 100, 1) if _eff_ss > 0 else 0
+                    _sec_note = f" → £{_eff_ss:.2f}/mo" if _adm_disc > 0 else ""
+                    st.caption(f"Margin: {_sm:.1f}%{_sec_note}")
                     sec_new.append({"name": _sc["name"], "buy": _sb, "sell": _ss})
             if st.button("💾 Save Security Tier Pricing", key="adm_sec_save"):
                 st.session_state.active_config["system_security"] = sec_new
