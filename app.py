@@ -3808,7 +3808,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     # ── T&C Confirmation Signature ────────────────────────────────────────────
     pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(0, 6, "  Confirmation — I have read and agree to the full Terms & Conditions", fill=True, ln=True)
+    pdf.cell(0, 6, "  Confirmation - I have read and agree to the full Terms & Conditions", fill=True, ln=True)
     pdf.set_text_color(0, 0, 0); pdf.ln(3)
     _tc_cols = pdf.epw / 3
     pdf.set_font("Helvetica", "", 8)
