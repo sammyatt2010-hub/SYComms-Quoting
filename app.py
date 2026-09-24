@@ -1270,6 +1270,8 @@ with col_hw2:
             st.selectbox("Website Widget",
                          ["None", "Include — £50/mo"],
                          key="cs_website")
+        st.checkbox("🎁 AI Portal — 1st month free (500 mins)", key="cs_ai_portal_free",
+                    help="Promotional offer: first month of AI Portal 500-min bundle at no charge")
 
 # ─── POST-EXPANDER REBUILDS (session state → module-level lists) ─────────────
 # Call Scope services
@@ -2079,6 +2081,12 @@ rec_switch = get_recommended_switch(poe_needed)
 hw_buy     = compute_hw_buy()
 hw_sell    = compute_hw_sell()
 svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
+
+# BB free year: compute Year 1 total (£0 BB) for customer display
+bb_free_year   = st.session_state.get("q_bb_free_year", False)
+_bb_full_sell  = svc["bb_sell"]                                   # standard BB sell price
+_bb_yr1_sell   = 0.0 if bb_free_year else _bb_full_sell          # £0 in year 1 if promo
+_bb_yr1_saving = _bb_full_sell if bb_free_year else 0.0          # saving in yr1
 
 # Add Call Scope services + Security to total monthly
 _cs_svc_sell  = sum(r["sell"] * r["qty"] for r in cs_svc_rows)
@@ -2913,6 +2921,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
 
     # Voice Channel Licences
+    if st.session_state.get("cs_ai_portal_free", False):
+        svc_items.append(("AI Integration Portal - 1st month FREE (500 mins)", 1, "£0.00 month 1 only"))
     if total_voice_channels > 0:
         vc_billing_pdf = f"£{svc['lic_monthly']:.2f}/mo"  # always monthly - not part of lease
         all_equip_pdf.append((f"User / Voice Licences x{total_voice_channels}",
@@ -3047,7 +3057,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 6, "Service Charge Breakdown", ln=True)
     pdf.set_font("Helvetica", "", 9)
 
-    svc_items = [(f"{bb_provider} - {bb_package}", 1, f"£{svc['bb1_sell']:.2f}/mo")]
+    if bb_free_year and _bb_yr1_saving > 0:
+        svc_items = [(f"{bb_provider} - {bb_package} (FREE months 1-12)", 1,
+                      f"£0.00/mo (then £{_bb_full_sell:.2f}/mo)")]
+    else:
+        svc_items = [(f"{bb_provider} - {bb_package}", 1, f"£{svc['bb1_sell']:.2f}/mo")]
     if second_fttp and second_fttp_pkg:
         bb2_sell = svc["bb2_sell"]
         svc_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
@@ -4598,13 +4612,25 @@ with tab4:
         </div>
         <div class="cv-price-row" style="font-weight:700;border-top:2px solid #1f1450;margin-top:4px;padding-top:8px">
           <span style="color:#1f1450">Total (excl. VAT)</span>
-          <span style="color:#1f1450;font-size:1.1rem">£{total_mo:.2f}/mo</span>
+          <span style="color:#1f1450;font-size:1.1rem">£{total_mo - _bb_yr1_saving:.2f}/mo</span>
         </div>
         """, unsafe_allow_html=True)
+        if bb_free_year and _bb_yr1_saving > 0:
+            st.markdown(f"""
+            <div style="background:#e8f8f0;border-left:3px solid #1a7a40;border-radius:6px;
+                 padding:0.5rem 0.8rem;font-size:0.8rem;color:#1a7a40;margin-top:0.3rem">
+              🎁 <strong>Broadband FREE for months 1–12</strong><br>
+              From month 13: £{total_mo:.2f}/mo (broadband £{_bb_full_sell:.2f}/mo resumes)
+            </div>""", unsafe_allow_html=True)
+        if st.session_state.get("cs_ai_portal_free", False):
+            st.markdown("""
+            <div style="background:#e8f8f0;border-left:3px solid #1a7a40;border-radius:6px;
+                 padding:0.5rem 0.8rem;font-size:0.8rem;color:#1a7a40;margin-top:0.3rem">
+              🎁 <strong>AI Integration Portal — first month free</strong> (500 min bundle)
+            </div>""", unsafe_allow_html=True)
         st.markdown(f"""
         <div style="text-align:center;padding:0.5rem 0;font-size:0.8rem;color:#aaa">
           Agreement term: <strong style="color:#555">{lease_term} months</strong>
-          &nbsp;·&nbsp; Contact us for full pricing details
         </div>
         """, unsafe_allow_html=True)
 
