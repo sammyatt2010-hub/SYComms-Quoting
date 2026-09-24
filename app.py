@@ -5387,181 +5387,158 @@ with tab7:
                 except Exception as _e:
                     st.error(f"Email failed: {_e}")
 
-    st.caption("Upload PDFs and send the customer a secure signing link - no need for them to be in the room.")
+    st.markdown("### 📨 Send for Signature via Zoho Sign")
+    st.caption("Upload the PDF pack and send the customer a legally-binding Zoho Sign request.")
 
-    em_cfg_rs         = st.session_state.active_config.get("email", {})
-    GITHUB_TOKEN_RS   = st.secrets.get("GITHUB_TOKEN", "") if hasattr(st, "secrets") else ""
-    SIGNING_PORTAL_URL = st.secrets.get("SIGNING_PORTAL_URL", "") if hasattr(st, "secrets") else ""
+    # ── Zoho Sign OAuth helper ────────────────────────────────────────────────
+    def _zoho_get_access_token():
+        """Exchange refresh token for a fresh access token."""
+        import requests as _rq
+        secrets = st.secrets if hasattr(st, "secrets") else {}
+        r = _rq.post("https://accounts.zoho.eu/oauth/v2/token", data={
+            "grant_type":    "refresh_token",
+            "client_id":     secrets.get("ZOHO_CLIENT_ID", ""),
+            "client_secret": secrets.get("ZOHO_CLIENT_SECRET", ""),
+            "refresh_token": secrets.get("ZOHO_REFRESH_TOKEN", ""),
+        }, timeout=15)
+        if r.status_code == 200:
+            return r.json().get("access_token", "")
+        return None
 
-    # ── Helper functions ──────────────────────────────────────────────────────
-    def create_signing_session(docs, cust_name, cust_email, sndr_email, message):
-        """Upload PDFs to a private GitHub Gist and return (gist_id, signing_url)."""
-        from datetime import datetime as _dt
-        session_data = {
-            "customer_name":    cust_name,
-            "customer_email":   cust_email,
-            "sender_email":     sndr_email,
-            "message":          message,
-            "status":           "pending",
-            "created_at":       _dt.now().isoformat(),
-            # Deal figures for the signing portal display
-            "comp_name":        comp_name,
-            "contact_name":     contact_name,
-            "install_address":  install_address,
-            "hw_monthly_spread": round(hw_monthly_spread, 2),
-            "svc_total_sell":   round(svc["total_sell"], 2),
-            "total_mo":         round(total_mo, 2),
-            "lease_term":       lease_term,
-            "lease_label":      LEASE_TERM_LABELS.get(lease_term, f"{lease_term} months"),
-            "install_type":     install_type,
-            "bb_provider":      bb_provider,
-            "bb_package":       bb_package,
-            "payment_model":    payment_model,
-        }
-        files = {"session.json": {"content": json.dumps(session_data, indent=2)}}
-        for i, (fname, pdf_bytes) in enumerate(docs, 1):
-            files[f"doc_{i}_{fname}.b64"] = {"content": base64.b64encode(pdf_bytes).decode()}
+    def _zoho_send_for_signature(pdf_bytes, filename, signer_name, signer_email,
+                                  sender_note, from_name="SY Comms"):
+        """Upload PDF to Zoho Sign and create a signature request."""
+        import requests as _rq, json as _json
 
-        hdrs = {"Authorization": f"token {GITHUB_TOKEN_RS}",
-                "Accept": "application/vnd.github+json"}
+        token = _zoho_get_access_token()
+        if not token:
+            return False, "Could not get Zoho access token — check secrets."
+
+        headers = {"Authorization": f"Zoho-oauthtoken {token}"}
+        base    = "https://sign.zoho.eu/api/v1"
+
+        # Step 1: Upload document
+        upload_resp = _rq.post(
+            f"{base}/requests",
+            headers=headers,
+            data={"data": _json.dumps({
+                "requests": {
+                    "request_name": filename.replace(".pdf", ""),
+                    "actions": [{
+                        "action_type":    "SIGN",
+                        "recipient_name":  signer_name,
+                        "recipient_email": signer_email,
+                        "signing_order":   0,
+                        "verify_recipient": False,
+                    }],
+                    "notes": sender_note or f"Please review and sign your SY Comms proposal.",
+                    "expiration_days": 30,
+                    "email_reminders": True,
+                    "reminder_period": 3,
+                }
+            })},
+            files={"file": (filename, pdf_bytes, "application/pdf")},
+            timeout=60,
+        )
+        if upload_resp.status_code not in (200, 201):
+            return False, f"Zoho upload error {upload_resp.status_code}: {upload_resp.text[:200]}"
+
+        resp_data  = upload_resp.json()
+        request_id = resp_data.get("requests", {}).get("request_id", "")
+        if not request_id:
+            return False, f"No request_id in response: {upload_resp.text[:200]}"
+
+        # Step 2: Submit (send to signer)
+        submit_resp = _rq.post(
+            f"{base}/requests/{request_id}/submit",
+            headers=headers,
+            data={"data": _json.dumps({"requests": {"notes": sender_note or ""}})},
+            timeout=30,
+        )
+        if submit_resp.status_code in (200, 201):
+            sign_url = submit_resp.json().get("requests", {}).get("sign_url", "")
+            return True, request_id
+        return False, f"Submit error {submit_resp.status_code}: {submit_resp.text[:200]}"
+
+    # ── Check secrets configured ───────────────────────────────────────────────
+    _secrets_ok = False
+    if hasattr(st, "secrets"):
         try:
-            resp = _req.post(
-                "https://api.github.com/gists",
-                json={"files": files, "public": False,
-                      "description": f"SY Comms Signing - {cust_name}"},
-                headers=hdrs, timeout=30
+            _secrets_ok = bool(
+                st.secrets.get("ZOHO_CLIENT_ID") and
+                st.secrets.get("ZOHO_CLIENT_SECRET") and
+                st.secrets.get("ZOHO_REFRESH_TOKEN")
             )
-        except Exception as e:
-            return None, f"Network error: {e}"
+        except Exception:
+            pass
 
-        if resp.status_code != 201:
-            return None, f"GitHub error {resp.status_code}: {resp.text[:200]}"
+    if not _secrets_ok:
+        st.warning("Zoho Sign not configured. Add ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET and ZOHO_REFRESH_TOKEN to Streamlit secrets.")
+        st.stop()
 
-        gist_id     = resp.json()["id"]
-        signing_url = f"{SIGNING_PORTAL_URL}?gist={gist_id}"
-        return gist_id, signing_url
+    # ── UI ─────────────────────────────────────────────────────────────────────
+    zs_col1, zs_col2 = st.columns([3, 2])
 
-    def send_signing_invite(to_email, cust_name, signing_url, message, em):
-        """Email the customer their unique signing link."""
-        try:
-            msg            = MIMEMultipart()
-            msg["From"]    = f"{em.get('from_name','SY Comms')} <{em.get('username','')}>"
-            msg["To"]      = to_email
-            msg["Subject"] = "Please sign your documents - SY Comms"
-            html = f"""<html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto">
-              <div style="background:#1f1450;padding:20px 30px;border-radius:8px 8px 0 0">
-                <h2 style="color:#fff;margin:0"><span style="color:#00b5a3">Novalink</span> Hardware</h2></div>
-              <div style="background:#f9f9f9;padding:24px 30px;border:1px solid #e0e8e8;border-top:none">
-                <p>Dear {cust_name},</p>
-                {"<p>" + message + "</p>" if message else ""}
-                <p>Your documents are ready for your electronic signature. Please click the button below:</p>
-                <div style="text-align:center;margin:28px 0">
-                  <a href="{signing_url}" style="background:#008078;color:#fff;padding:14px 32px;
-                    border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem">
-                    Review &amp; Sign Documents
-                  </a>
-                </div>
-                <p style="font-size:0.83rem;color:#999">Or copy this link into your browser:<br/>
-                  <a href="{signing_url}" style="color:#008078">{signing_url}</a></p>
-                <p>Kind regards,<br/><strong>{em.get('from_name','SY Comms')}</strong></p>
-              </div></body></html>"""
-            msg.attach(MIMEText(html, "html"))
-            with smtplib.SMTP(em.get("smtp_host","smtp.gmail.com"),
-                              int(em.get("smtp_port", 587))) as srv:
-                srv.ehlo(); srv.starttls(); srv.ehlo()
-                srv.login(em["username"], em["password"])
-                srv.sendmail(em["username"], [to_email], msg.as_string())
-            return True, "sent"
-        except smtplib.SMTPAuthenticationError:
-            return False, "Gmail authentication failed - check App Password in Admin → Email."
-        except Exception as e:
-            return False, str(e)
+    with zs_col1:
+        st.markdown("**📎 Document to send**")
+        zs_auto = st.checkbox("Auto-generate Full Proposal Pack", value=True, key="zs_auto_pdf")
+        if zs_auto:
+            st.caption("The full PDF pack will be generated from the current deal and sent.")
+            zs_upload = None
+        else:
+            zs_upload = st.file_uploader("Upload PDF instead", type=["pdf"],
+                                          key="zs_upload", label_visibility="collapsed")
 
-    # ── Setup checks ──────────────────────────────────────────────────────────
-    setup_ok = True
-    if not GITHUB_TOKEN_RS:
-        pass  # GitHub token not configured - remote signing unavailable
-        st.code('GITHUB_TOKEN = "ghp_your_token_here"', language="toml")
-        setup_ok = False
+    with zs_col2:
+        st.markdown("**👤 Signer details**")
+        zs_name    = st.text_input("Signer name",  value=contact_name or comp_name or "",
+                                    key="zs_name",  placeholder="Jane Smith")
+        zs_email   = st.text_input("Signer email", value=director_email or billing_email or "",
+                                    key="zs_email", placeholder="jane@acme.co.uk")
+        zs_note    = st.text_area("Personal message (optional)", height=80, key="zs_note",
+                                   placeholder="Please review and sign at your earliest convenience.")
 
-    if not SIGNING_PORTAL_URL:
-        pass  # Signing portal URL not configured - remote signing unavailable
-        st.code('SIGNING_PORTAL_URL = "https://your-signing-portal.streamlit.app"', language="toml")
-        setup_ok = False
+    st.markdown("")
+    _zs_ready = bool(zs_name and zs_email and (zs_auto or zs_upload))
+    if not _zs_ready:
+        _zs_missing = []
+        if not zs_name:  _zs_missing.append("signer name")
+        if not zs_email: _zs_missing.append("signer email")
+        if not zs_auto and not zs_upload: _zs_missing.append("PDF upload")
+        st.caption(f"Still needed: {', '.join(_zs_missing)}")
 
-    if not em_cfg_rs.get("username") or not em_cfg_rs.get("password"):
-        st.warning("**Email not configured.** Go to Admin Panel → Email and save your SMTP settings first.")
-        setup_ok = False
+    if st.button("✍️ Send for Signature via Zoho Sign",
+                  type="primary", use_container_width=True,
+                  disabled=not _zs_ready, key="btn_zoho_send"):
 
-    if setup_ok:
-        # ── Upload + customer form ────────────────────────────────────────────
-        rs_col1, rs_col2 = st.columns([3, 2])
-
-        with rs_col1:
-            st.markdown("**📎 Documents to send**")
-            uploaded_docs = st.file_uploader(
-                "Upload PDFs", type=["pdf"], accept_multiple_files=True,
-                key="rs_docs", label_visibility="collapsed"
-            )
-            if uploaded_docs:
-                for uf in uploaded_docs:
-                    st.markdown(f"- 📄 **{uf.name}** ({len(uf.getvalue())//1024} KB)")
-
-        with rs_col2:
-            st.markdown("**👤 Customer details**")
-            rs_name    = st.text_input("Customer name",  value=comp_name or "",
-                                       key="rs_name", placeholder="Acme Ltd")
-            rs_email   = st.text_input("Customer email", value=director_email or billing_email or "",
-                                       key="rs_email", placeholder="jane@acme.co.uk")
-            rs_cc      = st.text_input("CC (your address)",
-                                       value=em_cfg_rs.get("reply_to", em_cfg_rs.get("username","")),
-                                       key="rs_cc")
-            rs_message = st.text_area("Personal message (optional)", height=90, key="rs_msg",
-                                      placeholder="Please review and sign at your earliest convenience.")
-
-        st.markdown("")
-        rs_ready = bool(uploaded_docs and rs_name and rs_email)
-        if not rs_ready:
-            missing = [x for cond, x in [(not uploaded_docs,"at least one PDF"),
-                                          (not rs_name,"customer name"),
-                                          (not rs_email,"customer email")] if cond]
-            st.caption(f"Still needed: {', '.join(missing)}")
-
-        if st.button("📨 Create Signing Session & Email Customer",
-                     type="primary", use_container_width=True, disabled=not rs_ready):
-
-            with st.spinner("Uploading documents and creating signing session..."):
-                docs_list = [(uf.name, uf.getvalue()) for uf in uploaded_docs]
-                gist_id, result = create_signing_session(
-                    docs_list, rs_name, rs_email, rs_cc, rs_message
-                )
-
-            if gist_id:
-                signing_url = result
-                st.success("Signing session created!")
-
-                with st.spinner("Sending invite email to customer..."):
-                    ok, msg = send_signing_invite(
-                        rs_email, rs_name, signing_url, rs_message, em_cfg_rs
-                    )
-
-                if ok:
-                    st.success(f"Invite email sent to **{rs_email}**")
-                else:
-                    st.error(f"Session created but email failed: {msg}")
-                    st.info("You can manually copy and share the signing link below.")
-
-                # Show the signing link clearly
-                st.markdown("**Customer signing link:**")
-                st.code(signing_url)
-
-                st.markdown(f"""
-                <div style="background:#e8f4fb;border-left:4px solid #00b5a3;border-radius:0 8px 8px 0;
-                            padding:0.9rem 1.1rem;margin-top:0.4rem;font-size:0.86rem;color:#2d1f6e">
-                  📋 <strong>Reference:</strong> {gist_id[:12].upper()}<br/>
-                  👤 <strong>Customer:</strong> {rs_name} ({rs_email})<br/>
-                  📄 <strong>Documents:</strong> {len(docs_list)}<br/>
-                  Once signed, all parties automatically receive the completed documents by email.
-                </div>""", unsafe_allow_html=True)
+        with st.spinner("Preparing and sending to Zoho Sign..."):
+            # Get PDF bytes
+            if zs_auto:
+                _pdf_bytes = build_pdf()
+                _pdf_name  = f"SYComms_Proposal_{s(comp_name).replace(' ','_')}_{date.today()}.pdf"
             else:
-                st.error(f"Could not create signing session: {result}")
+                _pdf_bytes = zs_upload.getvalue()
+                _pdf_name  = zs_upload.name
+
+            ok, result = _zoho_send_for_signature(
+                pdf_bytes=_pdf_bytes,
+                filename=_pdf_name,
+                signer_name=zs_name,
+                signer_email=zs_email,
+                sender_note=zs_note,
+            )
+
+        if ok:
+            st.success(f"✅ Sent to {zs_name} ({zs_email}) via Zoho Sign!")
+            st.markdown(f"""
+            <div style="background:#e8f8f0;border-left:4px solid #1a7a40;border-radius:8px;
+                 padding:1rem 1.2rem;margin-top:0.5rem">
+              <strong>Reference ID:</strong> {result}<br>
+              <strong>Status:</strong> Awaiting signature from {zs_name}<br>
+              <strong>Note:</strong> {zs_name} will receive an email from Zoho Sign with a secure link.
+              You'll get an email confirmation when they sign. You can also track status in
+              <a href="https://sign.zoho.eu" target="_blank">sign.zoho.eu</a>.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.error(f"❌ Zoho Sign error: {result}")
