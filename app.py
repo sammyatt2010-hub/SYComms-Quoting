@@ -3307,7 +3307,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
         pdf.set_x(pdf.l_margin)
         pdf.set_fill_color(255, 250, 230)
-        pdf.multi_cell(pdf.epw, 4.5, _ps(_special_conds.replace("—", "-").replace("–", "-")), fill=True, align="J")
+        pdf.multi_cell(pdf.epw, 4.5, s(_special_conds.replace("—", "-").replace("–", "-")), fill=True, align="J")
         pdf.ln(4)
 
     # ── Signature section ─────────────────────────────────────────────────────
