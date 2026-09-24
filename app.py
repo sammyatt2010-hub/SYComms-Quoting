@@ -4618,14 +4618,15 @@ with tab4:
             st.markdown(f"""
             <div style="background:#e8f8f0;border-left:3px solid #1a7a40;border-radius:6px;
                  padding:0.5rem 0.8rem;font-size:0.8rem;color:#1a7a40;margin-top:0.3rem">
-              🎁 <strong>Broadband FREE for months 1–12</strong><br>
+              🎁 <strong>Broadband FREE for the first 12 months</strong><br>
               From month 13: £{total_mo:.2f}/mo (broadband £{_bb_full_sell:.2f}/mo resumes)
             </div>""", unsafe_allow_html=True)
         if st.session_state.get("cs_ai_portal_free", False):
             st.markdown("""
             <div style="background:#e8f8f0;border-left:3px solid #1a7a40;border-radius:6px;
                  padding:0.5rem 0.8rem;font-size:0.8rem;color:#1a7a40;margin-top:0.3rem">
-              🎁 <strong>AI Integration Portal — first month free</strong> (500 min bundle)
+              🎁 <strong>AI Integration Portal — first month free</strong> (500 min bundle)<br>
+              <span style="font-size:0.75rem">From month 2: £25.00/mo (500 min bundle)</span>
             </div>""", unsafe_allow_html=True)
         st.markdown(f"""
         <div style="text-align:center;padding:0.5rem 0;font-size:0.8rem;color:#aaa">
