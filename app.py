@@ -990,45 +990,6 @@ with col_hw1:
             )
             if qty > 0:
                 cordless_quantities[name] = qty
-
-
-    st.markdown("**🔮 Call Scope**")
-    _cs_col1, _cs_col2 = st.columns(2)
-    # Seed defaults if not yet in config
-    if "call_scope_services" not in st.session_state.active_config:
-        st.session_state.active_config["call_scope_services"] = [
-            {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
-            {"name": "AI Integration - CRM",    "buy": 25.00, "sell": 35.00},
-            {"name": "Manager Dashboard",        "buy": 40.00, "sell": 59.00},
-            {"name": "Call Score",               "buy": 20.00, "sell": 29.00},
-        ]
-    _cs_main_cfg = st.session_state.active_config.get("call_scope_services", [])
-    with _cs_col1:
-        for _cs in _cs_main_cfg[:2]:
-            st.number_input(
-                f"{_cs['name']}  £{_cs['sell']:.2f}/mo",
-                min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
-            )
-            # Conditional minutes bundle when AI Integration is selected
-            if "AI Integration" in _cs["name"] and st.session_state.get(f"cs_{_cs['name']}", 0) > 0:
-                st.selectbox(
-                    f"Minutes bundle for {_cs['name']}",
-                    ["None", "500 mins  — £25/mo", "1000 mins — £35/mo", "1500 mins — £45/mo"],
-                    key=f"cs_mins_{_cs['name']}"
-                )
-        st.selectbox("Call Answer - My PA",
-                     ["None", "500 mins — £149/mo", "1000 mins — £199/mo", "2000 mins — £249/mo"],
-                     key="cs_mypa")
-    with _cs_col2:
-        for _cs in _cs_main_cfg[2:]:
-            st.number_input(
-                f"{_cs['name']}  £{_cs['sell']:.2f}/mo",
-                min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
-            )
-        st.selectbox("Website Widget",
-                     ["None", "Include — £50/mo"],
-                     key="cs_website")
-
 with col_hw2:
     # ── PBX & CCTV - prominent quick-select ───────────────────────────────────
     st.markdown("<div style='margin-top:2.6rem'></div>", unsafe_allow_html=True)
@@ -1272,6 +1233,43 @@ with col_hw2:
         for _sc in sec_cfg:
             st.number_input(f"{_sc['name']}  (£{_sc['sell']:.2f}/instance/mo)",
                             min_value=0, value=0, step=1, key=f"sec_{_sc['name']}")
+
+
+    with st.expander("🔮 Call Scope", expanded=False):
+        st.caption("Call Scope platform modules — monthly service charges unless noted")
+        if "call_scope_services" not in st.session_state.active_config:
+            st.session_state.active_config["call_scope_services"] = [
+                {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
+                {"name": "AI Integration - CRM",    "buy": 25.00, "sell": 35.00},
+                {"name": "Manager Dashboard",        "buy": 40.00, "sell": 59.00},
+                {"name": "Call Score",               "buy": 20.00, "sell": 29.00},
+            ]
+        _cs_exp_cfg = st.session_state.active_config.get("call_scope_services", [])
+        _cse_col1, _cse_col2 = st.columns(2)
+        with _cse_col1:
+            for _cs in _cs_exp_cfg[:2]:
+                st.number_input(
+                    f"{_cs['name']}  £{_cs['sell']:.2f}/mo",
+                    min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
+                )
+                if "AI Integration" in _cs["name"] and st.session_state.get(f"cs_{_cs['name']}", 0) > 0:
+                    st.selectbox(
+                        f"Minutes for {_cs['name']}",
+                        ["None", "500 mins  — £25/mo", "1000 mins — £35/mo", "1500 mins — £45/mo"],
+                        key=f"cs_mins_{_cs['name']}"
+                    )
+            st.selectbox("Call Answer - My PA",
+                         ["None", "500 mins — £149/mo", "1000 mins — £199/mo", "2000 mins — £249/mo"],
+                         key="cs_mypa")
+        with _cse_col2:
+            for _cs in _cs_exp_cfg[2:]:
+                st.number_input(
+                    f"{_cs['name']}  £{_cs['sell']:.2f}/mo",
+                    min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
+                )
+            st.selectbox("Website Widget",
+                         ["None", "Include — £50/mo"],
+                         key="cs_website")
 
 # ─── POST-EXPANDER REBUILDS (session state → module-level lists) ─────────────
 # Call Scope services
