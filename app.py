@@ -1196,6 +1196,7 @@ with col_hw2:
             # FTTC, ADSL etc — no auto router (ISP provides modem/router)
             _default_router = None
         router_quantities = {}
+        add_router = False
         if _router_mode == "None / Customer Supplied":
             router_type = "None / Customer Supplied"
             add_router  = False
@@ -1207,6 +1208,7 @@ with col_hw2:
             else:
                 router_type = "None / Customer Supplied"
                 add_router  = False
+        else:  # Manual select
             add_router = False
             router_type = "None / Customer Supplied"
             st.caption("Set quantities for each router needed:")
@@ -1218,7 +1220,7 @@ with col_hw2:
                     if _rq > 0:
                         router_quantities[_rname] = _rq
                         add_router = True
-                        router_type = _rname  # use last selected for legacy references
+                        router_type = _rname
 
         additional_wired_ports = st.number_input(
             "Additional wired network ports", min_value=0,
