@@ -2668,8 +2668,9 @@ def build_proposal_pdf():
             p.set_fill_color(245, 247, 255)
         else:
             p.set_fill_color(255, 255, 255)
+        _lbl_safe = _ps(lbl.replace("—", "-").replace("–", "-"))
         p.set_text_color(60, 60, 60); p.set_font("Helvetica", "", 8)
-        p.cell(140, 5.5, _ps(f"  {lbl}"), fill=True, ln=False)
+        p.cell(140, 5.5, f"  {_lbl_safe}", fill=True, ln=False)
         p.set_font("Helvetica", "B", 8); p.set_text_color(31, 20, 80)
         p.cell(0, 5.5, _ps(val), fill=True, ln=True, align="R")
     p.set_text_color(0, 0, 0)
