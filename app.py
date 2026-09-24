@@ -4642,7 +4642,8 @@ with tab5:
         _adj_commission = round(_adj_units * 1000, 2)
 
         # Feasibility mini-panel ────────────────────────────────────────────────
-        _feas_lease_total   = adj_rental * lease_term
+        _buyout_rental      = (pl_data["sales_rate"] / 1000.0) * termination_cost
+        _feas_lease_total   = max(adj_rental - _buyout_rental, 0) * lease_term
         _feas_max_settle    = round(_feas_lease_total * 0.70, 2)
         _settle_ok          = termination_cost <= _feas_max_settle
         _f_col  = "#1a7a40" if _settle_ok else "#c0392b"
@@ -4752,7 +4753,8 @@ with tab6:
     st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
 
     _new_rental    = float(st.session_state.get('adj_rent', pl_data['rental']))
-    _lease_total   = _new_rental * lease_term
+    _buyout_rental = (pl_data['sales_rate'] / 1000.0) * termination_cost
+    _lease_total   = max(_new_rental - _buyout_rental, 0) * lease_term
     _max_settlement = round(_lease_total * 0.70, 2)
     _settlement_ok  = termination_cost <= _max_settlement
 
