@@ -3222,6 +3222,20 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.multi_cell(pdf.epw, 4.5, terms)
     pdf.ln(6)
 
+    # ── Special Conditions (from consultant notes) ───────────────────────────
+    _special_conds = st.session_state.get("c_notes", "").strip()
+    if _special_conds:
+        pdf.ln(2)
+        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(0, 6, "  Special Conditions / Agreed Terms", fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
+        pdf.set_x(pdf.l_margin)
+        pdf.set_fill_color(255, 250, 230)
+        pdf.multi_cell(pdf.epw, 4.5, s(_special_conds.replace("-", "-").replace("-", "-")), fill=True, align="J")
+        pdf.ln(4)
+        pdf.set_fill_color(255, 255, 255)
+
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_font("Helvetica", "B", 9)
     pdf.ln(2)
@@ -3297,18 +3311,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     align="J"
     )
     pdf.ln(8)
-
-    # ── Special Conditions (from consultant notes) ───────────────────────────
-    _special_conds = st.session_state.get("c_notes", "").strip()
-    if _special_conds:
-        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.cell(0, 6, "  Special Conditions / Agreed Terms", fill=True, ln=True)
-        pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
-        pdf.set_x(pdf.l_margin)
-        pdf.set_fill_color(255, 250, 230)
-        pdf.multi_cell(pdf.epw, 4.5, s(_special_conds.replace("—", "-").replace("–", "-")), fill=True, align="J")
-        pdf.ln(4)
 
     # ── Signature section ─────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 9)
@@ -3812,8 +3814,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_text_color(0, 0, 0); pdf.ln(3)
     pdf.set_font("Helvetica", "", 8)
     _tc_half = pdf.epw / 2
-    # Row 1: Name (pre-filled) + Company (pre-filled)
-    pdf.cell(_tc_half, 5.5, f"Name:     {s(sig_name or '________________________')}", ln=False)
+    # Row 1: Name (deal contact or signer) + Company
+    _tc_name = s(sig_name or _contact or "________________________")
+    pdf.cell(_tc_half, 5.5, f"Name:     {_tc_name}", ln=False)
     pdf.cell(_tc_half, 5.5, f"Company:  {s(_comp or '________________________')}", ln=True)
     pdf.ln(1)
     # Row 2: Date (pre-filled) + Position/Title (blank to complete)
