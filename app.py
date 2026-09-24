@@ -3810,14 +3810,33 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "B", 8)
     pdf.cell(0, 6, "  Confirmation - I have read and agree to the full Terms & Conditions", fill=True, ln=True)
     pdf.set_text_color(0, 0, 0); pdf.ln(3)
-    _tc_cols = pdf.epw / 3
     pdf.set_font("Helvetica", "", 8)
-    pdf.cell(_tc_cols, 5, "Signature: ________________", ln=False)
-    pdf.cell(_tc_cols, 5, "Date: ________________", ln=False)
-    pdf.cell(_tc_cols, 5, "Position/Title: ________________", ln=True)
-    pdf.ln(2)
-    pdf.cell(_tc_cols, 5, f"Name: {s(sig_name or '________________________')}", ln=False)
-    pdf.cell(_tc_cols, 5, f"Company: {s(_comp or '________________________')}", ln=True)
+    _tc_half = pdf.epw / 2
+    # Row 1: Name (pre-filled) + Company (pre-filled)
+    pdf.cell(_tc_half, 5.5, f"Name:     {s(sig_name or '________________________')}", ln=False)
+    pdf.cell(_tc_half, 5.5, f"Company:  {s(_comp or '________________________')}", ln=True)
+    pdf.ln(1)
+    # Row 2: Date (pre-filled) + Position/Title (blank to complete)
+    pdf.cell(_tc_half, 5.5, f"Date:     {date.today().strftime('%d/%m/%Y')}", ln=False)
+    pdf.cell(_tc_half, 5.5, "Position / Title:  ________________________", ln=True)
+    pdf.ln(4)
+    # Signature row — stamp if captured, else blank line
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(40, 5, "Signature:", ln=False)
+    if sig_bytes:
+        try:
+            import tempfile as _tf_tc, os as _os_tc
+            with _tf_tc.NamedTemporaryFile(suffix=".png", delete=False) as _stc:
+                _stc.write(sig_bytes); _stc_path = _stc.name
+            try:
+                pdf.image(_stc_path, x=pdf.get_x(), y=pdf.get_y() - 1, h=12)
+            finally:
+                _os_tc.unlink(_stc_path)
+            pdf.ln(14)
+        except Exception:
+            pdf.cell(0, 14, "________________________________", ln=True)
+    else:
+        pdf.cell(0, 14, "________________________________", ln=True)
     pdf.set_text_color(0, 0, 0)
 
     # ── AUDIT CERTIFICATE PAGE - DocuSign-style ─────────────────────────────
