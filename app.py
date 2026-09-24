@@ -2628,14 +2628,43 @@ def build_proposal_pdf():
     p.set_font("Helvetica", "B", 8)
     p.cell(0, 6, "  Monthly Services Included", fill=True, ln=True)
     svc_rows = []
-    if svc["bb_sell"]    > 0: svc_rows.append((f"Broadband — {bb_provider} {bb_package}", f"GBP {svc['bb_sell']:.2f}/mo"))
-    if svc["lic_monthly"]> 0: svc_rows.append((f"Hosted User Licences ({total_voice_channels} users)", f"GBP {svc['lic_monthly']:.2f}/mo"))
-    if sw_sell_total     > 0: svc_rows.append(("Software / Add-ons", f"GBP {sw_sell_total:.2f}/mo"))
-    for i, (lbl, val) in enumerate(svc_rows):
-        if i % 2 == 0:
-            p.set_fill_color(245, 247, 255)
+    # Broadband — with free year note if active
+    if svc["bb_sell"] > 0:
+        if bb_free_year and _bb_yr1_saving > 0:
+            svc_rows.append((f"Broadband — {bb_provider} {bb_package} (FREE yr 1)",
+                             f"GBP 0.00/mo (then GBP {_bb_full_sell:.2f})"))
         else:
-            p.set_fill_color(255, 255, 255)
+            svc_rows.append((f"Broadband — {bb_provider} {bb_package}", f"GBP {svc['bb_sell']:.2f}/mo"))
+    if svc["lic_monthly"] > 0:
+        svc_rows.append((f"Hosted User Licences ({total_voice_channels} users)", f"GBP {svc['lic_monthly']:.2f}/mo"))
+    if sw_sell_total > 0:
+        svc_rows.append(("Software / Add-ons", f"GBP {sw_sell_total:.2f}/mo"))
+    # Call Scope services
+    for _csr in cs_svc_rows:
+        if _csr.get("qty", 0) > 0:
+            _csr_label = _csr["name"]
+            _csr_sell  = _csr["sell"] * _csr["qty"]
+            svc_rows.append((_csr_label, f"GBP {_csr_sell:.2f}/mo"))
+    # AI Portal first month free note
+    if st.session_state.get("cs_ai_portal_free", False):
+        svc_rows.append(("  AI Portal 500 mins — 1st month FREE", "GBP 0.00 month 1"))
+    # System Security
+    for _sr in sec_rows:
+        if _sr.get("qty", 0) > 0:
+            svc_rows.append((f"{_sr['name']} x{_sr['qty']}",
+                             f"GBP {_sr['sell']*_sr['qty']:.2f}/mo"))
+    # IT Services
+    for _ir in it_rows:
+        if _ir.get("qty", 0) > 0:
+            svc_rows.append((f"IT: {_ir['service']} x{_ir['qty']}",
+                             f"GBP {_ir.get('sell', _ir.get('cost',0)) * _ir['qty']:.2f}/mo"))
+    # Mobile SIMs
+    for _mr in mobile_rows:
+        if _mr.get("qty", 0) > 0:
+            svc_rows.append((f"Mobile — {_mr['network']} {_mr['package']} x{_mr['qty']}",
+                             f"GBP {_mr['sell']*_mr['qty']:.2f}/mo"))
+    for i, (lbl, val) in enumerate(svc_rows):
+        p.set_fill_color(245, 247, 255) if i % 2 == 0 else p.set_fill_color(255, 255, 255)
         p.set_text_color(60, 60, 60); p.set_font("Helvetica", "", 8)
         p.cell(140, 5.5, _ps(f"  {lbl}"), fill=True, ln=False)
         p.set_font("Helvetica", "B", 8); p.set_text_color(31, 20, 80)
