@@ -1580,7 +1580,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
             st.caption("Edit wholesale (buy) and customer (sell) prices for all monthly service items. Changes apply immediately to new deals.")
 
             # Show current deal discount impact
-            _adm_disc = svc_disc_pct  # from consultant slider
+            _adm_disc = max(0.0, min(40.0, float(st.session_state.get("c_svc_disc", 0))))
             if _adm_disc > 0:
                 st.info(f"ℹ️ Consultant has applied a **{_adm_disc:.0f}% service discount** on this deal. "
                         f"Effective sell prices and margins shown below reflect this.")
