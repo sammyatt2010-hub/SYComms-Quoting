@@ -5507,38 +5507,36 @@ with tab7:
         if not zs_auto and not zs_upload: _zs_missing.append("PDF upload")
         st.caption(f"Still needed: {', '.join(_zs_missing)}")
 
-    if st.button("✍️ Send for Signature via Zoho Sign",
+    if st.button("📄 Generate & Prepare for Zoho Sign",
                   type="primary", use_container_width=True,
                   disabled=not _zs_ready, key="btn_zoho_send"):
-
-        with st.spinner("Preparing and sending to Zoho Sign..."):
-            # Get PDF bytes
+        with st.spinner("Generating PDF..."):
             if zs_auto:
                 _pdf_bytes = build_pdf()
                 _pdf_name  = f"SYComms_Proposal_{s(comp_name).replace(' ','_')}_{date.today()}.pdf"
             else:
                 _pdf_bytes = zs_upload.getvalue()
                 _pdf_name  = zs_upload.name
+            st.session_state["_zs_pdf_bytes"] = _pdf_bytes
+            st.session_state["_zs_pdf_name"]  = _pdf_name
+            st.session_state["_zs_ready"]     = True
+            st.rerun()
 
-            ok, result = _zoho_send_for_signature(
-                pdf_bytes=_pdf_bytes,
-                filename=_pdf_name,
-                signer_name=zs_name,
-                signer_email=zs_email,
-                sender_note=zs_note,
-            )
-
-        if ok:
-            st.success(f"✅ Sent to {zs_name} ({zs_email}) via Zoho Sign!")
-            st.markdown(f"""
-            <div style="background:#e8f8f0;border-left:4px solid #1a7a40;border-radius:8px;
-                 padding:1rem 1.2rem;margin-top:0.5rem">
-              <strong>Reference ID:</strong> {result}<br>
-              <strong>Status:</strong> Awaiting signature from {zs_name}<br>
-              <strong>Note:</strong> {zs_name} will receive an email from Zoho Sign with a secure link.
-              You'll get an email confirmation when they sign. You can also track status in
-              <a href="https://sign.zoho.eu" target="_blank">sign.zoho.eu</a>.
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.error(f"❌ Zoho Sign error: {result}")
+    if st.session_state.get("_zs_ready"):
+        _pdf_bytes = st.session_state.get("_zs_pdf_bytes")
+        _pdf_name  = st.session_state.get("_zs_pdf_name","proposal.pdf")
+        st.success("PDF ready to send!")
+        dl_col, link_col = st.columns(2)
+        with dl_col:
+            st.download_button("📥 1. Download PDF",
+                data=_pdf_bytes, file_name=_pdf_name,
+                mime="application/pdf", use_container_width=True,
+                key="zs_dl_pdf")
+        with link_col:
+            st.link_button("✍️ 2. Open Zoho Sign",
+                "https://sign.zoho.eu",
+                use_container_width=True)
+        st.info(
+            f"Download the PDF → go to Zoho Sign → click **Send for signatures** → "
+            f"upload the PDF → add **{zs_name}** ({zs_email}) as signer → send."
+        )
