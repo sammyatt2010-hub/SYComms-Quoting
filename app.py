@@ -274,6 +274,9 @@ current_mobile = current_total = 0.0
 commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
 commission_per_unit  = C.get("commission_per_unit", 1000)   # £ per unit
+# Override with appointment type rate if set
+_appt_rates = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
+commission_per_unit  = _appt_rates.get(st.session_state.get("q_appt_type", "Self Gen"), commission_per_unit)
 B   = cfg.get("branding", {})     # shorthand for branding dict
 # Branding helpers - refresh from full config (overrides early load)
 _CO       = B.get("company_name",    _CO)
@@ -292,7 +295,7 @@ QUOTE_KEYS = [
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
-    "q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
+    "q_appt_type","q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
     "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
     "q_rep_name","q_rep_position",
     "c_svc_disc",
@@ -759,6 +762,17 @@ if "_pending_quote" in st.session_state:
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
+    # ── Appointment Type — affects commission rate ────────────────────────────
+    APPT_RATES = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
+    appt_type = st.selectbox(
+        "📋 Appointment Type",
+        list(APPT_RATES.keys()),
+        key="q_appt_type",
+        help="Sets commission rate per unit for this deal"
+    )
+    _appt_rate = APPT_RATES[appt_type]
+    st.caption(f"Commission rate: **£{_appt_rate:,}/unit**")
+    st.markdown("---")
     st.markdown("### 🏢 Customer Details")
     comp_name       = st.text_input("Company Name", placeholder="Acme Ltd", key="q_comp_name")
     comp_reg        = st.text_input("Company Reg. No.", placeholder="12345678", key="q_comp_reg")
@@ -1961,7 +1975,7 @@ if _desired_rental <= 0:
 _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
 _adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
 commission_units       = _adjusted_gp / 4000
-commission             = round(commission_units * 1000, 2)
+commission             = round(commission_units * commission_per_unit, 2)
 # Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
 commission_full        = commission
 if svc_disc_pct > 0 and commission > 0:
