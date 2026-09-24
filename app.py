@@ -1183,12 +1183,10 @@ with col_hw2:
                                 ["Auto-select","Manual select","None / Customer Supplied"].index(_default_router_mode))
         # Smart default: FTTP → GWN 706, SoGEA → Technicolour, else Draytek
         _bb_pkg_lower = (bb_package or "").lower()
-        if "fttp" in _bb_pkg_lower:
-            # Prefer GWN7062E as FTTP default, fall back to GWN 706 if not in catalogue
-            if "Grandstream GWN7062E (FTTP)" in ROUTERS:
-                _default_router = "Grandstream GWN7062E (FTTP)"
-            elif "Grandstream GWN 706 (FTTP)" in ROUTERS:
-                _default_router = "Grandstream GWN 706 (FTTP)"
+        if "fttp" in _bb_pkg_lower and "Grandstream GWN7062E (FTTP)" in ROUTERS:
+            _default_router = "Grandstream GWN7062E (FTTP)"
+        elif "fttp" in _bb_pkg_lower and "Grandstream GWN 706 (FTTP)" in ROUTERS:
+            _default_router = "Grandstream GWN 706 (FTTP)"
         elif "sogea" in _bb_pkg_lower and "Technicolour DGA Series (SoGEA)" in ROUTERS:
             _default_router = "Technicolour DGA Series (SoGEA)"
         elif "Draytek Vigor 2927 (FTTP/SoGEA)" in ROUTERS:
