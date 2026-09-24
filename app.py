@@ -3878,9 +3878,8 @@ with tab1:
         </div>""" if is_spread else ""
 
         st.markdown(f"""
-        <div class="metric-card" style="text-align:left; margin-bottom:1rem">
-          <div class="metric-label">Agreement Term</div>
-          <div style="font-size:1.1rem; font-weight:600">{LEASE_TERM_LABELS[lease_term]}</div>
+        <div style="font-size:0.72rem;color:#999;margin-bottom:0.2rem">
+          Agreement term: <strong>{lease_term} months</strong>
         </div>
         {_hw_card}
         {_spread_note}
@@ -4028,6 +4027,12 @@ with tab2:
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
                 all_equip.append((addon_name, addon_qty))
+        for r in cs_svc_rows:
+            if r.get("qty", 0) > 0:
+                all_equip.append((r["name"], r["qty"]))
+        for r in sec_rows:
+            if r.get("qty", 0) > 0:
+                all_equip.append((r["name"], r["qty"]))
         for name, qty in all_equip:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:#555'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
@@ -4285,8 +4290,8 @@ with tab4:
             comp_rows.append(("Software Charges", 0.0, sw_sell_total))
 
         # Comparison table - built as a flat string to avoid markdown code-block indentation
-        _saving_bg  = "#e8f8f0" if saving_mo >= 0 else "#fdf0f0"
-        _saving_col = "#1a7a40" if saving_mo >= 0 else "#c0392b"
+        _saving_bg  = "#e8f8f0"  # always green — increase is also a positive investment
+        _saving_col = "#1a7a40"  # always green
         _saving_lbl = "Monthly Saving" if saving_mo >= 0 else "Monthly Increase"
         _arrow      = "-" if saving_mo >= 0 else "+"
 
