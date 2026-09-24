@@ -3298,6 +3298,18 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     )
     pdf.ln(8)
 
+    # ── Special Conditions (from consultant notes) ───────────────────────────
+    _special_conds = st.session_state.get("c_notes", "").strip()
+    if _special_conds:
+        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(0, 6, "  Special Conditions / Agreed Terms", fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
+        pdf.set_x(pdf.l_margin)
+        pdf.set_fill_color(255, 250, 230)
+        pdf.multi_cell(pdf.epw, 4.5, _ps(_special_conds.replace("—", "-").replace("–", "-")), fill=True, align="J")
+        pdf.ln(4)
+
     # ── Signature section ─────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 9)
     pdf.cell(0, 5, f"For {s(_comp or 'Company Name')}:", ln=True)
@@ -3446,13 +3458,19 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "I confirm I have authority to enter into this agreement on behalf of the Customer.",
         ]:
             pdf.set_font("Helvetica","",8)
-            pdf.set_font("Helvetica","",8)
             pdf.set_x(pdf.l_margin)
-            # Show customer's initials if signed, else blank line
-            _initials_str = "".join(w[0].upper() for w in sig_name.split() if w)[:4] if sig_name else "______"
-            pdf.cell(32, 5, f"  {_initials_str}", ln=False)
-            pdf.set_x(pdf.l_margin + 32)
-            pdf.multi_cell(pdf.epw - 32, 5, s(item))
+            # Draw tick box instead of initials/blank
+            _bx = pdf.l_margin + 2
+            _by = pdf.get_y() + 1
+            _bs = 4.5
+            pdf.set_draw_color(31, 20, 80)
+            pdf.rect(_bx, _by, _bs, _bs)
+            pdf.set_draw_color(0, 181, 163)
+            pdf.line(_bx + 0.6, _by + 2.2, _bx + 1.7, _by + 3.8)
+            pdf.line(_bx + 1.7, _by + 3.8, _bx + 3.9, _by + 0.6)
+            pdf.set_draw_color(0, 0, 0)
+            pdf.set_x(pdf.l_margin + 10)
+            pdf.multi_cell(pdf.epw - 10, 5, s(item))
             pdf.set_x(pdf.l_margin)
         pdf.ln(2)
         _eca_hdr("Final Declaration")
@@ -3780,7 +3798,26 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.multi_cell(pdf.epw, 3.8, s(_sec_text), align="J")
     pdf.ln(3)
     pdf.set_font("Helvetica", "I", 6.5); pdf.set_text_color(128, 128, 128)
-    pdf.multi_cell(pdf.epw, 3.5, "This is a summary. Full Terms & Conditions: https://sycomms.co.uk/terms-conditions", align="C")
+    pdf.multi_cell(pdf.epw, 3.5,
+        "This is a summary of key terms. Full Terms & Conditions available at https://sycomms.co.uk/terms-conditions "
+        "- by signing below you confirm you have read, understood and agree to the full Terms & Conditions at the link above.",
+        align="C")
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(5)
+
+    # ── T&C Confirmation Signature ────────────────────────────────────────────
+    pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.cell(0, 6, "  Confirmation — I have read and agree to the full Terms & Conditions", fill=True, ln=True)
+    pdf.set_text_color(0, 0, 0); pdf.ln(3)
+    _tc_cols = pdf.epw / 3
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(_tc_cols, 5, "Signature: ________________", ln=False)
+    pdf.cell(_tc_cols, 5, "Date: ________________", ln=False)
+    pdf.cell(_tc_cols, 5, "Position/Title: ________________", ln=True)
+    pdf.ln(2)
+    pdf.cell(_tc_cols, 5, f"Name: {s(sig_name or '________________________')}", ln=False)
+    pdf.cell(_tc_cols, 5, f"Company: {s(_comp or '________________________')}", ln=True)
     pdf.set_text_color(0, 0, 0)
 
     # ── AUDIT CERTIFICATE PAGE - DocuSign-style ─────────────────────────────
