@@ -1920,6 +1920,15 @@ hw_buy     = compute_hw_buy()
 hw_sell    = compute_hw_sell()
 svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
 
+# Add Call Scope services + Security to total monthly
+_cs_svc_sell  = sum(r["sell"] * r["qty"] for r in cs_svc_rows)
+_cs_svc_cost  = sum(r["buy"]  * r["qty"] for r in cs_svc_rows)
+_sec_svc_sell = sum(r["sell"] * r["qty"] for r in sec_rows)
+_sec_svc_cost = sum(r["buy"]  * r["qty"] for r in sec_rows)
+svc["cs_sell"]  = _cs_svc_sell
+svc["sec_sell"] = _sec_svc_sell
+svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell
+
 # ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
 # Applies to hosted user licences, software add-ons and broadband (broadband is capped
 # at wholesale cost). Mobiles are not discountable. Commission is reduced by the same %.
@@ -1941,7 +1950,8 @@ if svc_disc_pct > 0:
         svc["bb2_sell"] = round(max(bb2_list * _svc_mult, svc["bb2_floor"]), 2)
     svc["bb_sell"]     = svc["bb1_sell"] + svc["bb2_sell"]
     svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
-                          svc.get("mobile_sell", 0.0) + sw_sell_total)
+                          svc.get("mobile_sell", 0.0) + sw_sell_total +
+                          _cs_svc_sell + _sec_svc_sell)
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
