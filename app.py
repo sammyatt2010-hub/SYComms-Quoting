@@ -363,7 +363,7 @@ PRODUCT_IMAGES = {
     "Call Recording":                "images/call_recording.jpg",
     "Call Scope AI Agent":               "images/crm_ai.jpg",
     "ACD Light Agent":               "images/acd_light.jpg",
-    "Teams Integration":             "images/teams_integration.jpg",
+    "Click to Dial":                 "images/teams_integration.jpg",
     "HTML Wallboard":                "images/html_wallboard.jpg",
     # ── Grandstream Desktop ───────────────────────────────────────────────────
     "Grandstream GRP2601P":    "images/grp2601p.jpg",
@@ -826,6 +826,23 @@ with st.sidebar:
     # Silent floor: effective uplift never drops below 5% regardless of discount level
     service_uplift_pct = max(40 - service_discount_pct, 5)
 
+    st.markdown("")
+    st.markdown("**Desired Lease Rental**")
+    _sidebar_rental = st.number_input(
+        "Target Rental (£/mo)", min_value=0.0, value=0.0, step=10.0,
+        key="q_sidebar_rental",
+        help="Enter target monthly rental to override calculated figure. 0 = use calculated."
+    )
+    if _sidebar_rental > 0:
+        # Sync to the same session state key the consultant tab uses
+        st.session_state["c_desired_rental"] = _sidebar_rental
+        _prev_units = st.session_state.get("_prev_commission_units", 0.0)
+        st.caption(f"~{_prev_units:.2f} units")
+    elif st.session_state.get("q_sidebar_rental", 0.0) == 0.0:
+        # Clear when set back to 0
+        if st.session_state.get("c_desired_rental", 0.0) == _sidebar_rental:
+            pass  # keep consultant tab value
+
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
     termination_cost = st.number_input(
         "Buyout / Termination Cost (£)",
@@ -874,8 +891,9 @@ hw_fund         = "None"
 is_recurring    = True
 # Software add-on defaults (overridden by sidebar widgets above)
 sw_studio_qty = sw_callrec_qty = sw_crm_qty = 0
+_sw_studio_on = False
 sw_acd_qty = 0
-sw_teams_qty = sw_wallboard_qty = 0
+sw_ctd_qty = sw_wallboard_qty = 0
 
 # ─── QUOTE SAVE / LOAD ───────────────────────────────────────────────────────
 with st.expander("💾 Save / Load Quote", expanded=False):
@@ -1107,15 +1125,16 @@ with col_hw2:
         st.markdown("---")
         _sw_col1, _sw_col2 = st.columns(2)
         with _sw_col1:
-            sw_studio_qty    = st.number_input("SY Comms Studio",   0, 50, 0, key="q_sw_studio",  help="sell £11.95/user")
+            _sw_studio_on    = st.checkbox("SY Comms Studio  (£11.95/mo)", key="q_sw_studio")
+            sw_studio_qty    = 1 if _sw_studio_on else 0
             sw_callrec_qty   = st.number_input("Call Recording",    0, 50, 0, key="q_sw_callrec", help="sell £1.50/user")
         with _sw_col2:
-            sw_teams_qty     = st.number_input("Teams Integration", 0, 50, 0, key="q_sw_teams",   help="sell £3.75/user")
+            sw_ctd_qty       = st.number_input("Click to Dial",     0, 50, 0, key="q_sw_ctd",    help="sell £3.75/user")
             sw_wallboard_qty = st.number_input("HTML Wallboard",    0, 10, 0, key="q_sw_wb",      help="sell £99.00/instance")
     SW_ADDONS = [
         ("SY Comms Studio",   sw_studio_qty,    4.50, 11.95),
         ("Call Recording",    sw_callrec_qty,   0.01,  1.50),
-        ("Teams Integration", sw_teams_qty,     0.75,  3.75),
+        ("Click to Dial",     sw_ctd_qty,       0.75,  3.75),
         ("HTML Wallboard",    sw_wallboard_qty, 5.00, 99.00),
     ]
     sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
@@ -1530,7 +1549,7 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 [f"Switch: {d['name']}" for d in cfg.get("switches", []) if d.get("name")] +
                 [d["name"] for d in cfg.get("routers", []) if d.get("name")] +
                 ["SY Comms Studio", "Call Recording", "Call Scope AI Agent",
-                 "ACD Light Agent", "Teams Integration", "HTML Wallboard"]
+                 "ACD Light Agent", "Click to Dial", "HTML Wallboard"]
             )
 
             img_col1, img_col2 = st.columns([2, 3])
@@ -1767,6 +1786,10 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 new_wallboard  = st.number_input("Wallboard Sell £/user/mo",           value=float(c.get("wallboard_sell", 99.00)),    step=0.50)
                 new_uplift     = st.number_input("Default Service Uplift %",           value=float(c.get("default_service_uplift_pct", 40)), min_value=0.0, max_value=100.0, step=1.0)
             with cc2:
+                new_hw_uplift_up = st.number_input("Upfront Purchase Uplift %",
+                    value=float(c.get("hw_uplift_upfront_pct",20)), min_value=0.0,
+                    max_value=100.0, step=1.0, key="adm_hw_upfront_uplift",
+                    help="Markup on hardware cost for upfront purchase deals")
                 new_hw_uplift  = st.slider("Hardware Sell Margin %",
                     min_value=0, max_value=100, value=int(c.get("hw_uplift_pct", 50)), step=5,
                     help="Controls the hardware sell markup. Set before generating a quote. Not visible to customers.")
@@ -1780,7 +1803,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     "vc_sell_per_seat":  new_vc_sell,
                     "wallboard_sell":   new_wallboard,
                     "default_service_uplift_pct": new_uplift,
-                    "hw_uplift_pct":    new_hw_uplift,
+                    "hw_uplift_upfront_pct": new_hw_uplift_up,
+                    "hw_uplift_pct": new_hw_uplift,
                     "commission_per_unit": new_commission,
                 })
                 st.success("Costs updated!")
@@ -1947,9 +1971,11 @@ def compute_hw_buy():
             total += ROUTERS[router_type]
     return total
 
-def compute_hw_sell():
-    """Hardware sell price - uses per-item sell price from catalogue if available,
-    falls back to buy × (1 + hw_uplift_override/100) for items without a sell price."""
+def compute_hw_sell(uplift_pct=None):
+    """Compute total hardware sell value.
+    Falls back to buy x (1 + uplift/100) for items without a sell price."""
+    if uplift_pct is None:
+        uplift_pct = hw_uplift_override
     total = 0.0
     for name, qty in desktop_quantities.items():
         info = HANDSETS_DESKTOP[name]
@@ -2123,25 +2149,22 @@ if svc_disc_pct > 0:
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
-is_spread  = ("Lease" in payment_model)
-
 if is_spread:
-    # Use pricebook lease rental formula:
-    # rental = (sales_lease_rate / 1000) × sub_total
-    # Install cost is already embedded in cos_ex which drives the rental
-    # Customer pays NOTHING upfront in lease mode - rental covers everything
+    # Use pricebook lease rental formula
     hw_monthly_spread = pl_data["rental"]
     total_mo   = svc["total_sell"] + hw_monthly_spread
-    upfront    = 0.0   # no upfront in lease - install baked into rental
+    upfront    = 0.0
     pat        = pat_base
 else:
+    # Upfront: compute hw_sell at upfront uplift % (default 20%, not lease uplift)
+    hw_sell    = compute_hw_sell(uplift_pct=hw_uplift_upfront_override)
     hw_monthly_spread = 0.0
-    upfront    = compute_upfront() + termination_cost   # included in upfront total
+    _bb_inst   = BROADBAND[bb_provider][bb_package]["install"]
+    upfront    = hw_sell + compute_install_cost() + _bb_inst + termination_cost
     total_mo   = svc["total_sell"]
     pat        = pat_base
-
 # ── Consultant desired rental - adjusts lease amount and commission ───────────
-deal_type = "Hardware Lease (spread over term)" if is_spread else "Upfront Purchase"
+deal_type = "Hardware Lease (spread over term)" if is_spread else f"Upfront Purchase (cost + {hw_uplift_upfront_override:.0f}% uplift)"
 base_rental   = pl_data["rental"]      # the calculated lease rental (floor/reference)
 true_rate     = pl_data["true_rate"]
 
@@ -2157,6 +2180,7 @@ _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 e
 _adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
 commission_units       = _adjusted_gp / 4000
 commission             = round(commission_units * commission_per_unit, 2)
+st.session_state["_prev_commission_units"] = round(commission_units, 2)
 # Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
 commission_full        = commission
 if svc_disc_pct > 0 and commission > 0:
@@ -4478,8 +4502,16 @@ with tab4:
         # Comparison table - built as a flat string to avoid markdown code-block indentation
         _saving_bg  = "#e8f8f0"  # always green — increase is also a positive investment
         _saving_col = "#1a7a40"  # always green
-        _saving_lbl = "Monthly Saving" if saving_mo >= 0 else "Monthly Increase"
-        _arrow      = "-" if saving_mo >= 0 else "+"
+        if saving_mo >= 0:
+            _saving_lbl  = "Annual Saving"
+            _saving_disp = f"{chr(163)}{abs(saving_yr):,.2f}"
+            _saving_sub  = f"per year  ({chr(163)}{abs(saving_mo):.2f}/mo)"
+        else:
+            _daily       = abs(saving_mo) / 30.44
+            _saving_lbl  = "Daily Investment"
+            _saving_disp = f"{chr(163)}{_daily:.2f}"
+            _saving_sub  = f"per day  ({chr(163)}{abs(saving_mo):.2f}/mo increase)"
+        _arrow = "-" if saving_mo >= 0 else "+"
 
         _tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">'
         _tbl += '<thead><tr style="background:#1f1450;color:#fff">'
@@ -4509,8 +4541,8 @@ with tab4:
 
         _tbl += f'<div style="margin-top:1rem;padding:1rem 1.4rem;background:{_saving_bg};border-radius:10px;border-left:4px solid {_saving_col}">'
         _tbl += f'<div style="font-size:0.8rem;color:{_saving_col};font-weight:700;text-transform:uppercase;letter-spacing:.06em">{_saving_lbl}</div>'
-        _tbl += f'<div style="font-size:1.8rem;font-weight:800;color:{_saving_col}">{chr(163)}{abs(saving_mo):.2f}<span style="font-size:0.9rem;font-weight:400"> per month</span></div>'
-        _tbl += f'<div style="font-size:1rem;color:{_saving_col};margin-top:0.2rem">{chr(163)}{abs(saving_yr):.2f} per year &nbsp;&middot;&nbsp; {abs(saving_pct):.0f}% {"saving" if saving_mo>=0 else "increase"}</div>'
+        _tbl += f'<div style="font-size:1.8rem;font-weight:800;color:{_saving_col}">{_saving_disp}</div>'
+        _tbl += f'<div style="font-size:1rem;color:{_saving_col};margin-top:0.2rem">{_saving_sub}</div>'
         _tbl += "</div>"
 
         st.markdown(_tbl, unsafe_allow_html=True)
