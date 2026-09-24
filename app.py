@@ -855,7 +855,8 @@ with st.sidebar:
     _sidebar_rental = st.number_input(
         "Target Rental (£/mo)",
         min_value=0.0,
-        value=float(st.session_state.get("c_desired_rental", 0.0)),
+        value=float(st.session_state.get("c_desired_rental") or
+                   st.session_state.get("_prev_base_rental", 0.0)),
         step=10.0,
         key="q_sidebar_rental",
         help="Enter target monthly rental, then click Apply. 0 = use calculated figure."
@@ -871,10 +872,19 @@ with st.sidebar:
             st.rerun()
     _active_rental = st.session_state.get("c_desired_rental", 0.0)
     _prev_units    = st.session_state.get("_prev_commission_units", 0.0)
-    if _active_rental > 0:
-        st.caption(f"Active: £{_active_rental:.2f}/mo  ·  ~{_prev_units:.2f} units")
+    _calc_rental  = st.session_state.get("_prev_base_rental", 0.0)
+    _true_rate_ss = st.session_state.get("_prev_true_rate", 0.0)
+    _cos_full_ss  = st.session_state.get("_prev_cos_full", 0.0)
+    # Compute units live from whatever rental is in the box right now
+    _display_rental = _active_rental if _active_rental > 0 else _calc_rental
+    if _true_rate_ss > 0:
+        _live_units = ((_display_rental / _true_rate_ss) * 1000 - _cos_full_ss) / 4000
     else:
-        st.caption("Using calculated rental")
+        _live_units = _prev_units
+    if _active_rental > 0 and abs(_active_rental - _calc_rental) > 0.01:
+        st.caption(f"Override: £{_active_rental:.2f}/mo  ·  ~{_live_units:.2f} units")
+    else:
+        st.caption(f"Calculated: £{_calc_rental:.2f}/mo  ·  ~{_live_units:.2f} units")
 
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
     termination_cost = st.number_input(
@@ -2206,6 +2216,7 @@ else:
 # ── Consultant desired rental - adjusts lease amount and commission ───────────
 deal_type = "Hardware Lease (spread over term)" if is_spread else f"Upfront Purchase (cost + {hw_uplift_upfront_override:.0f}% uplift)"
 base_rental   = pl_data["rental"]      # the calculated lease rental (floor/reference)
+st.session_state["_prev_base_rental"] = round(base_rental, 2)
 true_rate     = pl_data["true_rate"]
 
 # Read consultant's desired rental from session state (default = calculated rental)
@@ -2221,6 +2232,8 @@ _adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
 commission_units       = _adjusted_gp / 4000
 commission             = round(commission_units * commission_per_unit, 2)
 st.session_state["_prev_commission_units"] = round(commission_units, 2)
+st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
+st.session_state["_prev_cos_full"]         = pl_data["cos_full"]
 # Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
 commission_full        = commission
 if svc_disc_pct > 0 and commission > 0:
