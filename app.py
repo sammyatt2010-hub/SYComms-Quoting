@@ -3336,7 +3336,12 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     else:
         pdf.cell(0, 14, "Signed: ________________", ln=True)
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(0, 5, f"Name: {s(sig_name or '')}", ln=True)
+    _la_contact_raw = sig_name or _contact or ""
+    _la_parts = [p.strip() for p in _la_contact_raw.split(" - ", 1)]
+    _la_name  = s(_la_parts[0]) if _la_parts[0] else "________________________"
+    _la_pos   = s(_la_parts[1]) if len(_la_parts) > 1 else "________________________"
+    pdf.cell(0, 5, f"Name: {_la_name}", ln=True)
+    pdf.cell(0, 5, f"Position / Title: {_la_pos}", ln=True)
     pdf.cell(0, 5, f"Date: {date.today().strftime('%d/%m/%Y')}", ln=True)
     pdf.add_page()
     _add_header(pdf, "Direct Debit Mandate & Customer Checklist")
