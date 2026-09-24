@@ -262,7 +262,8 @@ if "uploaded_images" not in st.session_state:
 
 cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
-hw_uplift_override = C.get("hw_uplift_pct", 50)  # from admin panel - not visible to customer
+hw_uplift_override         = C.get("hw_uplift_pct", 50)          # from admin panel
+hw_uplift_upfront_override = C.get("hw_uplift_upfront_pct", 20)  # upfront purchase uplift
 _no_switch = False  # default - overridden by sidebar switch radio button
 switch_quantities = {}  # for manual multi-switch mode
 cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
