@@ -1404,20 +1404,20 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
             desk_df = pd.DataFrame(cfg["handsets_desktop"])
             edited_desk = st.data_editor(desk_df, num_rows="dynamic", use_container_width=True, key="de_desktop",
                 column_config={"poe": st.column_config.CheckboxColumn("PoE"),
-                               "buy": st.column_config.NumberColumn("Buy £", format="£%.2f"),
+                               "buy": st.column_config.NumberColumn("Buy £", format="%.2f"),
                                "cat": st.column_config.SelectboxColumn("Category", options=["Desktop","Conference"])})
 
             st.markdown("**Cordless Handsets**")
             cord_df = pd.DataFrame(cfg["handsets_cordless"])
             edited_cord = st.data_editor(cord_df, num_rows="dynamic", use_container_width=True, key="de_cordless",
                 column_config={"bogof": st.column_config.CheckboxColumn("BOGOF Promo"),
-                               "buy": st.column_config.NumberColumn("Buy £", format="£%.2f"),
+                               "buy": st.column_config.NumberColumn("Buy £", format="%.2f"),
                                "cat": st.column_config.SelectboxColumn("Category", options=["Wi-Fi","DECT"])})
 
             st.markdown("**Headsets**")
             hs_df = pd.DataFrame(cfg["headsets"])
             edited_hs = st.data_editor(hs_df, num_rows="dynamic", use_container_width=True, key="de_headsets",
-                column_config={"buy": st.column_config.NumberColumn("Buy £", format="£%.2f")})
+                column_config={"buy": st.column_config.NumberColumn("Buy £", format="%.2f")})
 
             # ── Call Scope AI Setup cost ──────────────────────────────────
             st.markdown("**Call Scope AI Setup (one-off lease cost)**")
@@ -1453,8 +1453,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 edited_cs = st.data_editor(cs_svc_df, num_rows="dynamic",
                     use_container_width=True, key="de_cs_svc",
                     column_config={
-                        "buy": st.column_config.NumberColumn("Buy £/user/mo", format="£%.2f"),
-                        "sell": st.column_config.NumberColumn("Sell £/user/mo", format="£%.2f")})
+                        "buy": st.column_config.NumberColumn("Buy £/user/mo", format="%.2f"),
+                        "sell": st.column_config.NumberColumn("Sell £/user/mo", format="%.2f")})
 
                 if st.button("Apply Call Scope Service Pricing", key="cs_svc_apply"):
                     st.session_state.active_config["call_scope_services"] = edited_cs.to_dict("records")
@@ -1467,8 +1467,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 edited_csl = st.data_editor(cs_lease_df, num_rows="fixed",
                     use_container_width=True, key="de_cs_lease",
                     column_config={
-                        "buy": st.column_config.NumberColumn("Buy £", format="£%.2f"),
-                        "sell": st.column_config.NumberColumn("Sell £", format="£%.2f")})
+                        "buy": st.column_config.NumberColumn("Buy £", format="%.2f"),
+                        "sell": st.column_config.NumberColumn("Sell £", format="%.2f")})
                 if st.button("Apply Call Scope Lease Pricing", key="csl_apply"):
                     names_to_update = {r["name"]: r for r in edited_csl.to_dict("records")}
                     for item in st.session_state.active_config["other_hardware"]:
@@ -1481,28 +1481,28 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 edited_sec = st.data_editor(sec_df_admin, num_rows="fixed",
                     use_container_width=True, key="de_security",
                     column_config={
-                        "buy": st.column_config.NumberColumn("Buy £/instance/mo", format="£%.2f"),
-                        "sell": st.column_config.NumberColumn("Sell £/instance/mo", format="£%.2f")})
+                        "buy": st.column_config.NumberColumn("Buy £/instance/mo", format="%.2f"),
+                        "sell": st.column_config.NumberColumn("Sell £/instance/mo", format="%.2f")})
                 if st.button("Apply Security Pricing", key="sec_apply"):
                     st.session_state.active_config["system_security"] = edited_sec.to_dict("records")
                     st.success("Security tier pricing updated"); st.rerun()
             st.markdown("---")
             oh_df = pd.DataFrame(cfg["other_hardware"])
             edited_oh = st.data_editor(oh_df, num_rows="dynamic", use_container_width=True, key="de_other",
-                column_config={"buy": st.column_config.NumberColumn("Buy £", format="£%.2f")})
+                column_config={"buy": st.column_config.NumberColumn("Buy £", format="%.2f")})
 
             hw_col1, hw_col2 = st.columns(2)
             with hw_col1:
                 st.markdown("**Switches**")
                 sw_df = pd.DataFrame(cfg["switches"])
                 edited_sw = st.data_editor(sw_df, num_rows="dynamic", use_container_width=True, key="de_switches",
-                    column_config={"buy": st.column_config.NumberColumn("Buy £", format="£%.2f"),
+                    column_config={"buy": st.column_config.NumberColumn("Buy £", format="%.2f"),
                                    "poe_ports": st.column_config.NumberColumn("POE Ports")})
             with hw_col2:
                 st.markdown("**Routers**")
                 rt_df = pd.DataFrame(cfg["routers"])
                 edited_rt = st.data_editor(rt_df, num_rows="dynamic", use_container_width=True, key="de_routers",
-                    column_config={"buy": st.column_config.NumberColumn("Buy £", format="£%.2f")})
+                    column_config={"buy": st.column_config.NumberColumn("Buy £", format="%.2f")})
 
             if st.button("✅ Apply Hardware Changes", type="primary", key="apply_hw"):
                 st.session_state.active_config["handsets_desktop"] = edited_desk.dropna(subset=["name"]).to_dict("records")
@@ -1594,9 +1594,9 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 with cs_svc_cols[_ci % 4]:
                     st.markdown(f"**{_cs['name']}**")
                     _b = st.number_input(f"Buy £/mo", value=float(_cs["buy"]), step=0.50,
-                                         key=f"adm_cs_buy_{_ci}", format="£%.2f")
+                                         key=f"adm_cs_buy_{_ci}", format="%.2f")
                     _s = st.number_input(f"Sell £/mo", value=float(_cs.get("sell", _cs["buy"]*1.45)), step=0.50,
-                                         key=f"adm_cs_sell_{_ci}", format="£%.2f")
+                                         key=f"adm_cs_sell_{_ci}", format="%.2f")
                     _margin = round((_s - _b) / _s * 100, 1) if _s > 0 else 0
                     st.caption(f"Margin: {_margin:.1f}%")
                     cs_svc_new.append({"name": _cs["name"], "buy": _b, "sell": _s})
@@ -1621,9 +1621,9 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 with mypa_cols[_mi]:
                     st.markdown(f"**{_mp['name']}**")
                     _mb = st.number_input("Buy £/mo", value=float(_mp["buy"]), step=5.0,
-                                          key=f"adm_mypa_buy_{_mi}", format="£%.2f")
+                                          key=f"adm_mypa_buy_{_mi}", format="%.2f")
                     _ms = st.number_input("Sell £/mo", value=float(_mp.get("sell", _mp["buy"]*1.5)), step=5.0,
-                                          key=f"adm_mypa_sell_{_mi}", format="£%.2f")
+                                          key=f"adm_mypa_sell_{_mi}", format="%.2f")
                     _mm = round((_ms - _mb) / _ms * 100, 1) if _ms > 0 else 0
                     st.caption(f"Margin: {_mm:.1f}%")
                     mypa_new.append({"name": _mp["name"], "buy": _mb, "sell": _ms})
@@ -1646,9 +1646,9 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     with cl_cols[_li]:
                         st.markdown(f"**{_li_item['name']}**")
                         _lb = st.number_input("Buy £", value=float(_li_item["buy"]), step=5.0,
-                                              key=f"adm_cl_buy_{_li}", format="£%.2f")
+                                              key=f"adm_cl_buy_{_li}", format="%.2f")
                         _ls = st.number_input("Sell £", value=float(_li_item.get("sell", _li_item["buy"]*1.5)), step=5.0,
-                                              key=f"adm_cl_sell_{_li}", format="£%.2f")
+                                              key=f"adm_cl_sell_{_li}", format="%.2f")
                         _lm = round((_ls - _lb) / _ls * 100, 1) if _ls > 0 else 0
                         st.caption(f"Margin: {_lm:.1f}%")
                         cl_new_vals[_li_item["name"]] = {"buy": _lb, "sell": _ls}
@@ -1675,9 +1675,9 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 with sec_adm_cols[_si]:
                     st.markdown(f"**{_sc['name']}**")
                     _sb = st.number_input("Buy £/mo", value=float(_sc["buy"]), step=0.50,
-                                          key=f"adm_sec_buy_{_si}", format="£%.2f")
+                                          key=f"adm_sec_buy_{_si}", format="%.2f")
                     _ss = st.number_input("Sell £/mo", value=float(_sc.get("sell", _sc["buy"]*1.43)), step=0.50,
-                                          key=f"adm_sec_sell_{_si}", format="£%.2f")
+                                          key=f"adm_sec_sell_{_si}", format="%.2f")
                     _sm = round((_ss - _sb) / _ss * 100, 1) if _ss > 0 else 0
                     st.caption(f"Margin: {_sm:.1f}%")
                     sec_new.append({"name": _sc["name"], "buy": _sb, "sell": _ss})
@@ -1703,8 +1703,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                     column_config={
                         "category": st.column_config.TextColumn("Category"),
                         "name":     st.column_config.TextColumn("Service"),
-                        "buy":      st.column_config.NumberColumn("Buy £/user/mo", format="£%.2f"),
-                        "sell":     st.column_config.NumberColumn("Sell £/user/mo", format="£%.2f"),
+                        "buy":      st.column_config.NumberColumn("Buy £/user/mo", format="%.2f"),
+                        "sell":     st.column_config.NumberColumn("Sell £/user/mo", format="%.2f"),
                     })
                 st.caption("Note: updating IT pricing here updates the live catalogue for the current session.")
                 if st.button("💾 Apply IT Services Pricing", key="adm_it_save"):
@@ -1729,8 +1729,8 @@ with st.expander("🔐 Manager & Admin Panel", expanded=False):
                 column_config={
                     "provider": st.column_config.TextColumn("Provider"),
                     "package":  st.column_config.TextColumn("Package"),
-                    "cost":     st.column_config.NumberColumn("Wholesale Cost £", format="£%.2f"),
-                    "install":  st.column_config.NumberColumn("Install Charge £", format="£%.2f"),
+                    "cost":     st.column_config.NumberColumn("Wholesale Cost £", format="%.2f"),
+                    "install":  st.column_config.NumberColumn("Install Charge £", format="%.2f"),
                 })
 
             if st.button("✅ Apply Broadband Changes", type="primary", key="apply_bb"):
