@@ -5354,12 +5354,25 @@ with tab7:
         """Upload PDFs to a private GitHub Gist and return (gist_id, signing_url)."""
         from datetime import datetime as _dt
         session_data = {
-            "customer_name":  cust_name,
-            "customer_email": cust_email,
-            "sender_email":   sndr_email,
-            "message":        message,
-            "status":         "pending",
-            "created_at":     _dt.now().isoformat(),
+            "customer_name":    cust_name,
+            "customer_email":   cust_email,
+            "sender_email":     sndr_email,
+            "message":          message,
+            "status":           "pending",
+            "created_at":       _dt.now().isoformat(),
+            # Deal figures for the signing portal display
+            "comp_name":        comp_name,
+            "contact_name":     contact_name,
+            "install_address":  install_address,
+            "hw_monthly_spread": round(hw_monthly_spread, 2),
+            "svc_total_sell":   round(svc["total_sell"], 2),
+            "total_mo":         round(total_mo, 2),
+            "lease_term":       lease_term,
+            "lease_label":      LEASE_TERM_LABELS.get(lease_term, f"{lease_term} months"),
+            "install_type":     install_type,
+            "bb_provider":      bb_provider,
+            "bb_package":       bb_package,
+            "payment_model":    payment_model,
         }
         files = {"session.json": {"content": json.dumps(session_data, indent=2)}}
         for i, (fname, pdf_bytes) in enumerate(docs, 1):
@@ -5371,7 +5384,7 @@ with tab7:
             resp = _req.post(
                 "https://api.github.com/gists",
                 json={"files": files, "public": False,
-                      "description": f"Novalink Signing - {cust_name}"},
+                      "description": f"SY Comms Signing - {cust_name}"},
                 headers=hdrs, timeout=30
             )
         except Exception as e:
