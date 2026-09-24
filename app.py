@@ -255,6 +255,8 @@ if "consultant_unlocked" not in st.session_state:
     st.session_state.consultant_unlocked = False
 if "c_desired_rental" not in st.session_state:
     st.session_state.c_desired_rental = 0.0
+if "c_svc_disc" not in st.session_state:
+    st.session_state.c_svc_disc = 0
 if "uploaded_images" not in st.session_state:
     st.session_state.uploaded_images = {}
 
@@ -293,6 +295,7 @@ QUOTE_KEYS = [
     "q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
     "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
     "q_rep_name","q_rep_position",
+    "c_svc_disc",
 ]
 # Hardware quantity keys added dynamically after catalogues load
 def _hw_quote_keys():
@@ -1818,12 +1821,17 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
     uplift   = service_uplift_pct / 100.0
     bb_cost  = BROADBAND[bb_provider][bb_package]["cost"]
-    bb_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
+    bb1_sell = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
+    bb1_floor = bb_cost                      # wholesale - never sell below this
     if bb_care == "Business (+£8/mo)":
-        bb_sell += 8.0
+        bb1_sell  += 8.0
+        bb1_floor += 8.0                     # care charge passed through, not discountable
+    bb2_sell = bb2_floor = 0.0
     if second_fttp and second_fttp_pkg:
-        bb_cost2 = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
-        bb_sell += bb_cost2 * (1.0 + uplift)
+        bb_cost2  = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
+        bb2_sell  = bb_cost2 * (1.0 + uplift)
+        bb2_floor = bb_cost2
+    bb_sell = bb1_sell + bb2_sell
 
     # Voice channels - fixed sell price from pricebook (Professional Bundle)
     vc_sell_per_seat = C.get("vc_sell_per_seat", 12.00)
@@ -1840,6 +1848,10 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     return {
         "bb_cost":        bb_cost,
         "bb_sell":        bb_sell,
+        "bb1_sell":       bb1_sell,
+        "bb2_sell":       bb2_sell,
+        "bb1_floor":      bb1_floor,
+        "bb2_floor":      bb2_floor,
         "lic_monthly":    lic_monthly,
         "wallboard_mo":   wallboard_mo_val,
         "mobile_sell":    mobile_sell,
@@ -1891,23 +1903,28 @@ hw_buy     = compute_hw_buy()
 hw_sell    = compute_hw_sell()
 svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
 
-# Apply consultant charge adjustments (from Monthly Charge Breakdown in Consultant tab)
-# Uses previous-run session state so adjustments flow through to all customer-facing sections
-_c_adj_vc  = st.session_state.get("c_adj_vc",  None)
-_c_adj_sw  = st.session_state.get("c_adj_sw",  None)
-_c_adj_bb  = st.session_state.get("c_adj_bb",  None)
-_c_adj_ll  = st.session_state.get("c_adj_ll",  0.0)
-_c_adj_oth = st.session_state.get("c_adj_oth", 0.0)
-if _c_adj_vc is not None:
-    svc["lic_monthly"] = float(_c_adj_vc)
-if _c_adj_sw is not None:
-    sw_sell_total = float(_c_adj_sw)
-    svc["sw_sell"] = float(_c_adj_sw)
-if _c_adj_bb is not None:
-    svc["bb_sell"] = float(_c_adj_bb)
-# Recompute total_sell with all adjustments applied
-svc["total_sell"] = (svc["bb_sell"] + svc["lic_monthly"] +
-                     svc.get("mobile_sell", 0.0) + sw_sell_total + _c_adj_ll + _c_adj_oth)
+# ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
+# Applies to hosted user licences, software add-ons and broadband (broadband is capped
+# at wholesale cost). Mobiles are not discountable. Commission is reduced by the same %.
+svc_disc_pct  = max(0.0, min(40.0, float(st.session_state.get("c_svc_disc", 0))))
+_svc_mult     = 1.0 - svc_disc_pct / 100.0
+lic_list_total = float(svc["lic_monthly"])          # undiscounted, for consultant display
+bb1_list       = float(svc["bb1_sell"])
+bb2_list       = float(svc["bb2_sell"])
+sw_list_total  = float(sw_sell_total)               # undiscounted, for consultant display
+if svc_disc_pct > 0:
+    SW_ADDONS = [(n, q, c, round(sell * _svc_mult, 2)) for n, q, c, sell in SW_ADDONS]
+    sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
+    svc["sw_sell"]     = sw_sell_total
+    svc["lic_monthly"] = round(lic_list_total * _svc_mult, 2)
+    # Broadband: discounted, but NEVER below wholesale cost (per line)
+    if bb1_list > 0:
+        svc["bb1_sell"] = round(max(bb1_list * _svc_mult, svc["bb1_floor"]), 2)
+    if bb2_list > 0:
+        svc["bb2_sell"] = round(max(bb2_list * _svc_mult, svc["bb2_floor"]), 2)
+    svc["bb_sell"]     = svc["bb1_sell"] + svc["bb2_sell"]
+    svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
+                          svc.get("mobile_sell", 0.0) + sw_sell_total)
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
@@ -1945,6 +1962,12 @@ _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 e
 _adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
 commission_units       = _adjusted_gp / 4000
 commission             = round(commission_units * 1000, 2)
+# Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
+commission_full        = commission
+if svc_disc_pct > 0 and commission > 0:
+    commission_units   = commission_units * _svc_mult
+    commission         = round(commission * _svc_mult, 2)
+commission_lost        = round(commission_full - commission, 2)
 
 # Rental adjustment (vs calculated) - can be positive (premium) or negative (discount)
 rental_adjustment = _desired_rental - base_rental
@@ -2717,9 +2740,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     # Network & Connectivity
     if svc["bb_sell"] > 0:
         all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1,
-                               f"£{svc['bb_sell']:.2f}/mo"))
+                               f"£{svc['bb1_sell']:.2f}/mo"))
     if second_fttp and second_fttp_pkg:
-        bb2 = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
+        bb2 = svc["bb2_sell"]
         all_equip_pdf.append((f"Broadband - {bb_provider} {second_fttp_pkg} (2nd line)", 1,
                                f"£{bb2:.2f}/mo"))
     for r in mobile_rows:
@@ -2837,9 +2860,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 6, "Service Charge Breakdown", ln=True)
     pdf.set_font("Helvetica", "", 9)
 
-    svc_items = [(f"{bb_provider} - {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo")]
+    svc_items = [(f"{bb_provider} - {bb_package}", 1, f"£{svc['bb1_sell']:.2f}/mo")]
     if second_fttp and second_fttp_pkg:
-        bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] / (1 - service_uplift_pct/100)
+        bb2_sell = svc["bb2_sell"]
         svc_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
     if total_voice_channels > 0:
         svc_items.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
@@ -3801,7 +3824,7 @@ with tab1:
         st.caption("Ongoing monthly service charges")
         net_items = []
         if svc["bb_sell"] > 0:
-            net_items.append((f"{bb_provider} - {bb_package}", 1, f"£{svc['bb_sell']:.2f}/mo"))
+            net_items.append((f"{bb_provider} - {bb_package}", 1, f"£{svc['bb1_sell']:.2f}/mo"))
         # Voice Channel Licences - always show with monthly amount
         if total_voice_channels > 0:
             net_items.append((f"Hosted User Licences x{total_voice_channels} (Professional Bundle)",
@@ -3812,7 +3835,7 @@ with tab1:
                 net_items.append((addon_name, addon_qty, f"£{addon_sell * addon_qty:.2f}/mo"))
         # 2nd line BB
         if second_fttp and second_fttp_pkg:
-            bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
+            bb2_sell = svc["bb2_sell"]
             net_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
         # Mobile rows
 
@@ -4302,10 +4325,10 @@ with tab4:
     with cv_col1:
         st.markdown('<div class="cv-section">🌐 Your Services</div>', unsafe_allow_html=True)
         svc_lines = [
-            (f"Business Broadband - {bb_provider} {bb_package}", f"£{svc['bb_sell']:.2f}/mo"),
+            (f"Business Broadband - {bb_provider} {bb_package}", f"£{svc['bb1_sell']:.2f}/mo"),
         ]
         if second_fttp and second_fttp_pkg:
-            bb2_sell = BROADBAND[bb_provider][second_fttp_pkg]["cost"] * (1 + service_uplift_pct/100)
+            bb2_sell = svc["bb2_sell"]
             svc_lines.append((f"2nd Line - {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
         if total_voice_channels > 0:
             svc_lines.append((f"User / Voice Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
@@ -4556,15 +4579,7 @@ with tab5:
 
         # Row 2 - Full monthly total
         # Use adjusted values from breakdown if consultant has made changes
-        _c_adj_total = (
-            float(st.session_state.get("c_adj_calls", 0.0)) +
-            float(st.session_state.get("c_adj_vc",    svc["lic_monthly"])) +
-            float(st.session_state.get("c_adj_sw",    sw_sell_total)) +
-            float(st.session_state.get("c_adj_bb",    svc["bb_sell"])) +
-            _desired_rental +
-            float(st.session_state.get("c_adj_ll",    0.0)) +
-            float(st.session_state.get("c_adj_oth",   0.0))
-        )
+        _c_adj_total = svc["total_sell"] + _desired_rental
         _diff_total    = current_total - _c_adj_total
         _diff_col      = "#1a7a40" if _diff_total >= 0 else "#c0392b"
         _curr_total_str = f"£{current_total:.2f}" if current_total > 0 else "-"
@@ -4610,36 +4625,75 @@ with tab5:
         """, unsafe_allow_html=True)
 
 
-        # ── Adjustable Monthly Charges ────────────────────────────────────────
-        st.markdown("### 📋 Monthly Charge Breakdown")
-        st.caption("Adjust any line to price-match or offer a discount. Commission recalculates automatically.")
+        # ── Services Discount (slider) ────────────────────────────────────────
+        st.markdown("### 🏷️ Services Discount")
+        st.caption("Discount monthly licences, software & broadband by up to 40%. "
+                   "Every 1% of discount removes 1% of your commission.")
 
-        # No persistent keys - resets to live calculated values each run
-        # Equipment Rental is handled by the Lease Rental Adjustment above
-        _vc_default   = float(round(svc["lic_monthly"], 2))
-        _sw_default   = float(round(sw_sell_total, 2))
-        _bb_default   = float(round(svc["bb_sell"], 2))
+        def _sync_svc_disc():
+            st.session_state["c_svc_disc"] = st.session_state["c_svc_disc_w"]
 
-        _ch_col1, _ch_col2 = st.columns(2)
-        with _ch_col1:
-            adj_call_charges  = st.number_input("Est. Call Charges (£/mo)",     0.0, step=5.0, value=0.0,           key="c_adj_calls")
-            adj_user_lic      = st.number_input("Hosted User Licences (£/mo)",  0.0, step=1.0, value=_vc_default, key="c_adj_vc")
-            adj_software      = st.number_input("Software Charges (£/mo)",       0.0, step=5.0, value=_sw_default, key="c_adj_sw")
-        with _ch_col2:
-            adj_broadband     = st.number_input("Broadband Charges (£/mo)",      0.0, step=1.0, value=_bb_default, key="c_adj_bb")
-            adj_leased_line   = st.number_input("Leased Line Charges (£/mo)",    0.0, step=5.0, value=0.0,           key="c_adj_ll")
-            adj_other1        = st.number_input("Other Charges (£/mo)",          0.0, step=5.0, value=0.0,           key="c_adj_oth")
+        _sd_col1, _sd_col2 = st.columns([3, 2])
+        with _sd_col1:
+            st.slider("Services discount (%)", min_value=0, max_value=40, step=5,
+                      value=int(st.session_state.get("c_svc_disc", 0)),
+                      key="c_svc_disc_w", on_change=_sync_svc_disc,
+                      help="Applies to hosted user licences, software add-ons and broadband. "
+                           "Broadband can never go below wholesale cost. Mobiles are not discountable.")
 
-        # Equipment rental comes from the Desired Lease Rental above
-        adj_rental   = float(_desired_rental)
-        adj_total_mo = (adj_call_charges + adj_user_lic + adj_software +
-                        adj_broadband + adj_rental + adj_leased_line + adj_other1)
+            def _svc_row(label, list_price, new_price, note=""):
+                _chg = new_price < list_price - 0.005
+                _was = (f"<span style='color:#aaa;text-decoration:line-through;margin-right:0.5rem'>£{list_price:.2f}</span>"
+                        if _chg else "")
+                _nt  = f"<span style='color:#aaa;font-size:0.75rem'> {note}</span>" if note else ""
+                return (f"<div style='display:flex;justify-content:space-between;padding:0.35rem 0;"
+                        f"border-bottom:1px solid #f0f0f0;font-size:0.88rem'>"
+                        f"<span style='color:#555'>{label}{_nt}</span>"
+                        f"<span>{_was}<strong style='color:#1f1450'>£{new_price:.2f}/mo</strong></span></div>")
 
-        # Recalculate GP and commission from the desired rental
-        _adj_disc_turn  = (adj_rental / pl_data["true_rate"]) * 1000 if pl_data["true_rate"] > 0 else 0
-        _adj_gp         = _adj_disc_turn - pl_data["cos_full"]
-        _adj_units      = _adj_gp / 4000
-        _adj_commission = round(_adj_units * 1000, 2)
+            _svc_saving = ((lic_list_total - svc["lic_monthly"]) + (sw_list_total - sw_sell_total) +
+                           (bb1_list + bb2_list - svc["bb_sell"]))
+            _rows = ""
+            if lic_list_total > 0:
+                _rows += _svc_row(f"Hosted User Licences ({total_voice_channels} users)", lic_list_total, svc["lic_monthly"])
+            for _an, _aq, _ac, _asell in SW_ADDONS:
+                if _aq > 0:
+                    _alist = _asell / _svc_mult if _svc_mult > 0 else _asell
+                    _rows += _svc_row(f"{_an} x{_aq}", _alist * _aq, _asell * _aq)
+            if bb1_list > 0:
+                _rows += _svc_row(f"Broadband - {bb_package}", bb1_list, svc["bb1_sell"],
+                                  "(at wholesale floor)" if svc_disc_pct > 0 and svc["bb1_sell"] <= svc["bb1_floor"] + 0.005 else "")
+            if bb2_list > 0:
+                _rows += _svc_row(f"Broadband 2nd line - {second_fttp_pkg}", bb2_list, svc["bb2_sell"],
+                                  "(at wholesale floor)" if svc_disc_pct > 0 and svc["bb2_sell"] <= svc["bb2_floor"] + 0.005 else "")
+            if svc.get("mobile_sell", 0) > 0:
+                _rows += _svc_row("Mobiles", svc["mobile_sell"], svc["mobile_sell"], "(fixed)")
+            if not _rows:
+                _rows = "<div style='color:#aaa;font-size:0.85rem'>No licences or services on this deal yet.</div>"
+            st.markdown(_rows + _svc_row("<strong>Total monthly services</strong>",
+                                         svc["total_sell"] + _svc_saving,
+                                         svc["total_sell"]),
+                        unsafe_allow_html=True)
+
+        with _sd_col2:
+            _cm_col = "#c0392b" if commission_lost > 0 else "#1a7a40"
+            _cm_bg  = "#fdf0f0" if commission_lost > 0 else "#e8f8f0"
+            st.markdown(f"""
+            <div style="background:{_cm_bg};border-left:4px solid {_cm_col};
+                 border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
+              <div style="font-size:0.72rem;color:{_cm_col};font-weight:700;text-transform:uppercase">Commission Impact</div>
+              <div style="font-size:0.85rem;color:#555;margin-top:0.3rem">Before discount: <strong>£{commission_full:.2f}</strong></div>
+              <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
+              <div style="font-size:1.5rem;font-weight:800;color:#1f1450;margin-top:0.3rem">£{commission:.2f}</div>
+              <div style="font-size:0.75rem;color:#888">Services saving to customer: £{_svc_saving:.2f}/mo</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Values used by the panels below
+        adj_rental      = float(_desired_rental)
+        adj_total_mo    = svc["total_sell"] + adj_rental
+        _adj_units      = commission_units
+        _adj_commission = commission
 
         # Feasibility mini-panel ────────────────────────────────────────────────
         _buyout_rental      = (pl_data["sales_rate"] / 1000.0) * termination_cost
