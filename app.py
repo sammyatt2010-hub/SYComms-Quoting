@@ -1189,23 +1189,24 @@ with col_hw2:
             _default_router = "Grandstream GWN 706 (FTTP)"
         elif "sogea" in _bb_pkg_lower and "Technicolour DGA Series (SoGEA)" in ROUTERS:
             _default_router = "Technicolour DGA Series (SoGEA)"
-        elif "Draytek Vigor 2927 (FTTP/SoGEA)" in ROUTERS:
-            _default_router = "Draytek Vigor 2927 (FTTP/SoGEA)"
+        elif any(x in _bb_pkg_lower for x in ("sogea", "fttp", "leased", "etherway")):
+            # Other fibre types — use Draytek as fallback
+            _default_router = next((k for k in ROUTERS if "Draytek" in k), list(ROUTERS.keys())[0])
         else:
-            _default_router = list(ROUTERS.keys())[0]
+            # FTTC, ADSL etc — no auto router (ISP provides modem/router)
+            _default_router = None
         router_quantities = {}
         if _router_mode == "None / Customer Supplied":
             router_type = "None / Customer Supplied"
             add_router  = False
         elif _router_mode == "Auto-select":
-            if bb_provider != "None / Customer Supplied":
+            if bb_provider != "None / Customer Supplied" and _default_router:
                 router_type = _default_router
                 router_quantities = {_default_router: 1}
-                add_router  = True
+                add_router = True
             else:
                 router_type = "None / Customer Supplied"
                 add_router  = False
-        else:  # Manual select - qty grid like switches
             add_router = False
             router_type = "None / Customer Supplied"
             st.caption("Set quantities for each router needed:")
