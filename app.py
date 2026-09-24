@@ -100,12 +100,12 @@ def _default_config():
     return {
         "meta": {"version": "1.0", "password_hash": _DEFAULT_PWD_HASH},
         "email": {
-            "smtp_host":    "smtp.gmail.com",
+            "smtp_host":    "smtp.office365.com",
             "smtp_port":    587,
-            "username":     "sammyatt2010@googlemail.com",
+            "username":     "sales@sycomms.co.uk",
             "password":     "ltvkqbxtjukvrzdm",
             "from_name":    "SY Comms",
-            "reply_to":     "sammyatt2010@googlemail.com",
+            "reply_to":     "sales@sycomms.co.uk",
         },
         "branding": {
             "company_name":    "SY Comms",
