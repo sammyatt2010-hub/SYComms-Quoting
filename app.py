@@ -2149,6 +2149,8 @@ if svc_disc_pct > 0:
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
+is_spread  = ("Lease" in payment_model)
+
 if is_spread:
     # Use pricebook lease rental formula
     hw_monthly_spread = pl_data["rental"]
