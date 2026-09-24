@@ -2664,7 +2664,10 @@ def build_proposal_pdf():
             svc_rows.append((f"Mobile — {_mr['network']} {_mr['package']} x{_mr['qty']}",
                              f"GBP {_mr['sell']*_mr['qty']:.2f}/mo"))
     for i, (lbl, val) in enumerate(svc_rows):
-        p.set_fill_color(245, 247, 255) if i % 2 == 0 else p.set_fill_color(255, 255, 255)
+        if i % 2 == 0:
+            p.set_fill_color(245, 247, 255)
+        else:
+            p.set_fill_color(255, 255, 255)
         p.set_text_color(60, 60, 60); p.set_font("Helvetica", "", 8)
         p.cell(140, 5.5, _ps(f"  {lbl}"), fill=True, ln=False)
         p.set_font("Helvetica", "B", 8); p.set_text_color(31, 20, 80)
