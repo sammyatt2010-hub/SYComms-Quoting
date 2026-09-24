@@ -2921,9 +2921,6 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             all_equip_pdf.append((router_type, 1, _pdf_hw_billing))
 
     # Voice Channel Licences
-    if st.session_state.get("cs_ai_portal_free", False):
-        svc_items.append(("AI Integration Portal - 1st month FREE (500 mins)", 1, "£0.00 month 1 only"))
-    if total_voice_channels > 0:
         vc_billing_pdf = f"£{svc['lic_monthly']:.2f}/mo"  # always monthly - not part of lease
         all_equip_pdf.append((f"User / Voice Licences x{total_voice_channels}",
                                total_voice_channels, vc_billing_pdf))
@@ -3062,6 +3059,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                       f"£0.00/mo (then £{_bb_full_sell:.2f}/mo)")]
     else:
         svc_items = [(f"{bb_provider} - {bb_package}", 1, f"£{svc['bb1_sell']:.2f}/mo")]
+    if st.session_state.get("cs_ai_portal_free", False):
+        svc_items.append(("AI Integration Portal - 1st month FREE (500 mins)", 1, "£0.00 month 1 only"))
     if second_fttp and second_fttp_pkg:
         bb2_sell = svc["bb2_sell"]
         svc_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
