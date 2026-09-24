@@ -295,7 +295,7 @@ QUOTE_KEYS = [
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
-    "q_appt_type","q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
+    "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
     "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
     "q_rep_name","q_rep_position",
     "c_svc_disc",
@@ -771,7 +771,6 @@ with st.sidebar:
         help="Sets commission rate per unit for this deal"
     )
     _appt_rate = APPT_RATES[appt_type]
-    st.caption(f"Commission rate: **£{_appt_rate:,}/unit**")
     st.markdown("---")
     st.markdown("### 🏢 Customer Details")
     comp_name       = st.text_input("Company Name", placeholder="Acme Ltd", key="q_comp_name")
@@ -815,10 +814,14 @@ with st.sidebar:
         second_fttp_pkg = st.selectbox("2nd Line Package", list(BROADBAND[bb_provider].keys()), key="bb2")
 
     st.markdown("### 💰 Pricing Controls")
+    def _sync_sidebar_to_cons():
+        st.session_state["c_svc_disc"] = st.session_state["q_svc_discount"]
     service_discount_pct = st.slider(
-        "Service Discount %", 0, 30, 0, step=5,
-        help="0% = standard pricing. Increase to offer the customer a lower service price.",
-        key="q_svc_discount"
+        "Service Discount %", 0, 30,
+        value=int(st.session_state.get("c_svc_disc", 0)),
+        step=5,
+        help="0% = standard pricing. Syncs with Services Discount in Consultant tab.",
+        key="q_svc_discount", on_change=_sync_sidebar_to_cons
     )
     # Convert service discount → effective uplift (base 40%, reduced by discount)
     service_uplift_pct = max(40 - service_discount_pct, 5)
@@ -4429,10 +4432,9 @@ with tab4:
         </div>
         """, unsafe_allow_html=True)
         st.markdown(f"""
-        <div class="cv-total-box">
-          <div class="cv-total-label">Agreement Term</div>
-          <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fff">{LEASE_TERM_LABELS[lease_term]}</div>
-          <div class="cv-total-note">Contact us for full pricing details</div>
+        <div style="text-align:center;padding:0.5rem 0;font-size:0.8rem;color:#aaa">
+          Agreement term: <strong style="color:#555">{lease_term} months</strong>
+          &nbsp;·&nbsp; Contact us for full pricing details
         </div>
         """, unsafe_allow_html=True)
 
@@ -4645,12 +4647,16 @@ with tab5:
 
 
         # ── Services Discount (slider) ────────────────────────────────────────
+        _appt = st.session_state.get("q_appt_type", "Self Gen")
+        _appt_rates = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
+        st.info(f"📋 Appointment type: **{_appt}** — commission rate £{_appt_rates.get(_appt, 1000):,}/unit")
         st.markdown("### 🏷️ Services Discount")
         st.caption("Discount monthly licences, software & broadband by up to 40%. "
                    "Every 1% of discount removes 1% of your commission.")
 
         def _sync_svc_disc():
-            st.session_state["c_svc_disc"] = st.session_state["c_svc_disc_w"]
+            st.session_state["c_svc_disc"]    = st.session_state["c_svc_disc_w"]
+            st.session_state["q_svc_discount"] = st.session_state["c_svc_disc_w"]
 
         _sd_col1, _sd_col2 = st.columns([3, 2])
         with _sd_col1:
