@@ -829,19 +829,28 @@ with st.sidebar:
     st.markdown("")
     st.markdown("**Desired Lease Rental**")
     _sidebar_rental = st.number_input(
-        "Target Rental (£/mo)", min_value=0.0, value=0.0, step=10.0,
+        "Target Rental (£/mo)",
+        min_value=0.0,
+        value=float(st.session_state.get("c_desired_rental", 0.0)),
+        step=10.0,
         key="q_sidebar_rental",
-        help="Enter target monthly rental to override calculated figure. 0 = use calculated."
+        help="Enter target monthly rental, then click Apply. 0 = use calculated figure."
     )
-    if _sidebar_rental > 0:
-        # Sync to the same session state key the consultant tab uses
-        st.session_state["c_desired_rental"] = _sidebar_rental
-        _prev_units = st.session_state.get("_prev_commission_units", 0.0)
-        st.caption(f"~{_prev_units:.2f} units")
-    elif st.session_state.get("q_sidebar_rental", 0.0) == 0.0:
-        # Clear when set back to 0
-        if st.session_state.get("c_desired_rental", 0.0) == _sidebar_rental:
-            pass  # keep consultant tab value
+    _sr_col1, _sr_col2 = st.columns(2)
+    with _sr_col1:
+        if st.button("✅ Apply", key="btn_apply_rental", use_container_width=True):
+            st.session_state["c_desired_rental"] = _sidebar_rental
+            st.rerun()
+    with _sr_col2:
+        if st.button("✖ Clear", key="btn_clear_rental", use_container_width=True):
+            st.session_state["c_desired_rental"] = 0.0
+            st.rerun()
+    _active_rental = st.session_state.get("c_desired_rental", 0.0)
+    _prev_units    = st.session_state.get("_prev_commission_units", 0.0)
+    if _active_rental > 0:
+        st.caption(f"Active: £{_active_rental:.2f}/mo  ·  ~{_prev_units:.2f} units")
+    else:
+        st.caption("Using calculated rental")
 
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
     termination_cost = st.number_input(
