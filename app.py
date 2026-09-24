@@ -3991,6 +3991,7 @@ with tab2:
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
                 all_equip.append((addon_name, addon_qty))
+        for name, qty in all_equip:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:#555'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
 
