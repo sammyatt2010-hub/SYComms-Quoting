@@ -3814,14 +3814,18 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_text_color(0, 0, 0); pdf.ln(3)
     pdf.set_font("Helvetica", "", 8)
     _tc_half = pdf.epw / 2
-    # Row 1: Name (deal contact or signer) + Company
-    _tc_name = s(sig_name or _contact or "________________________")
+    # Split "Name - Position" from the contact field
+    _tc_contact_raw = sig_name or _contact or ""
+    _tc_parts   = [p.strip() for p in _tc_contact_raw.split(" - ", 1)]
+    _tc_name    = s(_tc_parts[0]) if _tc_parts[0] else "________________________"
+    _tc_pos     = s(_tc_parts[1]) if len(_tc_parts) > 1 else "________________________"
+    # Row 1: Name + Company
     pdf.cell(_tc_half, 5.5, f"Name:     {_tc_name}", ln=False)
     pdf.cell(_tc_half, 5.5, f"Company:  {s(_comp or '________________________')}", ln=True)
     pdf.ln(1)
-    # Row 2: Date (pre-filled) + Position/Title (blank to complete)
+    # Row 2: Date (pre-filled) + Position/Title (split from contact field)
     pdf.cell(_tc_half, 5.5, f"Date:     {date.today().strftime('%d/%m/%Y')}", ln=False)
-    pdf.cell(_tc_half, 5.5, "Position / Title:  ________________________", ln=True)
+    pdf.cell(_tc_half, 5.5, f"Position / Title:  {_tc_pos}", ln=True)
     pdf.ln(4)
     # Signature row — stamp if captured, else blank line
     pdf.set_font("Helvetica", "", 8)
