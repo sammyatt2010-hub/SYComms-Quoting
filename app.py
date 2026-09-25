@@ -27,7 +27,7 @@ except ImportError:
 # ─── NOVALINK BRAND ──────────────────────────────────────────────────────────
 SYCOMMS_LOGO_B64 = "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"
 st.set_page_config(
-    page_title="SY Comms | Quotation Tool",
+    page_title="Quotation Tool",
     page_icon="🔥",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -69,6 +69,10 @@ BRAND_CONFIGS = {
         "logo_key":   "SYCOMMS_LOGO_B64",
         "header":     "<span style=\'color:#00b5a3\'>SY</span>&middot;COMMS",
         "pw_key":     "APP_PASSWORD",
+        "email":      "hello@sycomms.co.uk",
+        "phone":      "01743 667419",
+        "website":    "www.sycomms.co.uk",
+        "about":      "SY Comms is a locally owned and operated telecoms and IT services company ",
     },
     "SY Plus": {
         "name":       "SY Plus",
@@ -79,9 +83,13 @@ BRAND_CONFIGS = {
         "pkg_label":  "Your SY Plus Package",
         "file_prefix":"SYPlus_Proposal",
         "accent":     "#0084c8",
-        "logo_key":   "SYCOMMS_LOGO_B64",   # use same logo until SY Plus has its own
+        "logo_key":   "SYCOMMS_LOGO_B64",
         "header":     "<span style=\'color:#0084c8\'>SY</span>&middot;PLUS",
         "pw_key":     "APP_PASSWORD_SYPLUS",
+        "email":      "hello@syplus.co.uk",
+        "phone":      "01743 667419",
+        "website":    "www.syplus.co.uk",
+        "about":      "SY Plus is a locally owned and operated telecoms and IT services company ",
     },
     "SW Comms": {
         "name":       "SW Comms",
@@ -92,9 +100,13 @@ BRAND_CONFIGS = {
         "pkg_label":  "Your SW Comms Package",
         "file_prefix":"SWComms_Proposal",
         "accent":     "#e67e22",
-        "logo_key":   "SYCOMMS_LOGO_B64",   # use same logo until SW Comms has its own
+        "logo_key":   "SYCOMMS_LOGO_B64",
         "header":     "<span style=\'color:#e67e22\'>SW</span>&middot;COMMS",
         "pw_key":     "APP_PASSWORD_SWCOMMS",
+        "email":      "hello@swcomms.co.uk",
+        "phone":      "01743 667419",
+        "website":    "www.swcomms.co.uk",
+        "about":      "SW Comms is a locally owned and operated telecoms and IT services company ",
     },
 }
 
@@ -394,6 +406,12 @@ _CO_FILE  = _sb["file_prefix"]
 _CO       = B.get("company_name",    _CO)
 _CO_LEGAL = B.get("company_legal",   _CO_LEGAL)
 _CO_TAG   = B.get("company_tagline", _CO_TAG)
+# Brand contact details shorthand (used throughout UI and PDFs)
+_BRAND    = BRAND_CONFIGS.get(st.session_state.get("selected_brand", "SY Comms"), BRAND_CONFIGS["SY Comms"])
+_CO_EMAIL = _BRAND["email"]
+_CO_PHONE = _BRAND["phone"]
+_CO_WEB   = _BRAND["website"]
+_CO_ABOUT = _BRAND["about"]
 _CO_CAP   = B.get("login_caption",   _CO_CAP)
 _CO_FOOT  = B.get("pdf_footer",      _CO_FOOT)
 _CO_PKG   = B.get("customer_pkg_label", _CO_PKG)
@@ -881,9 +899,9 @@ st.markdown(f"""
   <img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" style="height:56px;border-radius:8px;flex-shrink:0;" alt="SY Comms"/>
   <div>
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;color:#fff;line-height:1.1">
-      <span style="color:#00b5a3">SY</span>&middot;COMMS
+      {_BRAND["header"]}
     </div>
-    <div style="color:rgba(255,255,255,0.5);font-size:0.88rem;margin-top:0.2rem">SY Comms Quotation Tool &nbsp;·&nbsp; Build, price &amp; generate paperwork</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:0.88rem;margin-top:0.2rem">{_CO_TAG} &nbsp;·&nbsp; Build, price &amp; generate paperwork</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1654,7 +1672,7 @@ def build_proposal_pdf():
     # ── Why SY Comms — 3-col icon cards ─────────────────────────────────────────
     p.set_y(90)
     p.set_font("Helvetica", "B", 10); p.set_text_color(31, 20, 80)
-    p.cell(0, 6, "Why businesses trust SY Comms", ln=True); p.ln(1)
+    p.cell(0, 6, s(f"Why businesses trust {_CO}"), ln=True); p.ln(1)
 
     vals3 = [
         ("ONE BILL",         "Hardware, licences, broadband and support - one monthly payment."),
@@ -1697,10 +1715,10 @@ def build_proposal_pdf():
     p.cell(0, 7, "  Get in touch today", fill=True, ln=True)
     p.set_font("Helvetica", "", 8)
     contacts = [
-        ("Email",   "hello@sycomms.co.uk"),
-        ("Phone",   "01743 667419"),
+        ("Email",   _CO_EMAIL),
+        ("Phone",   _CO_PHONE),
         ("Address", "Suite C Jupiter House, Shrewsbury Business Park, SY2 6LG"),
-        ("Web",     "www.sycomms.co.uk"),
+        ("Web",     _CO_WEB),
     ]
     for lbl, val in contacts:
         p.set_fill_color(45, 31, 110)
@@ -1919,7 +1937,7 @@ def build_proposal_pdf():
     p.set_font("Helvetica", "B", 8)
     p.cell(0, 6, "  Ready to proceed? We're here to help.", fill=True, ln=True)
     p.set_font("Helvetica", "", 8); p.set_fill_color(45, 31, 110)
-    p.cell(0, 6, "  hello@sycomms.co.uk   |   01743 667419   |   www.sycomms.co.uk",
+    p.cell(0, 6, s(f"  {_CO_EMAIL}   |   {_CO_PHONE}   |   {_CO_WEB}"),
            fill=True, ln=True)
     p.set_text_color(0, 0, 0)
 
@@ -1963,7 +1981,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf_obj.set_text_color(255, 255, 255)
         pdf_obj.set_y(7)
         pdf_obj.set_x(48)
-        pdf_obj.cell(120, 10, s("SY·COMMS"), ln=False, align="L")
+        pdf_obj.cell(120, 10, s(_CO.upper()), ln=False, align="L")
         pdf_obj.set_font("Helvetica", "", 9)
         pdf_obj.set_y(19)
         pdf_obj.set_x(48)
@@ -2033,11 +2051,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_text_color(220, 220, 230)
     pdf.set_x(30)
     pdf.multi_cell(150, 5.5,
-        "SY Comms is a locally owned and operated telecoms and IT services company "
+        s(_CO_ABOUT +
         "serving businesses across the UK. We understand the "
         "unique needs of our community and are committed to delivering solutions that "
         "work for you. Our experienced local engineers are always on hand to provide "
-        "friendly, fast and personalised service.",
+        "friendly, fast and personalised service."),
         align="C"
     )
 
@@ -2069,7 +2087,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_y(267)
     pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(200, 200, 220)
-    pdf.cell(0, 5, "01743 667419   |   hello@sycomms.co.uk   |   sycomms.co.uk", ln=True, align="C")
+    pdf.cell(0, 5, s(f"{_CO_PHONE}   |   {_CO_EMAIL}   |   {_CO_WEB}"), ln=True, align="C")
     pdf.set_y(273)
     pdf.cell(0, 5, "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG", ln=True, align="C")
 
@@ -2638,7 +2656,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "We have had the opportunity to obtain independent legal and/or financial advice.",
             "We are entering into this agreement voluntarily.",
             "This transaction is our own commercial decision. SY COMMS LTD has not provided legal, financial, tax or accounting advice.",
-            "We authorise SY COMMS LTD to proceed and authorise SY Comms Ltd to receive the settlement payment from the new finance provider.",
+            f"We authorise {_CO_LEGAL.upper()} to proceed and authorise {_CO_LEGAL} to receive the settlement payment from the new finance provider.",
         ], 1):
             pdf.set_x(pdf.l_margin); pdf.multi_cell(pdf.epw, 3.8, f"{n}.  {s(ack)}", align="J")
         pdf.ln(2)
@@ -2752,7 +2770,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_text_color(0,0,0); pdf.set_font("Helvetica","",8.5)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw,4,
-        f"SY Comms Ltd agrees to provide on-site warranty cover including remote diagnostics "
+        f"{_CO_LEGAL} agrees to provide on-site warranty cover including remote diagnostics "
         f"and programming of faults to the equipment listed above for an agreement term of "
         f"{LEASE_TERM_LABELS[lease_term]}. "
         f"Faulty equipment will be repaired or replaced. Additional equipment added will be "
@@ -2787,7 +2805,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica","",8)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw,4,
-        "SY Comms Ltd agrees to provide remote and on-site maintenance cover for the equipment above "
+        f"{_CO_LEGAL} agrees to provide remote and on-site maintenance cover for the equipment above "
         "at the tier level set out above and the customer agrees to pay the monthly charge as set out "
         "above for the Agreement Term, subject to the terms and conditions. As a duly authorised "
         "representative of the customer, I confirm that I have read, understood and accept the terms "
@@ -2827,7 +2845,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(1)
     pdf.set_font("Helvetica","",8)
     pdf.set_text_color(100,100,100)
-    pdf.multi_cell(0,4,"SY Comms Ltd are committed to the very highest levels of customer care. This Questionnaire "
+    pdf.multi_cell(0,4,f"{_CO_LEGAL} are committed to the very highest levels of customer care. This Questionnaire "
         "is essential for our understanding of your needs and therefore satisfaction with our services.",align="C")
     pdf.set_text_color(0,0,0)
     pdf.ln(2)
@@ -2874,20 +2892,20 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
              extra="If alarm works via the main system lines then a new standalone line may need to be added.")
     _crf_q(3,f"This agreement includes: {_vc_desc} voice channels and {_bb_desc} broadband service(s) as agreed. "
              "Additional services will be added at our standard tariffs.")
-    _crf_q(4,"I am aware, if we have signed up for SY Comms Ltd line provision, a single figure code such as '9' "
+    _crf_q(4,f"I am aware, if we have signed up for {_CO_LEGAL} line provision, a single figure code such as '9' "
              "must be used to make external calls. Other methods may result in these calls being charged by other providers.")
     _crf_q(5,f"I can confirm that I currently have {num_employees or '______'} employees")
-    _crf_q(6,"SY Comms Ltd are unable to make any representations to any carrier or service provider on our behalf. "
-             "I appreciate that SY Comms Ltd can provide advice, but understand that any correspondence with current providers is ultimately our responsibility.")
+    _crf_q(6,f"{_CO_LEGAL} are unable to make any representations to any carrier or service provider on our behalf. "
+             f"I appreciate that {_CO_LEGAL} can provide advice, but understand that any correspondence with current providers is ultimately our responsibility.")
     _crf_q(7,"I am aware that there may be a delay in switching chosen carrier after installation has taken place "
              "and that calls during this period may be routed through your existing provider.")
     _crf_q(8,"I understand that in the event that our telephone numbers do not exist within the BT network, "
-             "Cloud5 Comms Network Services Ltd cannot guarantee that they will be ported to the SY Comms Ltd Network.")
+             f"Cloud5 Comms Network Services Ltd cannot guarantee that they will be ported to the {_CO_LEGAL} Network.")
     _crf_q(9,"I am aware that the engineer will conduct a physical line check on site to help identify all available lines "
              "coming into the premises. It is ultimately my responsibility to ensure all lines are accounted for.")
     if termination_cost > 0:
         _crf_q(10,f"We acknowledge that in entering into the above agreement you have agreed to not only rent new equipment "
-                 f"supplied by SY Comms Ltd, but also settlement of an existing agreement to the maximum sum of: "
+                 f"supplied by {_CO_LEGAL}, but also settlement of an existing agreement to the maximum sum of: "
                  f"£{termination_cost:.2f} as per the figure agreed on the order forms.")
     else:
         _crf_q(10,"We acknowledge that in entering into the above agreement you have agreed to rent new equipment "
