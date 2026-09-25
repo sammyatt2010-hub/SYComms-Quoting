@@ -534,7 +534,7 @@ MOBILE_NETWORKS = {
     },
 }
 
-IT_SERVICES = {
+_IT_SERVICES_DEFAULT = {
     "Microsoft 365": {
         "M365 Business Premium":             {"cost": 17.24},
         "M365 Business Standard + Copilot":  {"cost": 18.47},
@@ -549,6 +549,8 @@ IT_SERVICES = {
         "Support (per user)": {"cost": 25.00, "sell": 35.00},
     },
 }
+IT_SERVICES = st.session_state.active_config.get("it_services", _IT_SERVICES_DEFAULT)
+
 IT_UPLIFT_PCT = 15.0  # % markup on cost price
 
 HARDWARE_FUNDS = {"Bronze": 500, "Silver": 1000, "Gold": 1500}
@@ -1349,9 +1351,16 @@ with col_hw2:
                         ["None", "500 mins  — £25/mo", "1000 mins — £35/mo", "1500 mins — £45/mo"],
                         key=f"cs_mins_{_cs['name']}"
                     )
-            st.selectbox("Call Answer - My PA",
-                         ["None", "500 mins — £149/mo", "1000 mins — £199/mo", "2000 mins — £249/mo"],
-                         key="cs_mypa")
+            _mypa_opts_cfg = st.session_state.active_config.get("mypa_bundles", [
+                {"name": "My PA 500 mins",  "sell": 149.0},
+                {"name": "My PA 1000 mins", "sell": 199.0},
+                {"name": "My PA 2000 mins", "sell": 249.0},
+            ])
+            _mypa_opts = ["None"] + [
+                f"{mp['name'].replace('My PA ','')} — £{mp['sell']:.0f}/mo"
+                for mp in _mypa_opts_cfg
+            ]
+            st.selectbox("Call Answer - My PA", _mypa_opts, key="cs_mypa")
         with _cse_col2:
             for _cs in _cs_exp_cfg[2:]:
                 st.number_input(
@@ -1390,15 +1399,34 @@ _cs_web_sel   = st.session_state.get("cs_website", "None")
 cs_call_answer = _cs_mypa_sel != "None"
 cs_website     = _cs_web_sel != "None"
 cs_any_selected = bool(cs_svc_rows or cs_call_answer or cs_website)
-_CS_MYPA_COSTS = {"500 mins — £149/mo": 149.0, "1000 mins — £199/mo": 199.0, "2000 mins — £249/mo": 249.0}
+# Build My PA cost lookup from config (picks up admin price changes)
+_mypa_defaults_calc = [
+    {"name": "My PA 500 mins",  "buy": 100.0, "sell": 149.0},
+    {"name": "My PA 1000 mins", "buy": 140.0, "sell": 199.0},
+    {"name": "My PA 2000 mins", "buy": 180.0, "sell": 249.0},
+]
+_mypa_cfg_calc = st.session_state.active_config.get("mypa_bundles", _mypa_defaults_calc)
+_CS_MYPA_COSTS = {
+    f"{mp['name'].replace('My PA ','')} — £{mp['sell']:.0f}/mo": mp["sell"]
+    for mp in _mypa_cfg_calc
+}
+_CS_MYPA_BUY = {
+    f"{mp['name'].replace('My PA ','')} — £{mp['sell']:.0f}/mo": mp["buy"]
+    for mp in _mypa_cfg_calc
+}
 _mypa_sel = st.session_state.get("cs_mypa", "None")
 if _mypa_sel != "None":
     _mypa_cost = _CS_MYPA_COSTS.get(_mypa_sel, 0.0)
-    cs_svc_rows.append({"name": f"Call Answer - My PA ({_mypa_sel.split(' —')[0]})",
-                        "qty": 1, "buy": _mypa_cost * 0.7, "sell": _mypa_cost})
+    _mypa_buy  = _CS_MYPA_BUY.get(_mypa_sel, _mypa_cost * 0.7)
+    if _mypa_cost > 0:
+        cs_svc_rows.append({"name": f"Call Answer - My PA ({_mypa_sel.split(' —')[0]})",
+                            "qty": 1, "buy": _mypa_buy, "sell": _mypa_cost})
 _web_sel = st.session_state.get("cs_website", "None")
 if _web_sel != "None":
-    cs_svc_rows.append({"name": "Website Widget", "qty": 1, "buy": 35.0, "sell": 50.0})
+    _web_cs_cfg = next((s for s in st.session_state.active_config.get("call_scope_services", [])
+                        if s.get("name") == "Website Widget"), {"buy": 30.0, "sell": 50.0})
+    cs_svc_rows.append({"name": "Website Widget", "qty": 1,
+                        "buy": _web_cs_cfg.get("buy", 30.0), "sell": _web_cs_cfg.get("sell", 50.0)})
 
 # System Security
 sec_cfg_mod = st.session_state.active_config.get("system_security", [
@@ -5264,6 +5292,8 @@ with tab7:
                             if cat not in IT_SERVICES:
                                 IT_SERVICES[cat] = {}
                             IT_SERVICES[cat][name] = {"cost": buy, "sell": sell}
+                    # Persist to active_config so it survives rerun
+                    st.session_state.active_config["it_services"] = IT_SERVICES
                     st.success("IT Services pricing updated for this session"); st.rerun()
 
         # ── TAB 3: Broadband & Lease Rates ────────────────────────────────────
@@ -5317,7 +5347,7 @@ with tab7:
                     "hw_uplift_pct": new_hw_uplift,
                     "commission_per_unit": new_commission,
                 })
-                st.success("Costs updated!")
+                st.success("Costs updated!"); st.rerun()
 
         # ── TAB 5: Branding ───────────────────────────────────────────────────
         with panel_tabs[5]:
