@@ -921,10 +921,11 @@ with st.sidebar:
             current_calls   = st.number_input("Call Charges (£/mo)",      0.0, step=5.0, key="q_curr_calls")
             current_it      = st.number_input("IT Services / M365 (£/mo)", 0.0, step=5.0, key="q_curr_it")
         with curr_col2:
+            current_hosted  = st.number_input("Hosted User Licences (£/mo)", 0.0, step=5.0, key="q_curr_hosted")
             current_mobile  = st.number_input("Mobile (£/mo)",            0.0, step=5.0, key="q_curr_mobile")
             current_support = st.number_input("Support / Maintenance (£/mo)", 0.0, step=5.0, key="q_curr_support")
             current_other   = st.number_input("Other / Misc (£/mo)",      0.0, step=5.0, key="q_curr_other")
-        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other + current_it
+        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other + current_it + current_hosted
 
     st.markdown("### 🏦 Bank Details")
     bank_name  = st.text_input("Bank Name", key="q_bank_name")
