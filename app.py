@@ -1654,7 +1654,7 @@ def build_proposal_pdf():
     p.set_text_color(255, 255, 255)
     p.set_font("Helvetica", "B", 22)
     p.set_y(18); p.set_x(48)
-    p.cell(0, 10, "SY COMMS LTD", ln=True)
+    p.cell(0, 10, s(_CO_LEGAL.upper()), ln=True)
     p.set_font("Helvetica", "", 11); p.set_x(48)
     p.set_text_color(0, 200, 180)
     p.cell(0, 7, "Short term contracts, long term relationships.", ln=True)
@@ -2022,7 +2022,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "B", 32)
     pdf.set_text_color(255, 255, 255)
     pdf.set_y(90)
-    pdf.cell(0, 12, "SY" + chr(183) + "COMMS", ln=True, align="C")
+    pdf.cell(0, 12, s(_CO.upper()), ln=True, align="C")
 
     # Tagline
     pdf.set_font("Helvetica", "", 13)
@@ -2055,7 +2055,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_y(165)
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(0, 181, 163)
-    pdf.cell(0, 8, "About SY" + chr(183) + "COMMS", ln=True, align="C")
+    pdf.cell(0, 8, s(f"About {_CO}"), ln=True, align="C")
 
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(220, 220, 230)
@@ -2658,14 +2658,14 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         _eca_hdr("Customer Acknowledgement")
         pdf.set_font("Helvetica","",7.5)
         for n, ack in enumerate([
-            "Telecommunications equipment supplied by SY COMMS LTD are financed under a new finance agreement.",
+            f"Telecommunications equipment supplied by {_CO_LEGAL.upper()} are financed under a new finance agreement.",
             "Our existing finance agreement will be terminated early and an early settlement payment is required.",
             "We understand the settlement of our existing finance agreement does not include settlement of any existing contracts for telecom services or maintenance.",
             "We have reviewed the Commercial Summary and confirm it accurately reflects the key commercial terms.",
             "We have had sufficient opportunity to ask questions.",
             "We have had the opportunity to obtain independent legal and/or financial advice.",
             "We are entering into this agreement voluntarily.",
-            "This transaction is our own commercial decision. SY COMMS LTD has not provided legal, financial, tax or accounting advice.",
+            f"This transaction is our own commercial decision. {_CO_LEGAL.upper()} has not provided legal, financial, tax or accounting advice.",
             f"We authorise {_CO_LEGAL.upper()} to proceed and authorise {_CO_LEGAL} to receive the settlement payment from the new finance provider.",
         ], 1):
             pdf.set_x(pdf.l_margin); pdf.multi_cell(pdf.epw, 3.8, f"{n}.  {s(ack)}", align="J")
@@ -2676,7 +2676,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             f"I understand the new agreement is for {LEASE_TERM_LABELS[lease_term]}.",
             "I understand the new monthly payment.",
             "I understand the Total Finance Amount.",
-            "I authorise SY COMMS LTD to settle the existing agreement.",
+            f"I authorise {_CO_LEGAL.upper()} to settle the existing agreement.",
             "I understand this is my company's commercial decision.",
             "I understand any settlement amount may change until confirmed by the finance provider.",
             "I confirm I have authority to enter into this agreement on behalf of the Customer.",
@@ -2703,7 +2703,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "This document records the exceptional commercial arrangement only and does not amend or replace "
             "the terms of the Commercial Proposal, Service Agreement or Finance Agreement. "
             "We confirm this document, together with the Commercial Proposal, Service Agreement and Finance Agreement, "
-            "accurately reflects the transaction we have chosen to enter into. We authorise SY COMMS LTD to proceed.", align="J")
+            f"accurately reflects the transaction we have chosen to enter into. We authorise {_CO_LEGAL.upper()} to proceed.", align="J")
         pdf.ln(3)
         _eca_hdr("Signatures")
         pdf.ln(1)
@@ -4004,7 +4004,7 @@ with tab3:
         st.markdown("")
         st.markdown("---")
         st.markdown("#### 📋 One-Page Proposal")
-        st.caption("Clean two-page summary: About SY Comms + deal breakdown. Great for emailing to a prospect before the full paperwork.")
+        st.caption(f"Clean two-page summary: About {_CO} + deal breakdown. Great for emailing to a prospect before the full paperwork.")
         proposal_bytes = build_proposal_pdf()
         st.download_button(
             label=f"📋 Download Proposal Summary - {comp_name}",
