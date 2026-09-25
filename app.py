@@ -4185,7 +4185,7 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         return False, f"❌ Email failed: {e}"
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "📊 Feasibility", "✍️ Sign & Send", "📨 Remote Signing"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send"])
 
 # ── TAB 1: PROPOSAL SUMMARY ──────────────────────────────────────────────────
 with tab1:
@@ -5250,57 +5250,61 @@ with tab5:
 
 # ── TAB 6: SIGN & SEND ────────────────────────────────────────────────────────
 
+    # ── Feasibility Calculator ──────────────────────────────────────────
+    st.markdown('---')
+    with st.expander('📊 Feasibility Calculator', expanded=False):
+        st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
+        st.markdown('## 📊 Feasibility Calculator')
+        st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
+    
+        _new_rental    = float(st.session_state.get('adj_rent', pl_data['rental']))
+        _buyout_rental = (pl_data['sales_rate'] / 1000.0) * termination_cost
+        _lease_total   = max(_new_rental - _buyout_rental, 0) * lease_term
+        _max_settlement = round(_lease_total * 0.70, 2)
+        _settlement_ok  = termination_cost <= _max_settlement
+    
+        feas_col1, feas_col2 = st.columns(2)
+        with feas_col1:
+            st.markdown(f"""
+            <div style='background:#fff;border:1px solid #e0e8f0;border-radius:12px;padding:1.2rem'>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>New Monthly Rental</div>
+              <div style='font-size:2rem;font-weight:800;color:#1f1450'>£{_new_rental:.2f}</div>
+              <div style='font-size:0.8rem;color:#aaa'>per month over {LEASE_TERM_LABELS[lease_term]}</div>
+              <hr style='margin:0.8rem 0'>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Total Lease Value</div>
+              <div style='font-size:1.3rem;font-weight:700;color:#1f1450'>£{_lease_total:.2f}</div>
+              <div style='font-size:0.8rem;color:#aaa'>({lease_term} months × £{_new_rental:.2f})</div>
+              <hr style='margin:0.8rem 0'>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Max Settlement (70%)</div>
+              <div style='font-size:1.6rem;font-weight:800;color:#1a7a40'>£{_max_settlement:.2f}</div>
+              <div style='font-size:0.8rem;color:#aaa'>70% of total lease value</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with feas_col2:
+            _col  = '#1a7a40' if _settlement_ok else '#c0392b'
+            _bg   = '#e8f8f0' if _settlement_ok else '#fdf0f0'
+            _icon = '✅' if _settlement_ok else '🔴'
+            _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% - Review Required'
+            _diff = _max_settlement - termination_cost
+            st.markdown(f"""
+            <div style='background:{_bg};border:2px solid {_col};border-radius:12px;padding:1.4rem;text-align:center'>
+              <div style='font-size:2.5rem'>{_icon}</div>
+              <div style='font-size:1rem;font-weight:700;color:{_col};margin-top:0.5rem'>{_msg}</div>
+              <hr style='margin:0.8rem 0;border-color:{_col};opacity:0.3'>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:{_col}'>Customer Settlement / Buyout</div>
+              <div style='font-size:1.8rem;font-weight:800;color:{_col}'>£{termination_cost:.2f}</div>
+              <div style='font-size:0.8rem;color:{_col};margin-top:0.4rem'>
+                {'£' + f'{abs(_diff):.2f}' + ' headroom remaining' if _settlement_ok else '£' + f'{abs(_diff):.2f}' + ' over the 70% limit'}
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+        if termination_cost == 0:
+            st.info('💡 Enter a buyout / termination cost in the sidebar Deal Adjustments to run the feasibility check.')
+    
+    
+
 with tab6:
-    st.markdown('## 📊 Feasibility Calculator')
-    st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
-
-    _new_rental    = float(st.session_state.get('adj_rent', pl_data['rental']))
-    _buyout_rental = (pl_data['sales_rate'] / 1000.0) * termination_cost
-    _lease_total   = max(_new_rental - _buyout_rental, 0) * lease_term
-    _max_settlement = round(_lease_total * 0.70, 2)
-    _settlement_ok  = termination_cost <= _max_settlement
-
-    feas_col1, feas_col2 = st.columns(2)
-    with feas_col1:
-        st.markdown(f"""
-        <div style='background:#fff;border:1px solid #e0e8f0;border-radius:12px;padding:1.2rem'>
-          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>New Monthly Rental</div>
-          <div style='font-size:2rem;font-weight:800;color:#1f1450'>£{_new_rental:.2f}</div>
-          <div style='font-size:0.8rem;color:#aaa'>per month over {LEASE_TERM_LABELS[lease_term]}</div>
-          <hr style='margin:0.8rem 0'>
-          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Total Lease Value</div>
-          <div style='font-size:1.3rem;font-weight:700;color:#1f1450'>£{_lease_total:.2f}</div>
-          <div style='font-size:0.8rem;color:#aaa'>({lease_term} months × £{_new_rental:.2f})</div>
-          <hr style='margin:0.8rem 0'>
-          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Max Settlement (70%)</div>
-          <div style='font-size:1.6rem;font-weight:800;color:#1a7a40'>£{_max_settlement:.2f}</div>
-          <div style='font-size:0.8rem;color:#aaa'>70% of total lease value</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with feas_col2:
-        _col  = '#1a7a40' if _settlement_ok else '#c0392b'
-        _bg   = '#e8f8f0' if _settlement_ok else '#fdf0f0'
-        _icon = '✅' if _settlement_ok else '🔴'
-        _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% - Review Required'
-        _diff = _max_settlement - termination_cost
-        st.markdown(f"""
-        <div style='background:{_bg};border:2px solid {_col};border-radius:12px;padding:1.4rem;text-align:center'>
-          <div style='font-size:2.5rem'>{_icon}</div>
-          <div style='font-size:1rem;font-weight:700;color:{_col};margin-top:0.5rem'>{_msg}</div>
-          <hr style='margin:0.8rem 0;border-color:{_col};opacity:0.3'>
-          <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:{_col}'>Customer Settlement / Buyout</div>
-          <div style='font-size:1.8rem;font-weight:800;color:{_col}'>£{termination_cost:.2f}</div>
-          <div style='font-size:0.8rem;color:{_col};margin-top:0.4rem'>
-            {'£' + f'{abs(_diff):.2f}' + ' headroom remaining' if _settlement_ok else '£' + f'{abs(_diff):.2f}' + ' over the 70% limit'}
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    if termination_cost == 0:
-        st.info('💡 Enter a buyout / termination cost in the sidebar Deal Adjustments to run the feasibility check.')
-
-
-with tab7:
     st.markdown('<div class="tab-content"></div>', unsafe_allow_html=True)
 
     if not comp_name:
@@ -5570,156 +5574,7 @@ with tab7:
                 except Exception as _e:
                     st.error(f"Email failed: {_e}")
 
-    st.markdown("### 📨 Send for Signature via Zoho Sign")
-    st.caption("Upload the PDF pack and send the customer a legally-binding Zoho Sign request.")
-
-    # ── Zoho Sign OAuth helper ────────────────────────────────────────────────
-    def _zoho_get_access_token():
-        """Exchange refresh token for a fresh access token."""
-        import requests as _rq
-        secrets = st.secrets if hasattr(st, "secrets") else {}
-        r = _rq.post("https://accounts.zoho.eu/oauth/v2/token", data={
-            "grant_type":    "refresh_token",
-            "client_id":     secrets.get("ZOHO_CLIENT_ID", ""),
-            "client_secret": secrets.get("ZOHO_CLIENT_SECRET", ""),
-            "refresh_token": secrets.get("ZOHO_REFRESH_TOKEN", ""),
-        }, timeout=15)
-        if r.status_code == 200:
-            return r.json().get("access_token", "")
-        return None
-
-    def _zoho_send_for_signature(pdf_bytes, filename, signer_name, signer_email,
-                                  sender_note, from_name="SY Comms"):
-        """Upload PDF to Zoho Sign and create a signature request."""
-        import requests as _rq, json as _json
-
-        token = _zoho_get_access_token()
-        if not token:
-            return False, "Could not get Zoho access token — check secrets."
-
-        headers = {"Authorization": f"Zoho-oauthtoken {token}"}
-        base    = "https://sign.zoho.eu/api/v1"
-
-        # Step 1: Upload document
-        upload_resp = _rq.post(
-            f"{base}/requests",
-            headers=headers,
-            data={"data": _json.dumps({
-                "requests": {
-                    "request_name": filename.replace(".pdf", ""),
-                    "actions": [{
-                        "action_type":    "SIGN",
-                        "recipient_name":  signer_name,
-                        "recipient_email": signer_email,
-                        "signing_order":   0,
-                        "verify_recipient": False,
-                    }],
-                    "notes": sender_note or f"Please review and sign your SY Comms proposal.",
-                    "expiration_days": 30,
-                    "email_reminders": True,
-                    "reminder_period": 3,
-                }
-            })},
-            files={"file": (filename, pdf_bytes, "application/pdf")},
-            timeout=60,
-        )
-        if upload_resp.status_code not in (200, 201):
-            return False, f"Zoho upload error {upload_resp.status_code}: {upload_resp.text[:200]}"
-
-        resp_data  = upload_resp.json()
-        request_id = resp_data.get("requests", {}).get("request_id", "")
-        if not request_id:
-            return False, f"No request_id in response: {upload_resp.text[:200]}"
-
-        # Step 2: Submit (send to signer)
-        submit_resp = _rq.post(
-            f"{base}/requests/{request_id}/submit",
-            headers=headers,
-            data={"data": _json.dumps({"requests": {"notes": sender_note or ""}})},
-            timeout=30,
-        )
-        if submit_resp.status_code in (200, 201):
-            sign_url = submit_resp.json().get("requests", {}).get("sign_url", "")
-            return True, request_id
-        return False, f"Submit error {submit_resp.status_code}: {submit_resp.text[:200]}"
-
-    # ── Check secrets configured ───────────────────────────────────────────────
-    _secrets_ok = False
-    if hasattr(st, "secrets"):
-        try:
-            _secrets_ok = bool(
-                st.secrets.get("ZOHO_CLIENT_ID") and
-                st.secrets.get("ZOHO_CLIENT_SECRET") and
-                st.secrets.get("ZOHO_REFRESH_TOKEN")
-            )
-        except Exception:
-            pass
-
-    if not _secrets_ok:
-        st.warning("Zoho Sign not configured. Add ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET and ZOHO_REFRESH_TOKEN to Streamlit secrets.")
-        st.stop()
-
-    # ── UI ─────────────────────────────────────────────────────────────────────
-    zs_col1, zs_col2 = st.columns([3, 2])
-
-    with zs_col1:
-        st.markdown("**📎 Document to send**")
-        zs_auto = st.checkbox("Auto-generate Full Proposal Pack", value=True, key="zs_auto_pdf")
-        if zs_auto:
-            st.caption("The full PDF pack will be generated from the current deal and sent.")
-            zs_upload = None
-        else:
-            zs_upload = st.file_uploader("Upload PDF instead", type=["pdf"],
-                                          key="zs_upload", label_visibility="collapsed")
-
-    with zs_col2:
-        st.markdown("**👤 Signer details**")
-        zs_name    = st.text_input("Signer name",  value=contact_name or comp_name or "",
-                                    key="zs_name",  placeholder="Jane Smith")
-        zs_email   = st.text_input("Signer email", value=director_email or billing_email or "",
-                                    key="zs_email", placeholder="jane@acme.co.uk")
-        zs_note    = st.text_area("Personal message (optional)", height=80, key="zs_note",
-                                   placeholder="Please review and sign at your earliest convenience.")
-
-    st.markdown("")
-    _zs_ready = bool(zs_name and zs_email and (zs_auto or zs_upload))
-    if not _zs_ready:
-        _zs_missing = []
-        if not zs_name:  _zs_missing.append("signer name")
-        if not zs_email: _zs_missing.append("signer email")
-        if not zs_auto and not zs_upload: _zs_missing.append("PDF upload")
-        st.caption(f"Still needed: {', '.join(_zs_missing)}")
-
-    if st.button("📄 Generate & Prepare for Zoho Sign",
-                  type="primary", use_container_width=True,
-                  disabled=not _zs_ready, key="btn_zoho_send"):
-        with st.spinner("Generating PDF..."):
-            if zs_auto:
-                _pdf_bytes = build_pdf()
-                _pdf_name  = f"SYComms_Proposal_{s(comp_name).replace(' ','_')}_{date.today()}.pdf"
-            else:
-                _pdf_bytes = zs_upload.getvalue()
-                _pdf_name  = zs_upload.name
-            st.session_state["_zs_pdf_bytes"] = _pdf_bytes
-            st.session_state["_zs_pdf_name"]  = _pdf_name
-            st.session_state["_zs_ready"]     = True
-            st.rerun()
-
-    if st.session_state.get("_zs_ready"):
-        _pdf_bytes = st.session_state.get("_zs_pdf_bytes")
-        _pdf_name  = st.session_state.get("_zs_pdf_name","proposal.pdf")
-        st.success("PDF ready to send!")
-        dl_col, link_col = st.columns(2)
-        with dl_col:
-            st.download_button("📥 1. Download PDF",
-                data=_pdf_bytes, file_name=_pdf_name,
-                mime="application/pdf", use_container_width=True,
-                key="zs_dl_pdf")
-        with link_col:
-            st.link_button("✍️ 2. Open Zoho Sign",
-                "https://sign.zoho.eu",
-                use_container_width=True)
-        st.info(
-            f"Download the PDF → go to Zoho Sign → click **Send for signatures** → "
-            f"upload the PDF → add **{zs_name}** ({zs_email}) as signer → send."
-        )
+    st.divider()
+    st.markdown("### ✍️ Send via Zoho Sign")
+    st.caption("Download the signed pack above, then upload it to Zoho Sign to send the customer a legally-binding e-signature request.")
+    st.link_button("Open Zoho Sign →", "https://sign.zoho.eu", use_container_width=False)
