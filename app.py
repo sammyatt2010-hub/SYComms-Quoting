@@ -54,41 +54,114 @@ _CO_FOOT  = _early_brand.get("pdf_footer",      "SY Comms | All figures exclude 
 _CO_PKG   = _early_brand.get("customer_pkg_label", "Your SY Comms Package")
 _CO_FILE  = _early_brand.get("proposal_filename_prefix", "SYComms_Proposal")
 
+
+# ─── MULTI-BRAND CONFIG ───────────────────────────────────────────────────────
+BRAND_CONFIGS = {
+    "SY Comms": {
+        "name":       "SY Comms",
+        "legal":      "SY Comms Ltd",
+        "tagline":    "SY Comms Quotation Tool",
+        "caption":    "Authorised SY Comms users only.",
+        "footer":     "SY Comms | All figures exclude VAT | This document is confidential",
+        "pkg_label":  "Your SY Comms Package",
+        "file_prefix":"SYComms_Proposal",
+        "accent":     "#00b5a3",
+        "logo_key":   "SYCOMMS_LOGO_B64",
+        "header":     "<span style=\'color:#00b5a3\'>SY</span>&middot;COMMS",
+        "pw_key":     "APP_PASSWORD",
+    },
+    "SY Plus": {
+        "name":       "SY Plus",
+        "legal":      "SY Plus Ltd",
+        "tagline":    "SY Plus Quotation Tool",
+        "caption":    "Authorised SY Plus users only.",
+        "footer":     "SY Plus | All figures exclude VAT | This document is confidential",
+        "pkg_label":  "Your SY Plus Package",
+        "file_prefix":"SYPlus_Proposal",
+        "accent":     "#0084c8",
+        "logo_key":   "SYCOMMS_LOGO_B64",   # use same logo until SY Plus has its own
+        "header":     "<span style=\'color:#0084c8\'>SY</span>&middot;PLUS",
+        "pw_key":     "APP_PASSWORD_SYPLUS",
+    },
+    "SW Comms": {
+        "name":       "SW Comms",
+        "legal":      "SW Comms Ltd",
+        "tagline":    "SW Comms Quotation Tool",
+        "caption":    "Authorised SW Comms users only.",
+        "footer":     "SW Comms | All figures exclude VAT | This document is confidential",
+        "pkg_label":  "Your SW Comms Package",
+        "file_prefix":"SWComms_Proposal",
+        "accent":     "#e67e22",
+        "logo_key":   "SYCOMMS_LOGO_B64",   # use same logo until SW Comms has its own
+        "header":     "<span style=\'color:#e67e22\'>SW</span>&middot;COMMS",
+        "pw_key":     "APP_PASSWORD_SWCOMMS",
+    },
+}
+
 # ─── APP LOGIN GATE ──────────────────────────────────────────────────────────
-_APP_PASSWORD = "SYComms2026!!"   # ← change to update access password    # ← change this to update the app password
+# Brand passwords — add to Streamlit secrets:
+#   APP_PASSWORD         = "..."   (SY Comms)
+#   APP_PASSWORD_SYPLUS  = "..."   (SY Plus)
+#   APP_PASSWORD_SWCOMMS = "..."   (SW Comms)
+# Falls back to hardcoded default if secret not set.
+_FALLBACK_PW = "SYComms2026!!"
+
+def _get_brand_pw(pw_key):
+    try:
+        return st.secrets[pw_key]
+    except Exception:
+        return _FALLBACK_PW
 
 if "app_authenticated" not in st.session_state:
     st.session_state.app_authenticated = False
+if "selected_brand" not in st.session_state:
+    st.session_state.selected_brand = "SY Comms"
 
 if not st.session_state.app_authenticated:
-    _logo_src = f'data:image/jpeg;base64,{SYCOMMS_LOGO_B64}'
+    _sel_brand = st.session_state.selected_brand
+    _bc        = BRAND_CONFIGS[_sel_brand]
+    _accent    = _bc["accent"]
+    _logo_src  = f'data:image/jpeg;base64,{SYCOMMS_LOGO_B64}'
+
     login_html = (
         '<style>'
-        '.login-wrap{max-width:420px;margin:6vh auto 0;background:linear-gradient(160deg,#1f1450 0%,#2d1f6e 100%);border-radius:20px;padding:2.5rem 2.5rem 2rem;box-shadow:0 20px 60px rgba(0,0,0,0.4);text-align:center;border:1px solid rgba(0,181,163,0.2)}.'
+        '.login-wrap{max-width:440px;margin:4vh auto 0;background:linear-gradient(160deg,#1f1450 0%,#2d1f6e 100%);border-radius:20px;padding:2.5rem 2.5rem 2rem;box-shadow:0 20px 60px rgba(0,0,0,0.4);text-align:center;border:1px solid rgba(0,181,163,0.2)}.'
         'login-wrap h1{font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#fff;margin:0 0 0.2rem}.'
-        'login-wrap p{color:rgba(255,255,255,0.45);font-size:0.85rem;margin:0 0 1.8rem}.'
-        'login-accent{color:#00b5a3}</style>'
-        f'<div class="login-wrap"><img src="{_logo_src}" style="width:110px;margin-bottom:0.8rem;border-radius:8px;"><br>'
-        '<h1><span class="login-accent">SY</span>&middot;COMMS</h1>'
-        '<p>SY Comms Quotation Tool</p></div>'
+        'login-wrap p{color:rgba(255,255,255,0.45);font-size:0.85rem;margin:0 0 1.2rem}.'
+        f'.login-accent{{color:{_accent}}}</style>'
+        f'<div class="login-wrap"><img src="{_logo_src}" style="width:90px;margin-bottom:0.8rem;border-radius:8px;"><br>'
+        f'<h1>{_bc["header"]}</h1>'
+        f'<p>{_bc["tagline"]}</p></div>'
     )
     st.markdown(login_html, unsafe_allow_html=True)
-    # Centred login form
+
     col_l, col_m, col_r = st.columns([1, 2, 1])
     with col_m:
         st.markdown("###")
+        # Brand selector
+        brand_choice = st.selectbox(
+            "Company", list(BRAND_CONFIGS.keys()),
+            index=list(BRAND_CONFIGS.keys()).index(_sel_brand),
+            key="brand_selector",
+            label_visibility="collapsed",
+        )
+        if brand_choice != _sel_brand:
+            st.session_state.selected_brand = brand_choice
+            st.rerun()
+
         entered = st.text_input("", type="password",
-                                placeholder="Enter access password...",
+                                placeholder=f"Enter {brand_choice} password...",
                                 label_visibility="collapsed",
                                 key="login_pw_input")
         if st.button("Sign In →", use_container_width=True, type="primary"):
-            if entered == _APP_PASSWORD:
+            _correct_pw = _get_brand_pw(_bc["pw_key"])
+            if entered == _correct_pw:
                 st.session_state.app_authenticated = True
                 st.rerun()
             else:
                 st.error("Incorrect password - please try again.")
         st.markdown("")
-        st.caption(_CO_CAP)
+        st.caption(_bc["caption"])
 
     st.stop()   # ← nothing below renders until authenticated
 
@@ -308,6 +381,16 @@ _appt_rates = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemark
 commission_per_unit  = _appt_rates.get(st.session_state.get("q_appt_type", "Self Gen"), commission_per_unit)
 B   = cfg.get("branding", {})     # shorthand for branding dict
 # Branding helpers - refresh from full config (overrides early load)
+# Apply selected brand overrides first, then let config.json further customise
+_sb   = BRAND_CONFIGS.get(st.session_state.get("selected_brand", "SY Comms"), BRAND_CONFIGS["SY Comms"])
+_CO       = _sb["name"]
+_CO_LEGAL = _sb["legal"]
+_CO_TAG   = _sb["tagline"]
+_CO_CAP   = _sb["caption"]
+_CO_FOOT  = _sb["footer"]
+_CO_PKG   = _sb["pkg_label"]
+_CO_FILE  = _sb["file_prefix"]
+# Then let config.json branding further override if set
 _CO       = B.get("company_name",    _CO)
 _CO_LEGAL = B.get("company_legal",   _CO_LEGAL)
 _CO_TAG   = B.get("company_tagline", _CO_TAG)
