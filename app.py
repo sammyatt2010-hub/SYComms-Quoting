@@ -3203,6 +3203,20 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         return False, f"❌ Email failed: {e}"
 
 
+# ── Admin panel variable defaults (overridden inside tab7 when unlocked) ──────
+# These must be defined before tabs so tab1-tab6 can reference them safely.
+# Values are read from session state where widgets write them.
+override_customer       = st.session_state.get("mgr_cust", "")
+override_initials       = st.session_state.get("mgr_init", "")
+override_monthly_lease  = 0.0
+override_bb_sell        = float(st.session_state.get("adm_bb_override", 0.0))
+override_upfront        = float(st.session_state.get("adm_override_upfront", 0.0))
+override_install_cost   = float(st.session_state.get("adm_override_install", 0.0))
+credits_months          = int(st.session_state.get("adm_credits_months", 0))
+credits_amount          = float(st.session_state.get("adm_credits_amount", 0.0))
+cashback_amount         = float(st.session_state.get("adm_cashback", 0.0))
+
+
 # ─── CALCULATIONS ENGINE (Recurring model - hardware upfront, services monthly) ─
 
 def compute_poe_needed():
@@ -3518,19 +3532,6 @@ pure_connectivity = round(svc["bb_sell"] + svc["mobile_sell"], 2)
 sgp          = pat * 0.10
 
 
-
-# ── Admin panel variable defaults (overridden inside tab7 when unlocked) ──────
-# These must be defined before tabs so tab1-tab6 can reference them safely.
-# Values are read from session state where widgets write them.
-override_customer       = st.session_state.get("mgr_cust", "")
-override_initials       = st.session_state.get("mgr_init", "")
-override_monthly_lease  = 0.0
-override_bb_sell        = float(st.session_state.get("adm_bb_override", 0.0))
-override_upfront        = float(st.session_state.get("adm_override_upfront", 0.0))
-override_install_cost   = float(st.session_state.get("adm_override_install", 0.0))
-credits_months          = int(st.session_state.get("adm_credits_months", 0))
-credits_amount          = float(st.session_state.get("adm_credits_amount", 0.0))
-cashback_amount         = float(st.session_state.get("adm_cashback", 0.0))
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "🔐 Admin"])
 
