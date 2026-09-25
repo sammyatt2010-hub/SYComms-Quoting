@@ -69,6 +69,7 @@ BRAND_CONFIGS = {
         "logo_key":   "SYCOMMS_LOGO_B64",
         "header":     "<span style=\'color:#00b5a3\'>SY</span>&middot;COMMS",
         "pw_key":     "APP_PASSWORD",
+        "address":    "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG",
         "email":      "hello@sycomms.co.uk",
         "phone":      "01743 667419",
         "website":    "www.sycomms.co.uk",
@@ -83,9 +84,10 @@ BRAND_CONFIGS = {
         "pkg_label":  "Your SY Plus Package",
         "file_prefix":"SYPlus_Proposal",
         "accent":     "#0084c8",
-        "logo_key":   "SYCOMMS_LOGO_B64",
+        "logo_key":   None,
         "header":     "<span style=\'color:#0084c8\'>SY</span>&middot;PLUS",
         "pw_key":     "APP_PASSWORD_SYPLUS",
+        "address":    "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG",
         "email":      "hello@syplus.co.uk",
         "phone":      "01743 667419",
         "website":    "www.syplus.co.uk",
@@ -100,9 +102,10 @@ BRAND_CONFIGS = {
         "pkg_label":  "Your SW Comms Package",
         "file_prefix":"SWComms_Proposal",
         "accent":     "#e67e22",
-        "logo_key":   "SYCOMMS_LOGO_B64",
+        "logo_key":   None,
         "header":     "<span style=\'color:#e67e22\'>SW</span>&middot;COMMS",
         "pw_key":     "APP_PASSWORD_SWCOMMS",
+        "address":    "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG",
         "email":      "hello@swcomms.co.uk",
         "phone":      "01743 667419",
         "website":    "www.swcomms.co.uk",
@@ -134,6 +137,8 @@ if not st.session_state.app_authenticated:
     _bc        = BRAND_CONFIGS[_sel_brand]
     _accent    = _bc["accent"]
     _logo_src  = f'data:image/jpeg;base64,{SYCOMMS_LOGO_B64}'
+    _logo_html = (f'<img src="{_logo_src}" style="width:90px;margin-bottom:0.8rem;border-radius:8px;"><br>'
+                  if _bc["logo_key"] else '')
 
     login_html = (
         '<style>'
@@ -141,7 +146,7 @@ if not st.session_state.app_authenticated:
         'login-wrap h1{font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#fff;margin:0 0 0.2rem}.'
         'login-wrap p{color:rgba(255,255,255,0.45);font-size:0.85rem;margin:0 0 1.2rem}.'
         f'.login-accent{{color:{_accent}}}</style>'
-        f'<div class="login-wrap"><img src="{_logo_src}" style="width:90px;margin-bottom:0.8rem;border-radius:8px;"><br>'
+        f'<div class="login-wrap">{_logo_html}'
         f'<h1>{_bc["header"]}</h1>'
         f'<p>{_bc["tagline"]}</p></div>'
     )
@@ -1615,7 +1620,7 @@ def s(text):
 
 
 def build_proposal_pdf():
-    """Visually rich two-page proposal matching SY Comms brand identity."""
+    """Visually rich two-page proposal matching brand identity."""
     from fpdf import FPDF
 
     def _ps(text):
@@ -1623,8 +1628,8 @@ def build_proposal_pdf():
 
     p = FPDF()
     p.set_auto_page_break(True, margin=15)
-    _p_logo_bytes = base64.b64decode(SYCOMMS_LOGO_B64)
-    _p_logo_buf   = io.BytesIO(_p_logo_bytes)
+    _p_logo_bytes = base64.b64decode(SYCOMMS_LOGO_B64) if _BRAND["logo_key"] else None
+    _p_logo_buf   = io.BytesIO(_p_logo_bytes) if _p_logo_bytes else None
 
     PW = 210  # page width mm
 
@@ -1641,7 +1646,7 @@ def build_proposal_pdf():
     p.rect(0, 82, PW, 3, "F")
     # Logo
     try:
-        p.image(_p_logo_buf, x=10, y=8, h=28); _p_logo_buf.seek(0)
+        if _p_logo_buf: p.image(_p_logo_buf, x=10, y=8, h=28); _p_logo_buf.seek(0)
     except Exception: pass
     # Hero headline
     p.set_text_color(255, 255, 255)
@@ -1736,7 +1741,7 @@ def build_proposal_pdf():
     # ── Compact header ────────────────────────────────────────────────────────────
     p.set_fill_color(31, 20, 80); p.rect(0, 0, PW, 22, "F")
     try:
-        p.image(_p_logo_buf, x=8, y=3, h=16); _p_logo_buf.seek(0)
+        if _p_logo_buf: p.image(_p_logo_buf, x=8, y=3, h=16); _p_logo_buf.seek(0)
     except Exception: pass
     p.set_text_color(255, 255, 255); p.set_font("Helvetica", "B", 13)
     p.set_y(4); p.set_x(34)
@@ -1966,17 +1971,18 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     _sort     = s(sort_code)
 
     # -- PAGE 1: PROPOSAL --
-    # Embed logo for PDF
-    _logo_bytes = base64.b64decode(SYCOMMS_LOGO_B64)
-    _logo_buf   = io.BytesIO(_logo_bytes)
+    # Embed logo for PDF (conditional on brand having a logo)
+    _logo_bytes = base64.b64decode(SYCOMMS_LOGO_B64) if _BRAND["logo_key"] else None
+    _logo_buf   = io.BytesIO(_logo_bytes) if _logo_bytes else None
 
     def _add_header(pdf_obj, subtitle="Customer Proposal & Order Documentation"):
         # Deep purple background
         pdf_obj.set_fill_color(31, 20, 80)
         pdf_obj.rect(0, 0, 210, 42, 'F')
-        # SY Comms circle logo on left
-        pdf_obj.image(_logo_buf, x=10, y=6, h=30)
-        _logo_buf.seek(0)
+        # Logo on left (if available for this brand)
+        if _logo_buf:
+            pdf_obj.image(_logo_buf, x=10, y=6, h=30)
+            _logo_buf.seek(0)
         # Company name right of logo
         pdf_obj.set_font("Helvetica", "B", 20)
         pdf_obj.set_text_color(255, 255, 255)
@@ -2090,7 +2096,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_text_color(200, 200, 220)
     pdf.cell(0, 5, s(f"{_CO_PHONE}   |   {_CO_EMAIL}   |   {_CO_WEB}"), ln=True, align="C")
     pdf.set_y(273)
-    pdf.cell(0, 5, "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG", ln=True, align="C")
+    pdf.cell(0, 5, s(_BRAND.get("address", "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG")), ln=True, align="C")
 
     # Teal accent stripe at bottom
     pdf.set_fill_color(0, 181, 163)
@@ -2910,32 +2916,32 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                  f"£{termination_cost:.2f} as per the figure agreed on the order forms.")
     else:
         _crf_q(10,"We acknowledge that in entering into the above agreement you have agreed to rent new equipment "
-                 "supplied by SY Comms Ltd as per the figure agreed on the order forms.")
+                 f"supplied by {_CO_LEGAL} as per the figure agreed on the order forms.")
     _crf_q(11,"I have confirmed the number of months remaining on existing contracts to the sales consultant")
     _crf_q(12,"I understand that only the cash back for ETC charges agreed & listed on the order forms will be paid "
-             "by SY Comms Ltd upon receipt of a copy invoice & contract from the previous supplier")
-    _crf_q(13,"I understand that any 'Special Conditions' agreed by SY Comms Ltd representative may not be considered "
-             "valid by SY Comms Ltd unless stated on the Order Form and clearly initialled by their representative.")
+             f"by {_CO_LEGAL} upon receipt of a copy invoice & contract from the previous supplier")
+    _crf_q(13,f"I understand that any 'Special Conditions' agreed by {_CO_LEGAL} representative may not be considered "
+             f"valid by {_CO_LEGAL} unless stated on the Order Form and clearly initialled by their representative.")
     _crf_q(14,"I understand that UK Local, UK National and UK Mobile call costs only have been accounted for on my "
-             "call cost proposal with SY Comms Ltd")
-    _crf_q(15,"I understand that if I do not take SY Comms Ltd mobiles after my current contract ends "
-             "SY Comms Ltd cannot guarantee the mobile savings.")
+             f"call cost proposal with {_CO_LEGAL}")
+    _crf_q(15,f"I understand that if I do not take {_CO_LEGAL} mobiles after my current contract ends "
+             f"{_CO_LEGAL} cannot guarantee the mobile savings.")
     _crf_q(16,"I agree that the rentals due under the Rental Agreement have been calculated based on the full purchase "
              "price of the Equipment. We agree and accept that our obligation to pay the Rentals in full on their due "
              "dates without reduction, deduction, withholding, or offset whatsoever, shall apply notwithstanding any "
              "failure on the part of the Supplier or the Equipment.")
-    _crf_q(17,"I fully understand that SY Comms Ltd will be and will at all times remain solely responsible for "
+    _crf_q(17,f"I fully understand that {_CO_LEGAL} will be and will at all times remain solely responsible for "
              "providing any maintenance or service provision in respect of the Equipment in a separate agreement. "
              "We are fully aware that if the Supplier stops providing maintenance for any reason we must fully "
              "comply with all obligations under the Rental Agreement to keep the Equipment maintained.")
-    _crf_q(18,"I understand that due to the data protection act, SY Comms Ltd have no authority to cancel any "
+    _crf_q(18,f"I understand that due to the data protection act, {_CO_LEGAL} have no authority to cancel any "
              "existing agreements with 3rd party suppliers. I am aware that (where applicable) it is my responsibility "
              "to cancel any existing agreements.")
     _crf_q(19,"Any settlement charges other than those on the Order Form can only be settled with supporting contracts "
-             "from existing providers which must be provided to SY Comms Ltd on request.")
-    _crf_q(20,"I understand that due to current trading climate SY Comms Ltd may require supportive additional "
+             f"from existing providers which must be provided to {_CO_LEGAL} on request.")
+    _crf_q(20,f"I understand that due to current trading climate {_CO_LEGAL} may require supportive additional "
              "financial information prior to installation.")
-    _crf_q(22,"I have provided a copy of bills relevant to the new services to be provided by SY Comms Ltd.")
+    _crf_q(22,f"I have provided a copy of bills relevant to the new services to be provided by {_CO_LEGAL}.")
     _crf_q(23,"I am fully aware that the CTI (screen popping) may not fully integrate with my current database "
              "and that screen popping may not be possible.")
 
@@ -2984,7 +2990,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(2)
     pdf.set_font("Helvetica","I",7.5)
     pdf.set_text_color(80,80,80)
-    pdf.multi_cell(0,3.8,"SY Comms Ltd confirm that any financial information given will be treated with utmost confidentiality.",align="C")
+    pdf.multi_cell(0,3.8,s(f"{_CO_LEGAL} confirm that any financial information given will be treated with utmost confidentiality."),align="C")
     pdf.set_text_color(0,0,0)
 
     # ── TERMS & CONDITIONS PAGE ──────────────────────────────────────
@@ -2992,7 +2998,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     _add_header(pdf, "Terms & Conditions - Network Services")
 
     _tc_sections = [
-        ("1. DEFINITIONS", "Contract means these terms and the Order. Charges are payable under clause 10. Initial Term means 12 months from Start Date. Extended Term means any 12-month renewal per clause 3. We/us means SY Comms Ltd, Shrewsbury SY2 6LG. You means the customer in the Order."),
+        ("1. DEFINITIONS", f"Contract means these terms and the Order. Charges are payable under clause 10. Initial Term means 12 months from Start Date. Extended Term means any 12-month renewal per clause 3. We/us means {_CO_LEGAL}. You means the customer in the Order."),
         ("3. DURATION & AUTOMATIC RENEWAL", "This contract automatically extends for 12 months at the end of the Minimum Term and each Extended Term unless 90 days written notice is given. You may add Services at any time."),
         ("4. SERVICES", "We provide Services with reasonable skill and care. We do not warrant uninterrupted or error-free service. Service Failures must be reported via our Helpdesk."),
         ("6. USE OF SERVICES", "Services are for business use only and must comply with our Acceptable Use Policy. You must not use Services to breach any law, compromise network security, or degrade service to other customers."),
@@ -3108,7 +3114,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_y(5)
         pdf.cell(0, 6, "CERTIFICATE OF COMPLETION", ln=True, align="C")
         pdf.set_font("Helvetica", "", 8)
-        pdf.cell(0, 5, "SY Comms  |  Electronic Signing Record", ln=True, align="C")
+        pdf.cell(0, 5, s(f"{_CO}  |  Electronic Signing Record"), ln=True, align="C")
         pdf.set_fill_color(0, 180, 216)
         pdf.rect(0, 22, 210, 1.5, "F")
         pdf.set_text_color(0, 0, 0)
@@ -3137,8 +3143,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
 
         _env_row("Envelope ID:", _envelope_id)
         _env_row("Status:", "COMPLETED", color=(0, 140, 70))
-        _env_row("Subject:", f"SY Comms Proposal - {_signer_co[:40]}")
-        _env_row("Originator:", "SY Comms")
+        _env_row("Subject:", s(f"{_CO} Proposal - {_signer_co[:40]}"))
+        _env_row("Originator:", s(_CO))
         _env_row("Document Pages:", "4   |   Signatures: 3")
         _env_row("Time Zone:", "(UTC+00:00) Dublin, Edinburgh, Lisbon, London")
         _env_row("Originator Email:", _orig_email)
@@ -3148,7 +3154,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         _section("Record Tracking")
         pdf.ln(1)
         _row3("Status", "Holder", "Location", bold1=True)
-        _row3("Original", "SY Comms", "SY Comms Quotation Tool")
+        _row3("Original", s(_CO), s(_CO_TAG))
         _row3(_sent_at, _orig_email, "Streamlit Cloud")
         pdf.ln(4)
 
