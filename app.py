@@ -402,20 +402,21 @@ _CO_CAP   = _sb["caption"]
 _CO_FOOT  = _sb["footer"]
 _CO_PKG   = _sb["pkg_label"]
 _CO_FILE  = _sb["file_prefix"]
-# Then let config.json branding further override if set
-_CO       = B.get("company_name",    _CO)
-_CO_LEGAL = B.get("company_legal",   _CO_LEGAL)
-_CO_TAG   = B.get("company_tagline", _CO_TAG)
 # Brand contact details shorthand (used throughout UI and PDFs)
 _BRAND    = BRAND_CONFIGS.get(st.session_state.get("selected_brand", "SY Comms"), BRAND_CONFIGS["SY Comms"])
 _CO_EMAIL = _BRAND["email"]
 _CO_PHONE = _BRAND["phone"]
 _CO_WEB   = _BRAND["website"]
 _CO_ABOUT = _BRAND["about"]
-_CO_CAP   = B.get("login_caption",   _CO_CAP)
-_CO_FOOT  = B.get("pdf_footer",      _CO_FOOT)
-_CO_PKG   = B.get("customer_pkg_label", _CO_PKG)
-_CO_FILE  = B.get("proposal_filename_prefix", _CO_FILE)
+# Let config.json further override ONLY for SY Comms (it's SY Comms-specific)
+if st.session_state.get("selected_brand", "SY Comms") == "SY Comms":
+    _CO       = B.get("company_name",                _CO)
+    _CO_LEGAL = B.get("company_legal",               _CO_LEGAL)
+    _CO_TAG   = B.get("company_tagline",             _CO_TAG)
+    _CO_CAP   = B.get("login_caption",               _CO_CAP)
+    _CO_FOOT  = B.get("pdf_footer",                  _CO_FOOT)
+    _CO_PKG   = B.get("customer_pkg_label",          _CO_PKG)
+    _CO_FILE  = B.get("proposal_filename_prefix",    _CO_FILE)
 
 # Keys captured when saving a quote
 QUOTE_KEYS = [
@@ -3297,7 +3298,7 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         from_str = f"{em_cfg['from_name']} <{em_cfg['username']}>"
         msg["From"]    = from_str
         msg["To"]      = to_addr
-        msg["Subject"] = f"Your SY Comms Proposal - {customer or 'Telecoms Quote'}"
+        msg["Subject"] = f"Your {_CO} Proposal - {customer or 'Telecoms Quote'}"
         if cc_addr:
             msg["Cc"] = cc_addr
         if em_cfg.get("reply_to"):
