@@ -3294,6 +3294,8 @@ def compute_hw_sell(uplift_pct=None):
     return round(total, 2)
 
 def compute_install_cost():
+    if override_install_cost > 0:
+        return override_install_cost         # manager override
     if install_type == "Engineer Install":
         return 500.0
     return 0.0
@@ -3315,6 +3317,9 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     if bb_package == "Leased Line / Other":
         bb1_sell  = ll_sell                  # bespoke sell price entered by consultant
         bb1_floor = ll_cost                  # bespoke cost is the floor
+    elif override_bb_sell > 0:
+        bb1_sell  = override_bb_sell         # manager override
+        bb1_floor = bb_cost
     else:
         bb1_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
         bb1_floor = bb_cost                  # wholesale - never sell below this
@@ -3456,6 +3461,8 @@ else:
     if bb_package == "Leased Line / Other":
         _bb_inst = ll_install
     upfront    = hw_sell + compute_install_cost() + _bb_inst + termination_cost
+    if override_upfront > 0:
+        upfront = override_upfront           # manager override
     total_mo   = svc["total_sell"]
     pat        = pat_base
 # ── Consultant desired rental - adjusts lease amount and commission ───────────
