@@ -880,11 +880,13 @@ with st.sidebar:
     _sr_col1, _sr_col2 = st.columns(2)
     with _sr_col1:
         if st.button("✅ Apply", key="btn_apply_rental", use_container_width=True):
-            st.session_state["c_desired_rental"] = _sidebar_rental
+            st.session_state["c_desired_rental"]       = _sidebar_rental
+            st.session_state["c_desired_rental_input"] = _sidebar_rental
             st.rerun()
     with _sr_col2:
         if st.button("✖ Clear", key="btn_clear_rental", use_container_width=True):
-            st.session_state["c_desired_rental"] = 0.0
+            st.session_state["c_desired_rental"]       = 0.0
+            st.session_state["c_desired_rental_input"] = 0.0
             st.rerun()
     _active_rental = st.session_state.get("c_desired_rental", 0.0)
     _prev_units    = st.session_state.get("_prev_commission_units", 0.0)
@@ -4924,10 +4926,13 @@ with tab5:
                 if st.button("✅ Apply Rental", type="primary",
                              use_container_width=True, key="c_apply"):
                     st.session_state["c_desired_rental"] = desired_rental_input
+                    st.session_state["q_sidebar_rental"] = desired_rental_input
                     st.rerun()
             with btn2:
                 if st.button("↩️ Reset to Calculated", use_container_width=True, key="c_reset"):
-                    st.session_state["c_desired_rental"] = 0.0
+                    st.session_state["c_desired_rental"]       = 0.0
+                    st.session_state["q_sidebar_rental"]       = 0.0
+                    st.session_state["c_desired_rental_input"] = 0.0
                     st.rerun()
             est_earnings = commission
 
