@@ -4649,8 +4649,6 @@ with tab6:
 
     if not comp_name:
         st.warning("👈 Add a customer name in the sidebar first.")
-        st.stop()
-
     em_cfg = st.session_state.active_config.get("email", {})
 
     # Capture client IP from Streamlit request headers (best effort)
@@ -4669,19 +4667,19 @@ with tab6:
     # ── Deal summary strip ────────────────────────────────────────────────────
     st.markdown(f"""
     <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);border-radius:12px;
-                padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;
-                justify-content:space-between;align-items:center;color:#fff">
+            padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;
+            justify-content:space-between;align-items:center;color:#fff">
       <div>
-        <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Customer</div>
-        <div style="font-size:1.1rem;font-weight:700">{comp_name}</div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Customer</div>
+    <div style="font-size:1.1rem;font-weight:700">{comp_name}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Monthly Services</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#00b5a3">£{total_mo:.2f} + VAT</div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Monthly Services</div>
+    <div style="font-size:1.4rem;font-weight:800;color:#00b5a3">£{total_mo:.2f} + VAT</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Upfront</div>
-        <div style="font-size:1.1rem;font-weight:700">£{upfront:.2f} + VAT</div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Upfront</div>
+    <div style="font-size:1.1rem;font-weight:700">£{upfront:.2f} + VAT</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
