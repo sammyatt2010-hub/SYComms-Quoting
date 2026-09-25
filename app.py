@@ -3511,6 +3511,20 @@ pure_connectivity = round(svc["bb_sell"] + svc["mobile_sell"], 2)
 sgp          = pat * 0.10
 
 
+
+# ── Admin panel variable defaults (overridden inside tab7 when unlocked) ──────
+# These must be defined before tabs so tab1-tab6 can reference them safely.
+# Values are read from session state where widgets write them.
+override_customer       = st.session_state.get("mgr_cust", "")
+override_initials       = st.session_state.get("mgr_init", "")
+override_monthly_lease  = 0.0
+override_bb_sell        = float(st.session_state.get("adm_bb_override", 0.0))
+override_upfront        = float(st.session_state.get("adm_override_upfront", 0.0))
+override_install_cost   = float(st.session_state.get("adm_override_install", 0.0))
+credits_months          = int(st.session_state.get("adm_credits_months", 0))
+credits_amount          = float(st.session_state.get("adm_credits_amount", 0.0))
+cashback_amount         = float(st.session_state.get("adm_cashback", 0.0))
+
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "🔐 Admin"])
 
 # ── TAB 1: PROPOSAL SUMMARY ──────────────────────────────────────────────────
@@ -4901,13 +4915,13 @@ with tab7:
                 override_customer = st.text_input("Customer Name (for audit)", key="mgr_cust")
                 override_initials = st.text_input("Manager Initials", key="mgr_init")
                 override_monthly_lease = 0.0  # not used in recurring
-                override_bb_sell = st.number_input("Override BB Sell (£/mo) - 0 = auto", min_value=0.0, value=0.0, step=1.0)
+                override_bb_sell = st.number_input("Override BB Sell (£/mo) - 0 = auto", min_value=0.0, value=float(st.session_state.get("adm_bb_override",0.0)), step=1.0, key="adm_bb_override")
             with mgr_col2:
-                override_upfront = st.number_input("Override Upfront Capital (£) - 0 = auto", min_value=0.0, value=0.0, step=10.0)
-                override_install_cost = st.number_input("Override Install Charge (£) - 0 = auto", min_value=0.0, value=0.0, step=50.0)
-                credits_months = st.number_input("Introductory Credit Period (months)", min_value=0, value=0, step=1)
-                credits_amount = st.number_input("Monthly Credit Amount (£)", min_value=0.0, value=0.0, step=5.0)
-                cashback_amount = st.number_input("Cashback / Settlement Fund (£)", min_value=0.0, value=0.0, step=50.0)
+                override_upfront = st.number_input("Override Upfront Capital (£) - 0 = auto", min_value=0.0, value=float(st.session_state.get("adm_override_upfront",0.0)), step=10.0, key="adm_override_upfront")
+                override_install_cost = st.number_input("Override Install Charge (£) - 0 = auto", min_value=0.0, value=float(st.session_state.get("adm_override_install",0.0)), step=50.0, key="adm_override_install")
+                credits_months = st.number_input("Introductory Credit Period (months)", min_value=0, value=int(st.session_state.get("adm_credits_months",0)), step=1, key="adm_credits_months")
+                credits_amount = st.number_input("Monthly Credit Amount (£)", min_value=0.0, value=float(st.session_state.get("adm_credits_amount",0.0)), step=5.0, key="adm_credits_amount")
+                cashback_amount = st.number_input("Cashback / Settlement Fund (£)", min_value=0.0, value=float(st.session_state.get("adm_cashback",0.0)), step=50.0, key="adm_cashback")
 
         # ── TAB 2: Hardware Catalogue ──────────────────────────────────────────
         with panel_tabs[1]:
