@@ -4075,7 +4075,7 @@ with tab4:
             _daily       = abs(saving_mo) / 30.44
             _saving_lbl  = "Daily Investment"
             _saving_disp = f"{chr(163)}{_daily:.2f}"
-            _saving_sub  = f"per day  ({chr(163)}{abs(saving_mo):.2f}/mo increase)"
+            _saving_sub  = "per day"
         _arrow = "-" if saving_mo >= 0 else "+"
 
         _tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">'
@@ -5521,12 +5521,7 @@ if pat < 250:
 elif pat < 500:
     pat_warn = "⚠️ Low PAT - consider manager review"
 
-st.markdown("---")
-
-st.markdown("### 💰 Internal Deal Financials")
-if not st.session_state.admin_unlocked:
-    st.info("🔒 Unlock the Admin Panel above to view deal financials.")
-else:
+if st.session_state.admin_unlocked:
     # Row 1 - 4 original cards
     fi1, fi2, fi3, fi4 = st.columns(4)
     with fi1:
