@@ -3203,6 +3203,160 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         return False, f"❌ Email failed: {e}"
 
 
+def compute_pricebook_pl():
+    """P&L using exact pricebook formula (verified against P & L Calcs sheet).
+    hw_rrp=hw_buy×1.5 | maintenance=0.2×hw_rrp | hw_srrp=hw_sell×1.5
+    sub_total=cos_ex+hw_srrp | rental=(sales_rate/1000)×sub_total
+    disc_turnover=(rental/true_rate)×1000 | gp=disc_turnover-cos_full
+    commission=(gp/4000)×1000
+    """
+    # LEASE_RATES is {months: sales_rate}, TRUE_LEASE_RATES is {months: true_rate}
+    _fallback_lr = {36: (39.45, 31.56), 60: (26.26, 21.01), 84: (20.58, 16.46), 24: (46.94, 37.5)}
+    sales_rate = LEASE_RATES.get(lease_term, _fallback_lr.get(lease_term, (20.58, 16.46))[0])
+    true_rate  = TRUE_LEASE_RATES.get(lease_term, _fallback_lr.get(lease_term, (20.58, 16.46))[1])
+    _hw_buy    = compute_hw_buy()
+    _hw_sell   = compute_hw_sell()
+    hw_rrp     = _hw_buy  * 1.5
+    hw_srrp    = _hw_sell * 1.5
+    maintenance_annual = 0.2 * hw_rrp
+    cos_ex     = maintenance_annual + 200.0 + compute_install_cost() + termination_cost + 400.0
+    sub_total  = cos_ex + hw_srrp
+    rental     = (sales_rate / 1000.0) * sub_total
+    disc_turn  = (rental / true_rate) * 1000.0
+    cos_full   = cos_ex + _hw_buy
+    gp         = disc_turn - cos_full
+    units      = gp / 4000.0
+    return {
+        "gross_profit": round(gp, 2), "comm_units": round(units, 3),
+        "commission": round(units * 1000, 2), "rental": round(rental, 2),
+        "disc_turnover": round(disc_turn, 2), "sub_total": round(sub_total, 2),
+        "hw_srrp": round(hw_srrp, 2), "maintenance_annual": round(maintenance_annual, 2),
+        "cos_full": round(cos_full, 2), "sales_rate": sales_rate, "true_rate": true_rate,
+    }
+
+def compute_pat(svc):
+    """Legacy - returns gross_profit from pricebook P&L formula as PAT proxy."""
+    return compute_pricebook_pl()["gross_profit"]
+
+# ── Compute everything ────────────────────────────────────────────────────────
+poe_needed = compute_poe_needed()
+rec_switch = get_recommended_switch(poe_needed)
+hw_buy     = compute_hw_buy()
+hw_sell    = compute_hw_sell()
+svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
+
+# BB free year: compute Year 1 total (£0 BB) for customer display
+bb_free_year   = st.session_state.get("q_bb_free_year", False)
+_bb_full_sell  = svc["bb_sell"]                                   # standard BB sell price
+_bb_yr1_sell   = 0.0 if bb_free_year else _bb_full_sell          # £0 in year 1 if promo
+_bb_yr1_saving = _bb_full_sell if bb_free_year else 0.0          # saving in yr1
+
+# Add Call Scope services + Security to total monthly
+_cs_svc_sell  = sum(r["sell"] * r["qty"] for r in cs_svc_rows)
+_cs_svc_cost  = sum(r["buy"]  * r["qty"] for r in cs_svc_rows)
+_sec_svc_sell = sum(r["sell"] * r["qty"] for r in sec_rows)
+_sec_svc_cost = sum(r["buy"]  * r["qty"] for r in sec_rows)
+svc["cs_sell"]  = _cs_svc_sell
+svc["sec_sell"] = _sec_svc_sell
+svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell
+
+# ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
+# Applies to hosted user licences, software add-ons and broadband (broadband is capped
+# at wholesale cost). Mobiles are not discountable. Commission is reduced by the same %.
+svc_disc_pct  = max(0.0, min(40.0, float(st.session_state.get("c_svc_disc", 0))))
+_svc_mult     = 1.0 - svc_disc_pct / 100.0
+lic_list_total = float(svc["lic_monthly"])          # undiscounted, for consultant display
+bb1_list       = float(svc["bb1_sell"])
+bb2_list       = float(svc["bb2_sell"])
+sw_list_total  = float(sw_sell_total)               # undiscounted, for consultant display
+if svc_disc_pct > 0:
+    SW_ADDONS = [(n, q, c, round(sell * _svc_mult, 2)) for n, q, c, sell in SW_ADDONS]
+    sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
+    svc["sw_sell"]     = sw_sell_total
+    svc["lic_monthly"] = round(lic_list_total * _svc_mult, 2)
+    # Broadband: discounted, but NEVER below wholesale cost (per line)
+    if bb1_list > 0:
+        svc["bb1_sell"] = round(max(bb1_list * _svc_mult, svc["bb1_floor"]), 2)
+    if bb2_list > 0:
+        svc["bb2_sell"] = round(max(bb2_list * _svc_mult, svc["bb2_floor"]), 2)
+    svc["bb_sell"]     = svc["bb1_sell"] + svc["bb2_sell"]
+    svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
+                          svc.get("mobile_sell", 0.0) + sw_sell_total +
+                          _cs_svc_sell + _sec_svc_sell)
+pat_base   = compute_pat(svc)
+pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
+
+is_spread  = ("Lease" in payment_model)
+
+if is_spread:
+    # Use pricebook lease rental formula
+    hw_monthly_spread = pl_data["rental"]
+    total_mo   = svc["total_sell"] + hw_monthly_spread
+    upfront    = 0.0
+    pat        = pat_base
+else:
+    # Upfront: compute hw_sell at upfront uplift % (default 20%, not lease uplift)
+    hw_sell    = compute_hw_sell(uplift_pct=hw_uplift_upfront_override)
+    hw_monthly_spread = 0.0
+    _bb_inst   = BROADBAND[bb_provider][bb_package]["install"]
+    if bb_package == "Leased Line / Other":
+        _bb_inst = ll_install
+    upfront    = hw_sell + compute_install_cost() + _bb_inst + termination_cost
+    total_mo   = svc["total_sell"]
+    pat        = pat_base
+# ── Consultant desired rental - adjusts lease amount and commission ───────────
+deal_type = "Hardware Lease (spread over term)" if is_spread else f"Upfront Purchase (cost + {hw_uplift_upfront_override:.0f}% uplift)"
+base_rental   = pl_data["rental"]      # the calculated lease rental (floor/reference)
+st.session_state["_prev_base_rental"] = round(base_rental, 2)
+true_rate     = pl_data["true_rate"]
+
+# Read consultant's desired rental from session state (default = calculated rental)
+_desired_rental = st.session_state.get("c_desired_rental", 0.0)
+if _desired_rental <= 0:
+    _desired_rental = base_rental      # default to calculated if not set
+
+# Recalculate GP and commission from desired rental
+# Formula: disc_turnover = (desired_rental / true_rate) × 1000
+# GP = disc_turnover - cos_full
+_desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
+_adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
+commission_units       = _adjusted_gp / 4000
+commission             = round(commission_units * commission_per_unit, 2)
+st.session_state["_prev_commission_units"] = round(commission_units, 2)
+st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
+st.session_state["_prev_cos_full"]         = pl_data["cos_full"]
+# Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
+commission_full        = commission
+if svc_disc_pct > 0 and commission > 0:
+    commission_units   = commission_units * _svc_mult
+    commission         = round(commission * _svc_mult, 2)
+commission_lost        = round(commission_full - commission, 2)
+
+# Rental adjustment (vs calculated) - can be positive (premium) or negative (discount)
+rental_adjustment = _desired_rental - base_rental
+
+# In lease mode, use desired_rental as the actual hw_monthly_spread
+if is_spread:
+    hw_monthly_spread = _desired_rental
+    total_mo          = svc["total_sell"] + hw_monthly_spread
+
+base_total_mo = total_mo
+rate_uplift   = rental_adjustment  # for display purposes
+adjusted_pat  = _adjusted_gp
+
+# Aliases for PDF / legacy references
+kit_cost    = hw_buy
+lease_mo    = hw_monthly_spread  # used in PDF as "Hardware Monthly" when spread
+rec_upfront = upfront
+
+# Pure connectivity cost - broadband + mobile only (for Commercial Summary card)
+pure_connectivity = round(svc["bb_sell"] + svc["mobile_sell"], 2)
+
+# SGP / sales comms
+# SGP / sales comms
+sgp          = pat * 0.10
+
+
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "🔐 Admin"])
 
 # ── TAB 1: PROPOSAL SUMMARY ──────────────────────────────────────────────────
@@ -5256,159 +5410,6 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
         "sw_cost":        sw_cost,
         "total_sell":     total_sell,
     }
-
-def compute_pricebook_pl():
-    """P&L using exact pricebook formula (verified against P & L Calcs sheet).
-    hw_rrp=hw_buy×1.5 | maintenance=0.2×hw_rrp | hw_srrp=hw_sell×1.5
-    sub_total=cos_ex+hw_srrp | rental=(sales_rate/1000)×sub_total
-    disc_turnover=(rental/true_rate)×1000 | gp=disc_turnover-cos_full
-    commission=(gp/4000)×1000
-    """
-    # LEASE_RATES is {months: sales_rate}, TRUE_LEASE_RATES is {months: true_rate}
-    _fallback_lr = {36: (39.45, 31.56), 60: (26.26, 21.01), 84: (20.58, 16.46), 24: (46.94, 37.5)}
-    sales_rate = LEASE_RATES.get(lease_term, _fallback_lr.get(lease_term, (20.58, 16.46))[0])
-    true_rate  = TRUE_LEASE_RATES.get(lease_term, _fallback_lr.get(lease_term, (20.58, 16.46))[1])
-    _hw_buy    = compute_hw_buy()
-    _hw_sell   = compute_hw_sell()
-    hw_rrp     = _hw_buy  * 1.5
-    hw_srrp    = _hw_sell * 1.5
-    maintenance_annual = 0.2 * hw_rrp
-    cos_ex     = maintenance_annual + 200.0 + compute_install_cost() + termination_cost + 400.0
-    sub_total  = cos_ex + hw_srrp
-    rental     = (sales_rate / 1000.0) * sub_total
-    disc_turn  = (rental / true_rate) * 1000.0
-    cos_full   = cos_ex + _hw_buy
-    gp         = disc_turn - cos_full
-    units      = gp / 4000.0
-    return {
-        "gross_profit": round(gp, 2), "comm_units": round(units, 3),
-        "commission": round(units * 1000, 2), "rental": round(rental, 2),
-        "disc_turnover": round(disc_turn, 2), "sub_total": round(sub_total, 2),
-        "hw_srrp": round(hw_srrp, 2), "maintenance_annual": round(maintenance_annual, 2),
-        "cos_full": round(cos_full, 2), "sales_rate": sales_rate, "true_rate": true_rate,
-    }
-
-def compute_pat(svc):
-    """Legacy - returns gross_profit from pricebook P&L formula as PAT proxy."""
-    return compute_pricebook_pl()["gross_profit"]
-
-# ── Compute everything ────────────────────────────────────────────────────────
-poe_needed = compute_poe_needed()
-rec_switch = get_recommended_switch(poe_needed)
-hw_buy     = compute_hw_buy()
-hw_sell    = compute_hw_sell()
-svc        = compute_service_charges(sw_sell=sw_sell_total, sw_cost=sw_cost_total)
-
-# BB free year: compute Year 1 total (£0 BB) for customer display
-bb_free_year   = st.session_state.get("q_bb_free_year", False)
-_bb_full_sell  = svc["bb_sell"]                                   # standard BB sell price
-_bb_yr1_sell   = 0.0 if bb_free_year else _bb_full_sell          # £0 in year 1 if promo
-_bb_yr1_saving = _bb_full_sell if bb_free_year else 0.0          # saving in yr1
-
-# Add Call Scope services + Security to total monthly
-_cs_svc_sell  = sum(r["sell"] * r["qty"] for r in cs_svc_rows)
-_cs_svc_cost  = sum(r["buy"]  * r["qty"] for r in cs_svc_rows)
-_sec_svc_sell = sum(r["sell"] * r["qty"] for r in sec_rows)
-_sec_svc_cost = sum(r["buy"]  * r["qty"] for r in sec_rows)
-svc["cs_sell"]  = _cs_svc_sell
-svc["sec_sell"] = _sec_svc_sell
-svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell
-
-# ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
-# Applies to hosted user licences, software add-ons and broadband (broadband is capped
-# at wholesale cost). Mobiles are not discountable. Commission is reduced by the same %.
-svc_disc_pct  = max(0.0, min(40.0, float(st.session_state.get("c_svc_disc", 0))))
-_svc_mult     = 1.0 - svc_disc_pct / 100.0
-lic_list_total = float(svc["lic_monthly"])          # undiscounted, for consultant display
-bb1_list       = float(svc["bb1_sell"])
-bb2_list       = float(svc["bb2_sell"])
-sw_list_total  = float(sw_sell_total)               # undiscounted, for consultant display
-if svc_disc_pct > 0:
-    SW_ADDONS = [(n, q, c, round(sell * _svc_mult, 2)) for n, q, c, sell in SW_ADDONS]
-    sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
-    svc["sw_sell"]     = sw_sell_total
-    svc["lic_monthly"] = round(lic_list_total * _svc_mult, 2)
-    # Broadband: discounted, but NEVER below wholesale cost (per line)
-    if bb1_list > 0:
-        svc["bb1_sell"] = round(max(bb1_list * _svc_mult, svc["bb1_floor"]), 2)
-    if bb2_list > 0:
-        svc["bb2_sell"] = round(max(bb2_list * _svc_mult, svc["bb2_floor"]), 2)
-    svc["bb_sell"]     = svc["bb1_sell"] + svc["bb2_sell"]
-    svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
-                          svc.get("mobile_sell", 0.0) + sw_sell_total +
-                          _cs_svc_sell + _sec_svc_sell)
-pat_base   = compute_pat(svc)
-pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
-
-is_spread  = ("Lease" in payment_model)
-
-if is_spread:
-    # Use pricebook lease rental formula
-    hw_monthly_spread = pl_data["rental"]
-    total_mo   = svc["total_sell"] + hw_monthly_spread
-    upfront    = 0.0
-    pat        = pat_base
-else:
-    # Upfront: compute hw_sell at upfront uplift % (default 20%, not lease uplift)
-    hw_sell    = compute_hw_sell(uplift_pct=hw_uplift_upfront_override)
-    hw_monthly_spread = 0.0
-    _bb_inst   = BROADBAND[bb_provider][bb_package]["install"]
-    if bb_package == "Leased Line / Other":
-        _bb_inst = ll_install
-    upfront    = hw_sell + compute_install_cost() + _bb_inst + termination_cost
-    total_mo   = svc["total_sell"]
-    pat        = pat_base
-# ── Consultant desired rental - adjusts lease amount and commission ───────────
-deal_type = "Hardware Lease (spread over term)" if is_spread else f"Upfront Purchase (cost + {hw_uplift_upfront_override:.0f}% uplift)"
-base_rental   = pl_data["rental"]      # the calculated lease rental (floor/reference)
-st.session_state["_prev_base_rental"] = round(base_rental, 2)
-true_rate     = pl_data["true_rate"]
-
-# Read consultant's desired rental from session state (default = calculated rental)
-_desired_rental = st.session_state.get("c_desired_rental", 0.0)
-if _desired_rental <= 0:
-    _desired_rental = base_rental      # default to calculated if not set
-
-# Recalculate GP and commission from desired rental
-# Formula: disc_turnover = (desired_rental / true_rate) × 1000
-# GP = disc_turnover - cos_full
-_desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
-_adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
-commission_units       = _adjusted_gp / 4000
-commission             = round(commission_units * commission_per_unit, 2)
-st.session_state["_prev_commission_units"] = round(commission_units, 2)
-st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
-st.session_state["_prev_cos_full"]         = pl_data["cos_full"]
-# Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
-commission_full        = commission
-if svc_disc_pct > 0 and commission > 0:
-    commission_units   = commission_units * _svc_mult
-    commission         = round(commission * _svc_mult, 2)
-commission_lost        = round(commission_full - commission, 2)
-
-# Rental adjustment (vs calculated) - can be positive (premium) or negative (discount)
-rental_adjustment = _desired_rental - base_rental
-
-# In lease mode, use desired_rental as the actual hw_monthly_spread
-if is_spread:
-    hw_monthly_spread = _desired_rental
-    total_mo          = svc["total_sell"] + hw_monthly_spread
-
-base_total_mo = total_mo
-rate_uplift   = rental_adjustment  # for display purposes
-adjusted_pat  = _adjusted_gp
-
-# Aliases for PDF / legacy references
-kit_cost    = hw_buy
-lease_mo    = hw_monthly_spread  # used in PDF as "Hardware Monthly" when spread
-rec_upfront = upfront
-
-# Pure connectivity cost - broadband + mobile only (for Commercial Summary card)
-pure_connectivity = round(svc["bb_sell"] + svc["mobile_sell"], 2)
-
-# SGP / sales comms
-# SGP / sales comms
-sgp          = pat * 0.10
 
 # ─── KPI METRICS ROW ─────────────────────────────────────────────────────────
 
