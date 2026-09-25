@@ -2777,8 +2777,12 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica","",8)
     _cs_names = {r["name"] for r in cs_svc_rows}  # exclude CS software from warranty
     for _name, _qty, _billing in all_equip_pdf:
-        _is_cs = _name in _cs_names or "Call Scope" in _name
-        if _qty > 0 and not _is_cs:
+        _is_cs       = _name in _cs_names or "Call Scope" in _name
+        _is_svc_line = (_name.startswith("Broadband -") or
+                        _name.startswith("User / Voice Licences") or
+                        "Mobile" in _name or
+                        _name.startswith("IT:"))
+        if _qty > 0 and not _is_cs and not _is_svc_line:
             pdf.set_fill_color(248,249,255)
             pdf.cell(95,5,f"  {s(_name)}",fill=True,ln=False)
             pdf.cell(45,5,str(_qty),fill=True,ln=False,align="C")
