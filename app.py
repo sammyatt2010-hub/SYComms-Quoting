@@ -5526,53 +5526,6 @@ with tab6:
 
         st.divider()
 
-        # ── Email signed PDF ─────────────────────────────────────────────────
-        st.markdown("**Email to Customer**")
-        to_email = st.text_input("Send to (customer)",
-                                  value=director_email or billing_email or "",
-                                  key="send_to")
-        cc_email = st.text_input("CC (your address)",
-                                  value=em_cfg.get("reply_to","") or em_cfg.get("username",""),
-                                  key="send_cc")
-        ready = bool(sig_bytes and sig_name and to_email)
-        if st.button("📨 Email Signed PDF", use_container_width=True,
-                     type="secondary", disabled=not ready, key="send_email_btn"):
-            if not sig_name:
-                st.warning("Please type the customer name.")
-            elif not to_email:
-                st.warning("Enter a recipient email address.")
-            else:
-                # Build signed PDF and send via SMTP
-                from datetime import datetime as _dtnow3
-                _ts3 = _dtnow3.now().strftime("%d/%m/%Y  %H:%M")
-                _email_pdf = st.session_state.get("_signed_pdf_bytes") or build_pdf(
-                    sig_bytes=sig_bytes, sig_name=sig_name,
-                    sig_company=comp_name or "", sig_timestamp=_ts3, sig_ip=_client_ip,
-                    curr_total=current_total, curr_bb=current_bb,
-                    curr_system=current_system, curr_calls=current_calls,
-                    curr_mobile=current_mobile,
-                )
-                _fn = f"SYComms_{safe}_SIGNED_{date.today()}.pdf"
-                try:
-                    import smtplib, email.mime.multipart as _mp, email.mime.base as _mb
-                    import email.mime.text as _mt
-                    from email.encoders import encode_base64 as _eb
-                    _msg = _mp.MIMEMultipart()
-                    _msg["Subject"] = f"Your Signed Proposal - {comp_name}"
-                    _msg["From"]    = em_cfg.get("username","")
-                    _msg["To"]      = to_email
-                    if cc_email: _msg["Cc"] = cc_email
-                    _msg.attach(_mt.MIMEText(f"Please find your signed proposal attached.\n\nThank you,\nSY Comms Ltd", "plain"))
-                    _att = _mb.MIMEBase("application","pdf"); _att.set_payload(_email_pdf)
-                    _eb(_att); _att.add_header("Content-Disposition","attachment",filename=_fn)
-                    _msg.attach(_att)
-                    with smtplib.SMTP_SSL(em_cfg.get("smtp_host","smtp.gmail.com"), int(em_cfg.get("smtp_port",465))) as _srv:
-                        _srv.login(em_cfg.get("username",""), em_cfg.get("password",""))
-                        _recipients = [to_email] + ([cc_email] if cc_email else [])
-                        _srv.sendmail(em_cfg.get("username",""), _recipients, _msg.as_string())
-                    st.success(f"Signed PDF emailed to {to_email}")
-                except Exception as _e:
-                    st.error(f"Email failed: {_e}")
 
     st.divider()
     st.markdown("### ✍️ Send via Zoho Sign")
