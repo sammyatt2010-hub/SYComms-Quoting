@@ -3203,6 +3203,160 @@ def send_proposal_email(em_cfg, to_addr, cc_addr, pdf_bytes, filename, customer,
         return False, f"❌ Email failed: {e}"
 
 
+# ─── CALCULATIONS ENGINE (Recurring model - hardware upfront, services monthly) ─
+
+def compute_poe_needed():
+    poe = 0
+    for name, qty in desktop_quantities.items():
+        if HANDSETS_DESKTOP[name]["poe"]:
+            poe += qty
+    poe += additional_wired_ports
+    return poe
+
+def get_recommended_switch(poe_needed):
+    if not auto_switch and manual_switch_name:
+        return next((s for s in SWITCHES if s["name"] == manual_switch_name), SWITCHES[0])
+    # Each desk phone needs 1 POE port (for phone) + 1 standard port (for PC)
+    # Total ports needed = poe_needed (phones) + poe_needed (PCs)
+    total_ports_needed = poe_needed * 2
+    for sw in SWITCHES:
+        if sw["poe_ports"] >= poe_needed and sw.get("total_ports", sw["poe_ports"]) >= total_ports_needed:
+            return sw
+    return SWITCHES[-1]
+
+def compute_hw_buy():
+    """Sum of all hardware at wholesale buy price."""
+    total = 0.0
+    for name, qty in desktop_quantities.items():
+        total += HANDSETS_DESKTOP[name]["buy"] * qty
+    for name, qty in cordless_quantities.items():
+        total += HANDSETS_CORDLESS[name]["buy"] * qty
+    for name, qty in headset_quantities.items():
+        total += HEADSETS[name]["buy"] * qty
+    for name, qty in other_quantities.items():
+        _oh_info = OTHER_HARDWARE.get(name)
+        if _oh_info: total += _oh_info["buy"] * qty
+    if not _no_switch:
+        if switch_quantities:  # manual multi-switch
+            for _sn, _sq in switch_quantities.items():
+                _si = next((s for s in SWITCHES if s["name"] == _sn), None)
+                if _si: total += _si["buy"] * _sq
+        else:  # auto-select
+            poe_n = compute_poe_needed()
+            total += get_recommended_switch(poe_n)["buy"]
+    if add_router:
+        if router_quantities:
+            for _rn, _rq in router_quantities.items():
+                if _rn in ROUTERS: total += ROUTERS[_rn] * _rq
+        elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
+            total += ROUTERS[router_type]
+    return total
+
+def compute_hw_sell(uplift_pct=None):
+    """Compute total hardware sell value.
+    Falls back to buy x (1 + uplift/100) for items without a sell price."""
+    if uplift_pct is None:
+        uplift_pct = hw_uplift_override
+    total = 0.0
+    for name, qty in desktop_quantities.items():
+        info = HANDSETS_DESKTOP[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    for name, qty in cordless_quantities.items():
+        info = HANDSETS_CORDLESS[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    for name, qty in headset_quantities.items():
+        info = HEADSETS[name]
+        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
+        total += sell * qty
+    for name, qty in other_quantities.items():
+        _oh_info2 = OTHER_HARDWARE.get(name)
+        if _oh_info2:
+            sell = _oh_info2.get("sell", _oh_info2["buy"] * (1 + hw_uplift_override / 100))
+            total += sell * qty
+    # Switch and router use uplift (no item-specific sell price stored)
+    if not _no_switch:
+        if switch_quantities:
+            for _sn, _sq in switch_quantities.items():
+                _si = next((s for s in SWITCHES if s["name"] == _sn), None)
+                if _si: total += _si["buy"] * (1 + hw_uplift_override / 100) * _sq
+        else:
+            sw = get_recommended_switch(compute_poe_needed())
+            total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
+    if add_router:
+        if router_quantities:
+            for _rn, _rq in router_quantities.items():
+                if _rn in ROUTERS: total += ROUTERS[_rn] * (1 + hw_uplift_override / 100) * _rq
+        elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
+            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
+            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
+    return round(total, 2)
+
+def compute_install_cost():
+    if install_type == "Engineer Install":
+        return 500.0
+    return 0.0
+
+def compute_upfront():
+    """Upfront = hw_sell + installation + BB install charge."""
+    bb_inst = BROADBAND[bb_provider][bb_package]["install"]
+    # Override with bespoke pricing for Leased Line / Other
+    if bb_package == "Leased Line / Other":
+        bb_inst = ll_install
+    return compute_hw_sell() + compute_install_cost() + bb_inst
+
+def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
+    """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
+    uplift   = service_uplift_pct / 100.0
+    bb_cost  = BROADBAND[bb_provider][bb_package]["cost"]
+    if bb_package == "Leased Line / Other":
+        bb_cost = ll_cost
+    if bb_package == "Leased Line / Other":
+        bb1_sell  = ll_sell                  # bespoke sell price entered by consultant
+        bb1_floor = ll_cost                  # bespoke cost is the floor
+    else:
+        bb1_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
+        bb1_floor = bb_cost                  # wholesale - never sell below this
+    if bb_care == "Business (+£8/mo)":
+        bb1_sell  += 8.0
+        bb1_floor += 8.0                     # care charge passed through, not discountable
+    bb2_sell = bb2_floor = 0.0
+    if second_fttp and second_fttp_pkg:
+        bb_cost2  = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
+        bb2_sell  = bb_cost2 * (1.0 + uplift)
+        bb2_floor = bb_cost2
+    bb_sell = bb1_sell + bb2_sell
+
+    # Voice channels - fixed sell price from pricebook (Professional Bundle)
+    vc_sell_per_seat = C.get("vc_sell_per_seat", 12.00)
+    vc_cost_per_seat = C.get("vc_cost_per_seat", 2.95)
+    lic_monthly      = total_voice_channels * vc_sell_per_seat
+
+    # Wallboard - computed here to avoid global scope issues
+    wallboard_mo_val = wallboard_users * C.get("wallboard_sell", 99.00)
+
+    mobile_sell      = sum(r["sell"] * r["qty"] for r in mobile_rows)
+    mobile_cost      = sum(r["cost"] * r["qty"] for r in mobile_rows)
+    total_sell       = bb_sell + lic_monthly + wallboard_mo_val + mobile_sell + sw_sell
+
+    return {
+        "bb_cost":        bb_cost,
+        "bb_sell":        bb_sell,
+        "bb1_sell":       bb1_sell,
+        "bb2_sell":       bb2_sell,
+        "bb1_floor":      bb1_floor,
+        "bb2_floor":      bb2_floor,
+        "lic_monthly":    lic_monthly,
+        "wallboard_mo":   wallboard_mo_val,
+        "mobile_sell":    mobile_sell,
+        "mobile_cost":    mobile_cost,
+        "sw_sell":        sw_sell,
+        "sw_cost":        sw_cost,
+        "total_sell":     total_sell,
+    }
+
+
 def compute_pricebook_pl():
     """P&L using exact pricebook formula (verified against P & L Calcs sheet).
     hw_rrp=hw_buy×1.5 | maintenance=0.2×hw_rrp | hw_srrp=hw_sell×1.5
@@ -5257,159 +5411,6 @@ with tab7:
             use_container_width=True,
             key="dl_config"
         )
-
-# ─── CALCULATIONS ENGINE (Recurring model - hardware upfront, services monthly) ─
-
-def compute_poe_needed():
-    poe = 0
-    for name, qty in desktop_quantities.items():
-        if HANDSETS_DESKTOP[name]["poe"]:
-            poe += qty
-    poe += additional_wired_ports
-    return poe
-
-def get_recommended_switch(poe_needed):
-    if not auto_switch and manual_switch_name:
-        return next((s for s in SWITCHES if s["name"] == manual_switch_name), SWITCHES[0])
-    # Each desk phone needs 1 POE port (for phone) + 1 standard port (for PC)
-    # Total ports needed = poe_needed (phones) + poe_needed (PCs)
-    total_ports_needed = poe_needed * 2
-    for sw in SWITCHES:
-        if sw["poe_ports"] >= poe_needed and sw.get("total_ports", sw["poe_ports"]) >= total_ports_needed:
-            return sw
-    return SWITCHES[-1]
-
-def compute_hw_buy():
-    """Sum of all hardware at wholesale buy price."""
-    total = 0.0
-    for name, qty in desktop_quantities.items():
-        total += HANDSETS_DESKTOP[name]["buy"] * qty
-    for name, qty in cordless_quantities.items():
-        total += HANDSETS_CORDLESS[name]["buy"] * qty
-    for name, qty in headset_quantities.items():
-        total += HEADSETS[name]["buy"] * qty
-    for name, qty in other_quantities.items():
-        _oh_info = OTHER_HARDWARE.get(name)
-        if _oh_info: total += _oh_info["buy"] * qty
-    if not _no_switch:
-        if switch_quantities:  # manual multi-switch
-            for _sn, _sq in switch_quantities.items():
-                _si = next((s for s in SWITCHES if s["name"] == _sn), None)
-                if _si: total += _si["buy"] * _sq
-        else:  # auto-select
-            poe_n = compute_poe_needed()
-            total += get_recommended_switch(poe_n)["buy"]
-    if add_router:
-        if router_quantities:
-            for _rn, _rq in router_quantities.items():
-                if _rn in ROUTERS: total += ROUTERS[_rn] * _rq
-        elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
-            total += ROUTERS[router_type]
-    return total
-
-def compute_hw_sell(uplift_pct=None):
-    """Compute total hardware sell value.
-    Falls back to buy x (1 + uplift/100) for items without a sell price."""
-    if uplift_pct is None:
-        uplift_pct = hw_uplift_override
-    total = 0.0
-    for name, qty in desktop_quantities.items():
-        info = HANDSETS_DESKTOP[name]
-        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
-        total += sell * qty
-    for name, qty in cordless_quantities.items():
-        info = HANDSETS_CORDLESS[name]
-        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
-        total += sell * qty
-    for name, qty in headset_quantities.items():
-        info = HEADSETS[name]
-        sell = info.get("sell", info["buy"] * (1 + hw_uplift_override / 100))
-        total += sell * qty
-    for name, qty in other_quantities.items():
-        _oh_info2 = OTHER_HARDWARE.get(name)
-        if _oh_info2:
-            sell = _oh_info2.get("sell", _oh_info2["buy"] * (1 + hw_uplift_override / 100))
-            total += sell * qty
-    # Switch and router use uplift (no item-specific sell price stored)
-    if not _no_switch:
-        if switch_quantities:
-            for _sn, _sq in switch_quantities.items():
-                _si = next((s for s in SWITCHES if s["name"] == _sn), None)
-                if _si: total += _si["buy"] * (1 + hw_uplift_override / 100) * _sq
-        else:
-            sw = get_recommended_switch(compute_poe_needed())
-            total += sw.get("sell", sw["buy"] * (1 + hw_uplift_override / 100))
-    if add_router:
-        if router_quantities:
-            for _rn, _rq in router_quantities.items():
-                if _rn in ROUTERS: total += ROUTERS[_rn] * (1 + hw_uplift_override / 100) * _rq
-        elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
-            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
-            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
-    return round(total, 2)
-
-def compute_install_cost():
-    if install_type == "Engineer Install":
-        return 500.0
-    return 0.0
-
-def compute_upfront():
-    """Upfront = hw_sell + installation + BB install charge."""
-    bb_inst = BROADBAND[bb_provider][bb_package]["install"]
-    # Override with bespoke pricing for Leased Line / Other
-    if bb_package == "Leased Line / Other":
-        bb_inst = ll_install
-    return compute_hw_sell() + compute_install_cost() + bb_inst
-
-def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
-    """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
-    uplift   = service_uplift_pct / 100.0
-    bb_cost  = BROADBAND[bb_provider][bb_package]["cost"]
-    if bb_package == "Leased Line / Other":
-        bb_cost = ll_cost
-    if bb_package == "Leased Line / Other":
-        bb1_sell  = ll_sell                  # bespoke sell price entered by consultant
-        bb1_floor = ll_cost                  # bespoke cost is the floor
-    else:
-        bb1_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
-        bb1_floor = bb_cost                  # wholesale - never sell below this
-    if bb_care == "Business (+£8/mo)":
-        bb1_sell  += 8.0
-        bb1_floor += 8.0                     # care charge passed through, not discountable
-    bb2_sell = bb2_floor = 0.0
-    if second_fttp and second_fttp_pkg:
-        bb_cost2  = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
-        bb2_sell  = bb_cost2 * (1.0 + uplift)
-        bb2_floor = bb_cost2
-    bb_sell = bb1_sell + bb2_sell
-
-    # Voice channels - fixed sell price from pricebook (Professional Bundle)
-    vc_sell_per_seat = C.get("vc_sell_per_seat", 12.00)
-    vc_cost_per_seat = C.get("vc_cost_per_seat", 2.95)
-    lic_monthly      = total_voice_channels * vc_sell_per_seat
-
-    # Wallboard - computed here to avoid global scope issues
-    wallboard_mo_val = wallboard_users * C.get("wallboard_sell", 99.00)
-
-    mobile_sell      = sum(r["sell"] * r["qty"] for r in mobile_rows)
-    mobile_cost      = sum(r["cost"] * r["qty"] for r in mobile_rows)
-    total_sell       = bb_sell + lic_monthly + wallboard_mo_val + mobile_sell + sw_sell
-
-    return {
-        "bb_cost":        bb_cost,
-        "bb_sell":        bb_sell,
-        "bb1_sell":       bb1_sell,
-        "bb2_sell":       bb2_sell,
-        "bb1_floor":      bb1_floor,
-        "bb2_floor":      bb2_floor,
-        "lic_monthly":    lic_monthly,
-        "wallboard_mo":   wallboard_mo_val,
-        "mobile_sell":    mobile_sell,
-        "mobile_cost":    mobile_cost,
-        "sw_sell":        sw_sell,
-        "sw_cost":        sw_cost,
-        "total_sell":     total_sell,
-    }
 
 # ─── KPI METRICS ROW ─────────────────────────────────────────────────────────
 
