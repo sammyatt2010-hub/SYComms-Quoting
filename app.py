@@ -197,7 +197,7 @@ def _default_config():
             {"provider": "SY Comms", "package": "FTTP 1000/115 Unlimited","cost": 38.61, "sell": 55.00, "install": 100.00},
             {"provider": "SY Comms", "package": "SOGEA 40/10 Unlimited",  "cost": 27.49, "sell": 30.00, "install": 122.50},
             {"provider": "SY Comms", "package": "SOGEA 80/20 Unlimited",  "cost": 28.12, "sell": 32.00, "install": 122.50},
-            {"provider": "SY Comms", "package": "Leased Line / Ethernet", "cost": 200.00,"sell": 350.00,"install": 0.00},
+            {"provider": "SY Comms", "package": "Leased Line / Other",    "cost": 0.00,   "sell": 0.00,  "install": 0.00},
         ],
         "constants": {
             "vc_cost_per_seat":    2.95,   # Professional Bundle buy cost per user/mo
@@ -294,7 +294,7 @@ QUOTE_KEYS = [
     "q_comp_name","q_comp_reg","q_biz_type","q_contact","q_phone",
     "q_dir_email","q_bill_email","q_address","q_employees",
     "q_deal_type","q_lease_term","q_install_type","q_num_sites",
-    "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp",
+    "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp","q_ll_cost","q_ll_sell","q_ll_install",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
     "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
@@ -831,6 +831,22 @@ with st.sidebar:
                                    help="Shows £0/mo on customer docs then full price from month 13")
     else:
         bb_free_year = False
+    # Bespoke price for Leased Line / Other
+    if bb_package == "Leased Line / Other":
+        _ll_col1, _ll_col2 = st.columns(2)
+        with _ll_col1:
+            ll_cost = st.number_input("Leased Line Cost (£/mo)", min_value=0.0, step=1.0,
+                                      value=float(st.session_state.get("q_ll_cost", 0.0)),
+                                      key="q_ll_cost", format="%.2f")
+        with _ll_col2:
+            ll_sell = st.number_input("Leased Line Sell (£/mo)", min_value=0.0, step=1.0,
+                                      value=float(st.session_state.get("q_ll_sell", 0.0)),
+                                      key="q_ll_sell", format="%.2f")
+        ll_install = st.number_input("Install / Setup (£ one-off)", min_value=0.0, step=10.0,
+                                     value=float(st.session_state.get("q_ll_install", 0.0)),
+                                     key="q_ll_install", format="%.2f")
+    else:
+        ll_cost = ll_sell = ll_install = 0.0
     bb_care      = st.selectbox("Care Level", ["Standard (FOC)", "Business (+£8/mo)"], key="q_bb_care")
     second_fttp  = st.checkbox("Add 2nd Broadband Line", key="q_second_fttp")
     second_fttp_pkg = None
@@ -2068,14 +2084,23 @@ def compute_install_cost():
 def compute_upfront():
     """Upfront = hw_sell + installation + BB install charge."""
     bb_inst = BROADBAND[bb_provider][bb_package]["install"]
+    # Override with bespoke pricing for Leased Line / Other
+    if bb_package == "Leased Line / Other":
+        bb_inst = ll_install
     return compute_hw_sell() + compute_install_cost() + bb_inst
 
 def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
     uplift   = service_uplift_pct / 100.0
     bb_cost  = BROADBAND[bb_provider][bb_package]["cost"]
-    bb1_sell = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
-    bb1_floor = bb_cost                      # wholesale - never sell below this
+    if bb_package == "Leased Line / Other":
+        bb_cost = ll_cost
+    if bb_package == "Leased Line / Other":
+        bb1_sell  = ll_sell                  # bespoke sell price entered by consultant
+        bb1_floor = ll_cost                  # bespoke cost is the floor
+    else:
+        bb1_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
+        bb1_floor = bb_cost                  # wholesale - never sell below this
     if bb_care == "Business (+£8/mo)":
         bb1_sell  += 8.0
         bb1_floor += 8.0                     # care charge passed through, not discountable
@@ -2210,6 +2235,8 @@ else:
     hw_sell    = compute_hw_sell(uplift_pct=hw_uplift_upfront_override)
     hw_monthly_spread = 0.0
     _bb_inst   = BROADBAND[bb_provider][bb_package]["install"]
+    if bb_package == "Leased Line / Other":
+        _bb_inst = ll_install
     upfront    = hw_sell + compute_install_cost() + _bb_inst + termination_cost
     total_mo   = svc["total_sell"]
     pat        = pat_base
