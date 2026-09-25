@@ -870,11 +870,11 @@ with st.sidebar:
 
     st.markdown("")
     st.markdown("**Desired Lease Rental**")
-    # Keep widget in sync with c_desired_rental (so consultant view Apply updates this too)
-    st.session_state["q_sidebar_rental"] = float(
-        st.session_state.get("c_desired_rental") or
-        st.session_state.get("_prev_base_rental", 0.0)
-    )
+    # Only sync from consultant side when flag is set
+    if st.session_state.pop("_sync_rental_to_sidebar", False):
+        st.session_state["q_sidebar_rental"] = float(
+            st.session_state.get("c_desired_rental") or
+            st.session_state.get("_prev_base_rental", 0.0))
     _sidebar_rental = st.number_input(
         "Target Rental (£/mo)",
         min_value=0.0,
@@ -885,11 +885,13 @@ with st.sidebar:
     _sr_col1, _sr_col2 = st.columns(2)
     with _sr_col1:
         if st.button("✅ Apply", key="btn_apply_rental", use_container_width=True):
-            st.session_state["c_desired_rental"] = _sidebar_rental
+            st.session_state["c_desired_rental"]      = _sidebar_rental
+            st.session_state["_sync_rental_to_cons"]  = True
             st.rerun()
     with _sr_col2:
         if st.button("✖ Clear", key="btn_clear_rental", use_container_width=True):
-            st.session_state["c_desired_rental"] = 0.0
+            st.session_state["c_desired_rental"]      = 0.0
+            st.session_state["_sync_rental_to_cons"]  = True
             st.rerun()
     _active_rental = st.session_state.get("c_desired_rental", 0.0)
     _prev_units    = st.session_state.get("_prev_commission_units", 0.0)
@@ -4914,10 +4916,10 @@ with tab5:
 
         c_left, c_right = st.columns([3, 2])
         with c_left:
-            # Pre-sync so sidebar Apply / Reset can update this widget
-            st.session_state["c_desired_rental_input"] = round(
-                base_rental if st.session_state.get("c_desired_rental", 0) <= 0
-                else st.session_state["c_desired_rental"], 2)
+            # Only sync from sidebar when flag is set
+            if st.session_state.pop("_sync_rental_to_cons", False):
+                st.session_state["c_desired_rental_input"] = round(
+                    st.session_state.get("c_desired_rental") or base_rental, 2)
             desired_rental_input = st.number_input(
                 "Desired Lease Rental (£/mo)",
                 min_value=0.01,
@@ -4930,11 +4932,14 @@ with tab5:
             with btn1:
                 if st.button("✅ Apply Rental", type="primary",
                              use_container_width=True, key="c_apply"):
-                    st.session_state["c_desired_rental"] = desired_rental_input
+                    st.session_state["c_desired_rental"]        = desired_rental_input
+                    st.session_state["_sync_rental_to_sidebar"] = True
                     st.rerun()
             with btn2:
                 if st.button("↩️ Reset to Calculated", use_container_width=True, key="c_reset"):
-                    st.session_state["c_desired_rental"] = 0.0
+                    st.session_state["c_desired_rental"]        = 0.0
+                    st.session_state["_sync_rental_to_sidebar"] = True
+                    st.session_state["_sync_rental_to_cons"]    = True
                     st.rerun()
             est_earnings = commission
 
