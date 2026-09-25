@@ -2399,6 +2399,16 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         svc_items.append(("Dark Web Monitoring", 1, "£10.00/mo (after 3m FOC)"))
     if proactive_bb:
         svc_items.append(("Proactive Broadband Management", 1, "£10.00/mo (after 3m FOC)"))
+    # Call Scope monthly services
+    for _csr in cs_svc_rows:
+        if _csr.get("qty", 0) > 0:
+            svc_items.append((s(_csr["name"]), _csr["qty"],
+                              f"£{_csr['sell']*_csr['qty']:.2f}/mo"))
+    # Security tiers
+    for _sr in sec_rows:
+        if _sr.get("qty", 0) > 0:
+            svc_items.append((s(_sr["name"]), _sr["qty"],
+                              f"£{_sr['sell']*_sr['qty']:.2f}/mo"))
 
     pdf.set_fill_color(31, 20, 80)
     pdf.set_text_color(255, 255, 255)
@@ -2765,8 +2775,9 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(45,5,"Qty",fill=True,ln=False,align="C")
     pdf.cell(0,5,"Billing",fill=True,ln=True,align="C")
     pdf.set_font("Helvetica","",8)
+    _cs_names = {r["name"] for r in cs_svc_rows}  # exclude CS software from warranty
     for _name, _qty, _billing in all_equip_pdf:
-        if _qty > 0:
+        if _qty > 0 and _name not in _cs_names:
             pdf.set_fill_color(248,249,255)
             pdf.cell(95,5,f"  {s(_name)}",fill=True,ln=False)
             pdf.cell(45,5,str(_qty),fill=True,ln=False,align="C")
@@ -3767,6 +3778,11 @@ with tab1:
         net_df = pd.DataFrame(net_items, columns=["Service", "Qty", "Charge"])
         st.dataframe(net_df, use_container_width=True, hide_index=True)
 
+        if cs_svc_rows:
+            st.markdown("#### 🔮 Call Scope Services")
+            cs_df = pd.DataFrame([{"Service": r["name"], "Qty": r["qty"],
+                                   "Monthly": f"£{r['sell']*r['qty']:.2f}/mo"} for r in cs_svc_rows])
+            st.dataframe(cs_df, use_container_width=True, hide_index=True)
 
     with prop_col2:
         st.markdown("#### Commercial Summary")
@@ -3835,11 +3851,6 @@ with tab1:
             ])
             st.dataframe(it_df, use_container_width=True, hide_index=True)
 
-        if cs_svc_rows:
-            st.markdown("#### 🔮 Call Scope Services")
-            cs_df = pd.DataFrame([{"Service": r["name"], "Qty": r["qty"],
-                                   "Monthly": f"£{r['sell']*r['qty']:.2f}/mo"} for r in cs_svc_rows])
-            st.dataframe(cs_df, use_container_width=True, hide_index=True)
         if sec_rows:
             st.markdown("#### 🛡️ System Security")
             sec_df = pd.DataFrame([{"Tier": r["name"], "Qty": r["qty"],
