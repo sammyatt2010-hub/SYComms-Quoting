@@ -899,10 +899,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── HEADER ──────────────────────────────────────────────────────────────────
-
+_show_logo = st.session_state.get("selected_brand", "SY Comms") == "SY Comms"
+_logo_img  = (f'<img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" style="height:56px;border-radius:8px;flex-shrink:0;" alt="{_CO}"/>'
+              if _show_logo else "")
 st.markdown(f"""
 <div class="main-header" style="display:flex;align-items:center;gap:1.2rem;">
-  <img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" style="height:56px;border-radius:8px;flex-shrink:0;" alt="SY Comms"/>
+  {_logo_img}
   <div>
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;color:#fff;line-height:1.1">
       {_BRAND["header"]}
