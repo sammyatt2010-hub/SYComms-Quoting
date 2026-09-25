@@ -267,6 +267,31 @@ cfg = st.session_state.active_config
 C   = cfg["constants"]   # shorthand for constants dict
 hw_uplift_override         = C.get("hw_uplift_pct", 50)          # from admin panel
 hw_uplift_upfront_override = C.get("hw_uplift_upfront_pct", 20)  # upfront purchase uplift
+
+# ── Early rental estimate so sidebar caption is never one-rerun stale ─────────
+# Reads current widget values from session state BEFORE sidebar renders.
+# Mirrors the P&L cos_ex formula; keeps sidebar in sync with termination cost etc.
+def _early_rental_estimate():
+    """Quick rental estimate using session-state widget values (no UI needed)."""
+    _term     = float(st.session_state.get("q_termination", 0))
+    _lease    = int(st.session_state.get("q_lease_term", 36))
+    _lr_map   = {24: 46.94, 36: 39.45, 48: 31.00, 60: 26.26, 72: 21.90, 84: 20.58}
+    _sr       = _lr_map.get(_lease, 39.45)
+    # Use stored hw_buy/sell from previous run to avoid rebuilding catalogues
+    _cos_full = float(st.session_state.get("_prev_cos_full", 0))
+    _base     = float(st.session_state.get("_prev_base_rental", 0))
+    if _base > 0 and _cos_full > 0:
+        # Adjust previous rental by change in termination cost
+        _prev_term = float(st.session_state.get("_prev_termination_cost", 0))
+        _delta     = _term - _prev_term
+        return round(_base + (_sr / 1000.0) * _delta, 2)
+    return _base
+
+_early_est = _early_rental_estimate()
+if _early_est > 0:
+    st.session_state["_prev_base_rental"] = _early_est
+# Store current termination cost so next rerun can compute delta
+st.session_state["_prev_termination_cost"] = float(st.session_state.get("q_termination", 0))
 _no_switch = False  # default - overridden by sidebar switch radio button
 switch_quantities = {}  # for manual multi-switch mode
 cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
