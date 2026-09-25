@@ -258,6 +258,8 @@ if "c_desired_rental" not in st.session_state:
     st.session_state.c_desired_rental = 0.0
 if "c_svc_disc" not in st.session_state:
     st.session_state.c_svc_disc = 0
+if "c_svc_disc_w" not in st.session_state:
+    st.session_state.c_svc_disc_w = 0
 if "uploaded_images" not in st.session_state:
     st.session_state.uploaded_images = {}
 
@@ -5075,8 +5077,9 @@ with tab5:
 
         _sd_col1, _sd_col2 = st.columns([3, 2])
         with _sd_col1:
+            # Keep widget key in sync with c_svc_disc (allows sidebar to push value here)
+            st.session_state["c_svc_disc_w"] = int(st.session_state.get("c_svc_disc", 0))
             st.slider("Services discount (%)", min_value=0, max_value=40, step=5,
-                      value=int(st.session_state.get("c_svc_disc", 0)),
                       key="c_svc_disc_w", on_change=_sync_svc_disc,
                       help="Applies to hosted user licences, software add-ons and broadband. "
                            "Broadband can never go below wholesale cost. Mobiles are not discountable.")
