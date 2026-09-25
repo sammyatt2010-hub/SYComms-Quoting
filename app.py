@@ -2013,9 +2013,10 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_fill_color(0, 181, 163)
     pdf.rect(0, 0, 210, 5, 'F')
 
-    # Logo centred - large
-    pdf.image(_logo_buf, x=75, y=25, h=55)
-    _logo_buf.seek(0)
+    # Logo centred - large (only shown for brands that have a logo)
+    if _logo_buf:
+        pdf.image(_logo_buf, x=75, y=25, h=55)
+        _logo_buf.seek(0)
 
     # Company name
     pdf.set_font("Helvetica", "B", 32)
