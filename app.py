@@ -4,6 +4,9 @@ import math
 import os
 import json
 import hashlib
+import hmac
+import html as html_lib
+import inspect
 import base64
 from pathlib import Path
 from datetime import date
@@ -59,6 +62,7 @@ _CO_FILE  = _early_brand.get("proposal_filename_prefix", "SYComms_Proposal")
 BRAND_CONFIGS = {
     "SY Comms": {
         "name":       "SY Comms",
+        "ui_accent":  "#1CC8B4", "ui_accent2": "#6EE7D8", "ui_rgb": "28,200,180", "mono": "SY",
         "legal":      "SY Comms Ltd",
         "tagline":    "SY Comms Quotation Tool",
         "caption":    "Authorised SY Comms users only.",
@@ -77,6 +81,7 @@ BRAND_CONFIGS = {
     },
     "SY Plus": {
         "name":       "SY Plus",
+        "ui_accent":  "#3D9BFF", "ui_accent2": "#7DD3FC", "ui_rgb": "61,155,255", "mono": "SY+",
         "legal":      "SY Plus Ltd",
         "tagline":    "SY Plus Quotation Tool",
         "caption":    "Authorised SY Plus users only.",
@@ -95,6 +100,7 @@ BRAND_CONFIGS = {
     },
     "SW Comms": {
         "name":       "SW Comms",
+        "ui_accent":  "#F5923E", "ui_accent2": "#FCC77A", "ui_rgb": "245,146,62", "mono": "SW",
         "legal":      "SW Comms Ltd",
         "tagline":    "SW Comms Quotation Tool",
         "caption":    "Authorised SW Comms users only.",
@@ -113,19 +119,179 @@ BRAND_CONFIGS = {
     },
 }
 
+
+# ─── DESIGN SYSTEM (dark dashboard, per-brand accent) ────────────────────────
+def _secret(key):
+    """Read a Streamlit secret safely; missing secret (or no secrets file) returns ''."""
+    try:
+        return str(st.secrets.get(key, "") or "")
+    except Exception:
+        return ""
+
+def esc(v):
+    return html_lib.escape(str(v if v is not None else ""), quote=True)
+
+def render_html(markup, target=None):
+    # Flatten lines: indented HTML inside st.markdown becomes a code block otherwise
+    (target or st).markdown("".join(l.strip() for l in markup.splitlines()), unsafe_allow_html=True)
+
+def chip(text, tone=""):
+    return f'<span class="pe-chip {tone}">{esc(text)}</span>'
+
+def section_header(num, title, subtitle=""):
+    render_html(f'<div class="pe-section"><div class="badge">{num}</div><div><div class="t">{esc(title)}</div>'
+                + (f'<div class="s">{esc(subtitle)}</div>' if subtitle else "") + "</div></div>")
+
+def _full_width():
+    try:
+        if "width" in inspect.signature(st.button).parameters:
+            return {"width": "stretch"}
+    except (TypeError, ValueError):
+        pass
+    return {"use_container_width": True}
+FULL_WIDTH = _full_width()
+
+_UI_BRAND = BRAND_CONFIGS.get(st.session_state.get("selected_brand", "SY Comms"), BRAND_CONFIGS["SY Comms"])
+
+_APP_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root{--bg:#0A0E1A;--surface:#111827;--surface-2:#161F33;--surface-3:#1C2740;--border:rgba(148,163,184,.14);--border-strong:rgba(148,163,184,.26);--text:#E7EAF3;--muted:#8C98B0;--faint:#5E6A82;--accent:__A1__;--accent-2:__A2__;--accent-soft:rgba(__RGB__,.14);--accent-line:rgba(__RGB__,.35);--good:#34D399;--warn:#FBBF24;--risk:#FB923C;--bad:#F87171;--radius:14px;--grad:linear-gradient(135deg,__A1__ 0%,__A2__ 100%);}
+html,body,[class*="css"],.stApp,button,input,textarea,select{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif!important}
+.stApp{background:radial-gradient(1200px 500px at 85% -10%,rgba(__RGB__,.08),transparent 60%),radial-gradient(900px 500px at 10% -20%,rgba(__RGB__,.06),transparent 60%),var(--bg)}
+[data-testid="stHeader"]{background:transparent}[data-testid="stDecoration"]{display:none}footer{visibility:hidden}
+.block-container{padding-top:1.6rem!important;padding-bottom:3rem!important;max-width:1500px}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1322 0%,#0A0E1A 100%);border-right:1px solid var(--border)}
+[data-testid="stSidebar"] h3{font-size:.78rem!important;font-weight:700!important;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2)!important;border-bottom:1px solid var(--border);padding-bottom:.4rem;margin-top:1.1rem!important}
+[data-testid="stWidgetLabel"] p{font-size:.76rem!important;font-weight:600!important;color:var(--muted)!important;text-transform:uppercase;letter-spacing:.06em}
+[data-testid="stCaptionContainer"]{color:var(--muted)!important}
+.st-key-card-login,.st-key-card-hardware,.st-key-card-quote,.st-key-card-summary{background:linear-gradient(180deg,rgba(22,31,51,.85) 0%,rgba(17,24,39,.85) 100%);border:1px solid var(--border)!important;border-radius:var(--radius);padding:22px 22px 18px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 20px 40px -24px rgba(0,0,0,.6);margin-bottom:18px}
+.st-key-card-summary{border-top:2px solid var(--accent)!important}
+[data-testid="stColumn"]:has(.st-key-card-summary){position:sticky;top:1rem;align-self:flex-start}
+[data-baseweb="input"],[data-baseweb="select"]>div,[data-baseweb="textarea"]{background:var(--surface)!important;border:1px solid var(--border-strong)!important;border-radius:10px!important}
+[data-baseweb="input"]:focus-within,[data-baseweb="select"]>div:focus-within,[data-baseweb="textarea"]:focus-within{border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--accent-soft)!important}
+[data-baseweb="input"]>div,[data-baseweb="base-input"]{background:transparent!important}
+[data-testid="stTextInputRootElement"],[data-testid="stNumberInputContainer"],[data-testid="stTextAreaRootElement"],[data-testid="stSelectbox"] div:has(> input),[data-testid="stMultiSelect"] div:has(> input),[data-testid="stDateInput"] div:has(> input){background:var(--surface)!important;border:1px solid var(--border-strong)!important;border-radius:10px!important}
+[data-testid="stTextInputRootElement"]:focus-within,[data-testid="stNumberInputContainer"]:focus-within,[data-testid="stTextAreaRootElement"]:focus-within,[data-testid="stSelectbox"] div:has(> input):focus-within,[data-testid="stMultiSelect"] div:has(> input):focus-within,[data-testid="stDateInput"] div:has(> input):focus-within{border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--accent-soft)!important}
+[data-testid="stMarkdownContainer"] :is(p,div,span,li,strong,em,h1,h2,h3,h4,h5,td,th):not([data-testid="stIconMaterial"]),[data-testid="stExpander"] summary p,[role="tab"] p{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif!important}
+.stButton button,.stDownloadButton button,.stFormSubmitButton button,.stLinkButton a{border-radius:10px!important;font-weight:600!important;border:1px solid var(--border-strong)!important;background:var(--surface-2)!important;color:var(--text)!important;transition:all .15s ease}
+.stButton button:hover,.stDownloadButton button:hover,.stLinkButton a:hover{border-color:var(--accent)!important;transform:translateY(-1px)}
+.stButton button[kind="primary"],.stDownloadButton button[kind="primary"],.stFormSubmitButton button,[data-testid="stBaseButton-primary"],[data-testid="stBaseLinkButton-primary"]{background:var(--grad)!important;border:none!important;color:#0A0E1A!important;box-shadow:0 8px 24px -10px rgba(__RGB__,.8)}
+.stButton button[kind="primary"] p,[data-testid="stBaseButton-primary"] p,.stFormSubmitButton button p,[data-testid="stBaseLinkButton-primary"] p{color:#0A0E1A!important;font-weight:700!important}
+[data-testid="stTabs"] [role="tablist"],[data-baseweb="tab-list"]{gap:4px;background:var(--surface);padding:4px;border-radius:12px;border:1px solid var(--border);width:fit-content;max-width:100%;overflow-x:auto}
+[data-testid="stTabs"] [role="tab"],[data-baseweb="tab"]{border-radius:9px!important;padding:8px 16px!important;color:var(--muted)!important;background:transparent!important}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"],[data-baseweb="tab"][aria-selected="true"]{background:var(--surface-3)!important;color:var(--text)!important}
+[data-baseweb="tab-highlight"],[data-baseweb="tab-border"],[data-testid="stTabs"] .react-aria-SelectionIndicator{display:none!important}
+[data-testid="stDataFrame"]{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+[data-testid="stExpander"] details{background:var(--surface);border:1px solid var(--border)!important;border-radius:12px!important}
+[data-testid="stExpander"] summary:hover{color:var(--accent-2)!important}
+[data-testid="stAlert"]{border-radius:12px!important}
+[data-baseweb="slider"] [role="slider"]{background:var(--accent)!important;box-shadow:0 0 0 4px var(--accent-soft)!important}
+[data-testid="stSliderThumbValue"]{color:var(--accent-2)!important}
+[data-testid="stCheckbox"] label span:has(svg),[data-baseweb="checkbox"] span:has(svg){background-color:var(--accent)!important;border-color:var(--accent)!important}
+[data-baseweb="radio"] div:first-child:has(div){border-color:var(--accent)!important}
+a{color:var(--accent-2)}
+hr{border-color:var(--border)!important}
+/* Hero + stepper */
+.pe-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding:6px 2px 22px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.pe-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);margin-bottom:8px}
+.pe-eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 4px rgba(52,211,153,.15)}
+.pe-title{font-size:2.05rem;font-weight:800;letter-spacing:-.035em;line-height:1.1;color:var(--text)}
+.pe-title span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pe-sub{color:var(--muted);font-size:.95rem;margin-top:8px;max-width:620px}
+.pe-stepper{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px}
+.pe-step{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 7px;border-radius:999px;font-size:.82rem;font-weight:600;color:var(--faint);white-space:nowrap}
+.pe-step .num{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.72rem;font-weight:700;border:1px solid var(--border-strong)}
+.pe-step.done{color:var(--muted)}.pe-step.done .num{background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.45);color:var(--good)}
+.pe-step.active{background:var(--surface-3);color:var(--text)}.pe-step.active .num{background:var(--grad);border:none;color:#0A0E1A}
+.pe-step-sep{width:14px;height:1px;background:var(--border-strong)}
+.pe-section{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.pe-section .badge{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:.85rem;border:1px solid var(--accent-line)}
+.pe-section .t{font-size:1.08rem;font-weight:700;color:var(--text)}.pe-section .s{font-size:.82rem;color:var(--muted);margin-top:2px}
+.pe-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.76rem;font-weight:600;background:var(--surface-3);color:var(--text);border:1px solid var(--border);white-space:nowrap}
+.pe-chip.accent{background:var(--accent-soft);color:var(--accent-2);border-color:var(--accent-line)}
+.pe-chip.good{background:rgba(52,211,153,.12);color:var(--good);border-color:rgba(52,211,153,.3)}
+.pe-chip.warn{background:rgba(251,191,36,.12);color:var(--warn);border-color:rgba(251,191,36,.3)}
+.pe-chip.bad{background:rgba(248,113,113,.12);color:var(--bad);border-color:rgba(248,113,113,.3)}
+.pe-logo{width:40px;height:40px;border-radius:12px;background:var(--grad);display:grid;place-items:center;color:#0A0E1A;font-weight:800;font-size:.9rem;letter-spacing:-.02em;overflow:hidden;box-shadow:0 10px 24px -10px rgba(__RGB__,.9)}
+.pe-logo img{width:100%;height:100%;object-fit:cover}
+.pe-login-head{text-align:center;margin:8vh 0 22px}.pe-login-head .pe-logo{width:54px;height:54px;margin:0 auto 16px;border-radius:16px;font-size:1.05rem}
+.pe-login-head .t{font-size:1.6rem;font-weight:800;letter-spacing:-.03em;color:var(--text)}.pe-login-head .s{color:var(--muted);font-size:.92rem;margin-top:6px}
+.pe-login-foot{text-align:center;color:var(--faint);font-size:.8rem;margin-top:4px}
+.pe-kpi{background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:14px;padding:16px 18px}
+.pe-kpi .l{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pe-kpi .v{font-size:1.8rem;font-weight:800;letter-spacing:-.03em;color:var(--text);margin-top:6px}
+/* Sidebar brand block */
+.pe-brand{display:flex;align-items:center;gap:12px;padding:4px 0 14px;margin-bottom:6px;border-bottom:1px solid var(--border)}
+.pe-brand .n{font-weight:800;font-size:1.02rem;color:var(--text);letter-spacing:-.02em}.pe-brand .g{font-size:.78rem;color:var(--muted)}
+/* Product cards: light stage for product photos, accent glow when selected */
+.pe-prod{border:1px solid var(--border);border-radius:12px;padding:8px;background:var(--surface);text-align:center;transition:border-color .15s ease}
+.pe-prod.on{border-color:var(--accent-line);box-shadow:0 0 0 1px var(--accent-line),0 10px 26px -14px rgba(__RGB__,.9)}
+.pe-prod-stage{border-radius:9px;background:radial-gradient(120% 90% at 50% 20%,#FFFFFF 0%,#EEF1F8 70%,#E3E8F2 100%);display:flex;align-items:center;justify-content:center;margin-bottom:6px;overflow:hidden}
+.pe-prod-stage img{max-width:100%;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(15,23,42,.18))}
+.pe-prod-ph{border-radius:9px;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:6px}
+.pe-prod-name{font-size:.74rem;font-weight:600;color:var(--text);line-height:1.25}
+.pe-prod-qty{display:inline-block;margin-top:4px;background:var(--accent-soft);color:var(--accent-2);border:1px solid var(--accent-line);border-radius:999px;padding:1px 8px;font-size:.7rem;font-weight:700}
+/* Live summary */
+.pe-sum-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pe-sum-head .t{font-weight:700;color:var(--text);font-size:.98rem}
+.pe-sum-total .l{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pe-sum-total .v{font-size:2rem;font-weight:800;letter-spacing:-.035em;color:var(--text);line-height:1.1;margin-top:4px}
+.pe-sum-total .v small{font-size:.8rem;font-weight:600;color:var(--muted);letter-spacing:0}
+.pe-sum-rows{margin-top:14px;border-top:1px solid var(--border)}
+.pe-sum-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.86rem}
+.pe-sum-row .k{color:var(--muted);white-space:nowrap}.pe-sum-row .v{color:var(--text);font-weight:600;text-align:right}
+.pe-sum-foot{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+.pe-empty{text-align:left}
+.pe-empty .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line);margin-bottom:12px}
+.pe-empty .t{font-weight:700;color:var(--text);margin-bottom:8px}
+.pe-empty ol{margin:0;padding-left:1.1rem;color:var(--muted);font-size:.86rem;line-height:1.7}
+/* Existing app classes, re-themed */
+.brand-accent{color:var(--accent)}
+.metric-card{background:var(--surface)!important;border:1px solid var(--border)!important;border-top:2px solid var(--accent)!important;border-radius:14px;padding:1.1rem 1.3rem;text-align:center;color:var(--text)!important}
+.metric-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)!important;margin-bottom:.4rem}
+.metric-value{font-size:1.8rem;font-weight:800;letter-spacing:-.03em;color:var(--text)!important;line-height:1.1}
+.metric-value.green,.pat-good{color:var(--good)!important}.metric-value.amber,.pat-warn{color:var(--warn)!important}.metric-value.red,.pat-bad{color:var(--bad)!important}
+.metric-sub{font-size:.75rem;color:var(--muted)!important;margin-top:.3rem}
+.section-header{font-size:1.02rem;font-weight:700;color:var(--text);margin:1.4rem 0 .75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.override-badge{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:.15rem .6rem;font-size:.7rem;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.05em}
+.line-item-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.9rem}
+.line-item-name{color:var(--text);flex:1}.line-item-qty{color:var(--muted);min-width:40px;text-align:center}.line-item-price{font-weight:600;color:var(--text);min-width:90px;text-align:right}
+.promo-tag{background:var(--grad);color:#0A0E1A;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;text-transform:uppercase;letter-spacing:.06em;margin-left:.5rem}
+.tab-content{padding:.6rem 0}
+.warning-box,.success-box,.info-box{border-radius:12px;padding:.8rem 1rem;font-size:.86rem;margin:.5rem 0;border:1px solid}
+.warning-box{background:rgba(251,191,36,.10);border-color:rgba(251,191,36,.30);color:#FDE68A}
+.success-box{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.30);color:#A7F3D0}
+.info-box{background:var(--accent-soft);border-color:var(--accent-line);color:var(--text)}
+/* Customer View */
+.cv-header{background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:16px;padding:1.8rem 2.2rem;margin-bottom:1.5rem}
+.cv-header h2{font-size:1.8rem;font-weight:800;letter-spacing:-.03em;margin:0;color:var(--text)!important}
+.cv-header p{color:var(--muted);margin:.3rem 0 0;font-size:.95rem}
+.cv-section{font-size:1rem;font-weight:700;color:var(--text);margin:1.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+.cv-hw-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;height:100%}
+.cv-hw-name{font-size:.8rem;font-weight:600;color:var(--text);margin-top:6px;line-height:1.3}
+.cv-hw-qty{background:var(--accent-soft);color:var(--accent-2);border:1px solid var(--accent-line);border-radius:999px;padding:1px 10px;font-size:.75rem;font-weight:700;display:inline-block;margin-top:4px}
+.cv-price-row{display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--border);font-size:.95rem}
+.cv-price-label{color:var(--muted)}.cv-price-val{font-weight:600;color:var(--text)}
+.cv-total-box{background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);border:1px solid var(--accent-line);border-radius:14px;padding:1.5rem 2rem;margin-top:1rem;text-align:center}
+.cv-total-label{color:var(--muted);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.cv-total-val{color:var(--text);font-size:2.5rem;font-weight:800;letter-spacing:-.035em;margin-top:.3rem}
+.cv-total-note{color:var(--muted);font-size:.8rem;margin-top:.3rem}
+.cv-include-item{font-size:.85rem;padding:.25rem 0;color:var(--text)}
+@media (max-width:900px){.pe-hero{align-items:flex-start}.pe-stepper{flex-wrap:wrap;border-radius:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+"""
+render_html("<style>" + _APP_CSS.replace("__A1__", _UI_BRAND["ui_accent"])
+            .replace("__A2__", _UI_BRAND["ui_accent2"]).replace("__RGB__", _UI_BRAND["ui_rgb"]) + "</style>")
+
 # ─── APP LOGIN GATE ──────────────────────────────────────────────────────────
 # Brand passwords — add to Streamlit secrets:
 #   APP_PASSWORD         = "..."   (SY Comms)
 #   APP_PASSWORD_SYPLUS  = "..."   (SY Plus)
 #   APP_PASSWORD_SWCOMMS = "..."   (SW Comms)
 # Falls back to hardcoded default if secret not set.
-_FALLBACK_PW = "SYComms2026!!"
-
 def _get_brand_pw(pw_key):
-    try:
-        return st.secrets[pw_key]
-    except Exception:
-        return _FALLBACK_PW
+    """Fail closed: no secret configured means nobody can sign in to that brand."""
+    return _secret(pw_key)
 
 if "app_authenticated" not in st.session_state:
     st.session_state.app_authenticated = False
@@ -135,50 +301,36 @@ if "selected_brand" not in st.session_state:
 if not st.session_state.app_authenticated:
     _sel_brand = st.session_state.selected_brand
     _bc        = BRAND_CONFIGS[_sel_brand]
-    _accent    = _bc["accent"]
-    _logo_src  = f'data:image/jpeg;base64,{SYCOMMS_LOGO_B64}'
-    _logo_html = (f'<img src="{_logo_src}" style="width:90px;margin-bottom:0.8rem;border-radius:8px;"><br>'
-                  if _bc["logo_key"] else '')
-
-    login_html = (
-        '<style>'
-        '.login-wrap{max-width:440px;margin:4vh auto 0;background:linear-gradient(160deg,#1f1450 0%,#2d1f6e 100%);border-radius:20px;padding:2.5rem 2.5rem 2rem;box-shadow:0 20px 60px rgba(0,0,0,0.4);text-align:center;border:1px solid rgba(0,181,163,0.2)}.'
-        'login-wrap h1{font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#fff;margin:0 0 0.2rem}.'
-        'login-wrap p{color:rgba(255,255,255,0.45);font-size:0.85rem;margin:0 0 1.2rem}.'
-        f'.login-accent{{color:{_accent}}}</style>'
-        f'<div class="login-wrap">{_logo_html}'
-        f'<h1>{_bc["header"]}</h1>'
-        f'<p>{_bc["tagline"]}</p></div>'
-    )
-    st.markdown(login_html, unsafe_allow_html=True)
-
-    col_l, col_m, col_r = st.columns([1, 2, 1])
-    with col_m:
-        st.markdown("###")
-        # Brand selector
-        brand_choice = st.selectbox(
-            "Company", list(BRAND_CONFIGS.keys()),
-            index=list(BRAND_CONFIGS.keys()).index(_sel_brand),
-            key="brand_selector",
-            label_visibility="collapsed",
-        )
-        if brand_choice != _sel_brand:
-            st.session_state.selected_brand = brand_choice
-            st.rerun()
-
-        entered = st.text_input("", type="password",
-                                placeholder=f"Enter {brand_choice} password...",
-                                label_visibility="collapsed",
-                                key="login_pw_input")
-        if st.button("Sign In →", use_container_width=True, type="primary"):
-            _correct_pw = _get_brand_pw(_bc["pw_key"])
-            if entered == _correct_pw:
-                st.session_state.app_authenticated = True
+    _lc, _mc, _rc = st.columns([1, 1.15, 1])
+    with _mc:
+        _tile = (f'<img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" alt="">'
+                 if _bc["logo_key"] else esc(_bc["mono"]))
+        render_html(f'<div class="pe-login-head"><div class="pe-logo">{_tile}</div>'
+                    f'<div class="t">{esc(_bc["name"])}</div>'
+                    f'<div class="s">{esc(_bc["tagline"])}</div></div>')
+        with st.container(key="card-login"):
+            brand_choice = st.selectbox(
+                "Company", list(BRAND_CONFIGS.keys()),
+                index=list(BRAND_CONFIGS.keys()).index(_sel_brand),
+                key="brand_selector",
+            )
+            if brand_choice != _sel_brand:
+                st.session_state.selected_brand = brand_choice
                 st.rerun()
-            else:
-                st.error("Incorrect password - please try again.")
-        st.markdown("")
-        st.caption(_bc["caption"])
+            entered = st.text_input("Password", type="password",
+                                    placeholder=f"Enter the {brand_choice} password",
+                                    key="login_pw_input")
+            if st.button("Sign in", type="primary", key="btn_sign_in", **FULL_WIDTH):
+                _correct_pw = _get_brand_pw(_bc["pw_key"])
+                if not _correct_pw:
+                    st.error(f"Sign-in isn't set up for {brand_choice} yet. "
+                             f"Add {_bc['pw_key']} to the app's Secrets.")
+                elif hmac.compare_digest(entered.encode(), _correct_pw.encode()):
+                    st.session_state.app_authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password - please try again.")
+        render_html(f'<div class="pe-login-foot">{esc(_bc["caption"])}</div>')
 
     st.stop()   # ← nothing below renders until authenticated
 
@@ -609,22 +761,19 @@ def get_product_image_b64(name):
     return None, None
 
 def product_card_html(name, info, qty=0, show_qty=False, img_height=80):
-    """Render a product card - real image if available, styled placeholder if not."""
+    """Product card: photo on a light stage (or icon tile), accent glow when selected."""
     b64, ext = get_product_image_b64(name)
     if b64:
-        img_html = f'<img src="data:image/{ext};base64,{b64}" style="width:100%;height:{img_height}px;object-fit:contain;border-radius:6px;margin-bottom:4px;">' 
+        img_html = (f'<div class="pe-prod-stage" style="height:{img_height}px">'
+                    f'<img src="data:image/{ext};base64,{b64}" style="height:{img_height - 10}px" alt=""></div>')
     else:
-        cat = info.get("cat", "Desktop")
-        icon = PRODUCT_ICONS.get(cat, "📱")
-        img_html = f'<div style="height:{img_height}px;background:linear-gradient(135deg,#2d1f6e,#3b2882);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:4px">{icon}</div>'
-    
-    qty_badge = f'<div style="background:#00b5a3;color:white;border-radius:10px;padding:1px 7px;font-size:0.7rem;font-weight:700;display:inline-block">x{qty}</div>' if show_qty and qty > 0 else ""
-    return f"""
-    <div style="border:1px solid #e8e8f0;border-radius:10px;padding:8px;background:#fff;text-align:center">
-      {img_html}
-      <div style="font-size:0.72rem;font-weight:600;color:#333;line-height:1.2">{name}</div>
-      {qty_badge}
-    </div>"""
+        icon = PRODUCT_ICONS.get(info.get("cat", "Desktop"), "📱")
+        img_html = f'<div class="pe-prod-ph" style="height:{img_height}px">{icon}</div>'
+    _sel = max([int(st.session_state.get(f"{pfx}_{name}", 0) or 0)
+                for pfx in ("desk", "cord", "hs", "oth")] + [qty])
+    _badge = f'<div class="pe-prod-qty">x{_sel}</div>' if _sel > 0 else ""
+    return (f'<div class="pe-prod{" on" if _sel > 0 else ""}">{img_html}'
+            f'<div class="pe-prod-name">{esc(name)}</div>{_badge}</div>')
 
 # ─── FULL PRODUCT CATALOGUE (from Excel NEW MECHANICS sheets) ────────────────
 
@@ -695,229 +844,9 @@ SERVICE_UPLIFT = 0.40
 
 # ─── STYLING ─────────────────────────────────────────────────────────────────
 
-st.markdown("""
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
-  html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
-
-  .main-header {
-    background: linear-gradient(135deg, #1f1450 0%, #2d1f6e 50%, #3b2882 100%);
-    border-radius: 16px;
-    padding: 2rem 2.5rem;
-    margin-bottom: 1.5rem;
-    border: 1px solid rgba(255,255,255,0.08);
-    position: relative;
-    overflow: hidden;
-  }
-  .main-header::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -20%;
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(circle, rgba(0,181,163,0.15) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .main-header h1 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 2.2rem;
-    color: #ffffff;
-    margin: 0;
-    letter-spacing: -0.5px;
-  }
-  .main-header p {
-    color: rgba(255,255,255,0.55);
-    margin: 0.3rem 0 0;
-    font-size: 0.95rem;
-    font-weight: 300;
-  }
-  .brand-accent { color: #00b5a3; }
-
-  .metric-card {
-    background: #ffffff !important;
-    border: 1px solid #e8e8f0 !important;
-    border-radius: 12px;
-    padding: 1.2rem 1.5rem;
-    text-align: center;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    color: #1f1450 !important;
-  }
-  .metric-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #666666 !important;
-    margin-bottom: 0.4rem;
-  }
-  .metric-value {
-    font-family: 'Syne', sans-serif;
-    font-size: 2rem;
-    font-weight: 700;
-    color: #1f1450 !important;
-    line-height: 1;
-  }
-  .metric-value.green { color: #00a854 !important; }
-  .metric-value.red { color: #008078 !important; }
-  .metric-value.amber { color: #f57c00 !important; }
-  .metric-sub {
-    font-size: 0.75rem;
-    color: #888888 !important;
-    margin-top: 0.3rem;
-  }
-
-  .section-header {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #1f1450;
-    margin: 1.5rem 0 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #f0f0f0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .override-badge {
-    background: #fff3e0;
-    border: 1px solid #ffb74d;
-    border-radius: 6px;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #e65100;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .line-item-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f5f5f5;
-    font-size: 0.9rem;
-  }
-  .line-item-name { color: #333; flex: 1; }
-  .line-item-qty { color: #666; min-width: 40px; text-align: center; }
-  .line-item-price { font-weight: 600; color: #1f1450; min-width: 90px; text-align: right; }
-
-  .promo-tag {
-    background: linear-gradient(90deg, #00b5a3, #009e8e);
-    color: white;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0.15rem 0.5rem;
-    border-radius: 20px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-left: 0.5rem;
-  }
-
-  .pat-good { color: #00a854 !important; }
-  .pat-warn { color: #f57c00 !important; }
-  .pat-bad  { color: #008078 !important; }
-
-  .tab-content { padding: 1rem 0; }
-
-  div[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1f1450 0%, #2d1f6e 100%);
-  }
-  div[data-testid="stSidebar"] * { color: rgba(255,255,255,0.85) !important; }
-  div[data-testid="stSidebar"] .stSelectbox label,
-  div[data-testid="stSidebar"] .stNumberInput label,
-  div[data-testid="stSidebar"] .stTextInput label,
-  div[data-testid="stSidebar"] .stTextArea label { color: rgba(255,255,255,0.6) !important; font-size: 0.8rem !important; }
-  div[data-testid="stSidebar"] h3 {
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 700 !important;
-    font-size: 0.85rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.1em !important;
-    color: #00b5a3 !important;
-    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-    padding-bottom: 0.4rem !important;
-    margin-top: 1.2rem !important;
-  }
-
-  .stTabs [data-baseweb="tab"] {
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    font-size: 0.85rem;
-    letter-spacing: 0.03em;
-  }
-
-  .stButton > button {
-    background: linear-gradient(135deg, #00b5a3, #008078);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    padding: 0.6rem 1.5rem;
-    width: 100%;
-  }
-  .stButton > button:hover {
-    background: linear-gradient(135deg, #33c4b5, #006058);
-  }
-
-  .stDownloadButton > button {
-    background: linear-gradient(135deg, #1f1450, #2d1f6e);
-    color: white !important;
-    border: 1px solid rgba(0,181,163,0.4);
-    border-radius: 8px;
-    font-weight: 600;
-    width: 100%;
-  }
-
-  .warning-box {
-    background: #fff8e1;
-    border-left: 4px solid #ffc107;
-    border-radius: 0 8px 8px 0;
-    padding: 0.8rem 1rem;
-    font-size: 0.85rem;
-    color: #5d4037;
-    margin: 0.5rem 0;
-  }
-  .success-box {
-    background: #e8f5e9;
-    border-left: 4px solid #43a047;
-    border-radius: 0 8px 8px 0;
-    padding: 0.8rem 1rem;
-    font-size: 0.85rem;
-    color: #1b5e20;
-    margin: 0.5rem 0;
-  }
-  .info-box {
-    background: #e3f2fd;
-    border-left: 4px solid #1976d2;
-    border-radius: 0 8px 8px 0;
-    padding: 0.8rem 1rem;
-    font-size: 0.85rem;
-    color: #0d47a1;
-    margin: 0.5rem 0;
-  }
-</style>
-""", unsafe_allow_html=True)
-
-# ─── HEADER ──────────────────────────────────────────────────────────────────
-_show_logo = st.session_state.get("selected_brand", "SY Comms") == "SY Comms"
-_logo_img  = (f'<img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" style="height:56px;border-radius:8px;flex-shrink:0;" alt="{_CO}"/>'
-              if _show_logo else "")
-st.markdown(f"""
-<div class="main-header" style="display:flex;align-items:center;gap:1.2rem;">
-  {_logo_img}
-  <div>
-    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;color:#fff;line-height:1.1">
-      {_BRAND["header"]}
-    </div>
-    <div style="color:rgba(255,255,255,0.5);font-size:0.88rem;margin-top:0.2rem">{_CO_TAG} &nbsp;·&nbsp; Build, price &amp; generate paperwork</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+# ─── HEADER (hero is filled at the end of the script) ────────────────────────
+_hero_ph = st.empty()
 
 # ── Apply any pending quote load (must happen before widgets render) ────────────
 if "_pending_quote" in st.session_state:
@@ -929,6 +858,10 @@ if "_pending_quote" in st.session_state:
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
+    _sb_tile = (f'<img src="data:image/jpeg;base64,{SYCOMMS_LOGO_B64}" alt="">'
+                if _UI_BRAND["logo_key"] else esc(_UI_BRAND["mono"]))
+    render_html(f'<div class="pe-brand"><div class="pe-logo">{_sb_tile}</div>'
+                f'<div><div class="n">{esc(_CO)}</div><div class="g">Quotation tool</div></div></div>')
     # ── Appointment Type — affects commission rate ────────────────────────────
     APPT_RATES = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
     appt_type = st.selectbox(
@@ -967,6 +900,14 @@ with st.sidebar:
     st.markdown("### 🌐 Broadband")
     _bb_providers = ["None / Customer Supplied"] + [k for k in BROADBAND.keys() if k != "None / Customer Supplied"]
     bb_provider  = st.selectbox("Provider", _bb_providers, key="q_bb_provider")
+    # When the provider changes, reset the router choice to match (Auto-select when
+    # there's broadband, None when there isn't). Otherwise the router setting stays
+    # stuck on whatever it was when the page first loaded.
+    _prev_bb_prov = st.session_state.get("_prev_bb_provider")
+    if _prev_bb_prov is not None and _prev_bb_prov != bb_provider:
+        st.session_state["router_mode"] = ("Auto-select" if bb_provider != "None / Customer Supplied"
+                                           else "None / Customer Supplied")
+    st.session_state["_prev_bb_provider"] = bb_provider
     bb_package   = st.selectbox("Package", list(BROADBAND[bb_provider].keys()), key="q_bb_package")
     if bb_provider != "None / Customer Supplied":
         bb_free_year = st.checkbox("\U0001f381 Free for first 12 months",
@@ -1186,9 +1127,14 @@ with st.expander("💾 Save / Load Quote", expanded=False):
 
 # ─── HARDWARE BUILDER (main area) ────────────────────────────────────────────
 
-st.markdown('<div class="section-header">📦 Hardware Builder</div>', unsafe_allow_html=True)
-
-col_hw1, col_hw2 = st.columns([3, 2])
+_main_col, _sum_col = st.columns([4, 1.3], gap="medium")
+with _main_col:
+    _hw_card = st.container(key="card-hardware")
+with _hw_card:
+    section_header("01", "Hardware", "Phones, networking, CCTV and add-ons for this customer")
+    col_hw1, col_hw2 = st.columns([3, 2])
+with _sum_col:
+    _sum_card = st.container(key="card-summary")
 
 # ─── SYSTEM HARDWARE BUILDER ─────────────────────────────────────────────────
 with col_hw1:
@@ -3778,7 +3724,9 @@ sgp          = pat * 0.10
 
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "🔐 Admin"])
+with st.container(key="card-quote"):
+    section_header("02", "Quote & paperwork", "Check the proposal, review the numbers and produce the documents")
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 Proposal Summary", "🖋️ Order Form Preview", "📥 Download Documents", "👤 Customer View", "💼 Consultant", "✍️ Sign & Send", "🔐 Admin"])
 
 # ── TAB 1: PROPOSAL SUMMARY ──────────────────────────────────────────────────
 with tab1:
@@ -3865,16 +3813,16 @@ with tab1:
         _spread_note = f"""
         <div class="metric-card" style="text-align:left; margin-bottom:1rem">
           <div class="metric-label">Hardware Lease Rental</div>
-          <div style="font-size:1.4rem; font-weight:700; color:#00b5a3">
+          <div style="font-size:1.4rem; font-weight:700; color:var(--accent)">
             £{hw_monthly_spread:.2f}/mo
           </div>
-          <div style="font-size:0.78rem;color:#888;margin-top:0.2rem">
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem">
             Spread over {LEASE_TERM_LABELS[lease_term]}
           </div>
         </div>""" if is_spread else ""
 
         st.markdown(f"""
-        <div style="font-size:0.72rem;color:#999;margin-bottom:0.2rem">
+        <div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.2rem">
           Agreement term: <strong>{lease_term} months</strong>
         </div>
         {_hw_card}
@@ -3882,15 +3830,15 @@ with tab1:
         <div class="metric-card" style="text-align:left; margin-bottom:1rem">
           <div class="metric-label">Network & Services</div>
           <div style="font-size:1.4rem; font-weight:700">£{svc["total_sell"]:.2f} + VAT</div>
-          <div style="font-size:0.78rem;color:#888;margin-top:0.2rem">Licences, broadband, software &amp; mobiles</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem">Licences, broadband, software &amp; mobiles</div>
         </div>
         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-             letter-spacing:0.1em;color:#aaaaaa;margin-bottom:0.4rem;padding-left:0.2rem">
+             letter-spacing:0.1em;color:var(--muted);margin-bottom:0.4rem;padding-left:0.2rem">
           TOTAL MONTHLY COMMITMENT
         </div>
-        <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);border-radius:12px;
+        <div style="background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);border-radius:12px;
              padding:1.2rem 1.4rem;border:1px solid rgba(0,181,163,0.25)">
-          <div style="font-size:2rem;font-weight:800;color:#00b5a3">
+          <div style="font-size:2rem;font-weight:800;color:var(--accent)">
             £{total_mo:.2f} + VAT
           </div>
           <div style="font-size:0.8rem;color:rgba(255,255,255,0.45);margin-top:0.4rem">
@@ -3959,8 +3907,8 @@ with tab2:
             "Installation Address": install_address or "⚠️ Not provided",
         }
         for label, val in fields.items():
-            colour = "#008078" if "⚠️" in val else "#333"
-            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid #f0f0f0;font-size:0.88rem'><span style='color:#888'>{label}</span><span style='color:{colour};font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
+            colour = "#FBBF24" if "⚠️" in val else "#E7EAF3"
+            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem'><span style='color:var(--muted)'>{label}</span><span style='color:{colour};font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
 
         st.markdown("#### 🏦 Direct Debit Mandate")
         bank_fields = {
@@ -3970,8 +3918,8 @@ with tab2:
             "Sort Code": sort_code or "⚠️ Not provided",
         }
         for label, val in bank_fields.items():
-            colour = "#008078" if "⚠️" in val else "#333"
-            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid #f0f0f0;font-size:0.88rem'><span style='color:#888'>{label}</span><span style='color:{colour};font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
+            colour = "#FBBF24" if "⚠️" in val else "#E7EAF3"
+            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem'><span style='color:var(--muted)'>{label}</span><span style='color:{colour};font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
 
     with of_col2:
         st.markdown("#### 📋 Deal & System Configuration")
@@ -3996,7 +3944,7 @@ with tab2:
         if cashback_amount > 0:
             config_fields["Settlement / Cashback"] = f"£{cashback_amount:.2f}"
         for label, val in config_fields.items():
-            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid #f0f0f0;font-size:0.88rem'><span style='color:#888'>{label}</span><span style='color:#333;font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem'><span style='color:var(--muted)'>{label}</span><span style='color:var(--text);font-weight:500'>{val}</span></div>", unsafe_allow_html=True)
 
         st.markdown("#### 📦 Equipment Summary")
         all_equip = [(n, q) for n, q in list(desktop_quantities.items()) +
@@ -4025,7 +3973,7 @@ with tab2:
             if r.get("qty", 0) > 0:
                 all_equip.append((r["name"], r["qty"]))
         for name, qty in all_equip:
-            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:#555'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:var(--muted)'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
 
 # ── TAB 3: DOWNLOAD ───────────────────────────────────────────────────────────
@@ -4062,7 +4010,7 @@ with tab3:
             f"Install Type: {install_type}",
         ]
         for d in summary:
-            st.markdown(f"<div style='font-size:0.88rem;padding:0.2rem 0;color:#555'>{d}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size:0.88rem;padding:0.2rem 0;color:var(--muted)'>{d}</div>", unsafe_allow_html=True)
 
     # ── DOWNLOAD BUTTON ──
     st.markdown("")
@@ -4097,35 +4045,6 @@ with tab3:
 
 # ── TAB 4: CUSTOMER VIEW ──────────────────────────────────────────────────────
 with tab4:
-    st.markdown("""
-    <style>
-      .cv-header {
-        background: linear-gradient(135deg, #1f1450 0%, #2d1f6e 100%);
-        border-radius: 16px; padding: 2rem 2.5rem; margin-bottom: 1.5rem; color: white;
-      }
-      .cv-header h2 { font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800; margin:0; color:white !important; }
-      .cv-header p  { color:rgba(255,255,255,0.6); margin:0.3rem 0 0; font-size:0.95rem; }
-      .cv-section   { font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; color:#1f1450;
-                      margin:1.5rem 0 0.75rem; padding-bottom:0.4rem; border-bottom:2px solid #f0f0f0; }
-      .cv-hw-card   { background:#fff; border:1px solid #e8e8f0; border-radius:12px; padding:12px;
-                      text-align:center; height:100%; }
-      .cv-hw-name   { font-size:0.8rem; font-weight:600; color:#333; margin-top:6px; line-height:1.3; }
-      .cv-hw-qty    { background:#00b5a3; color:white; border-radius:12px; padding:2px 10px;
-                      font-size:0.75rem; font-weight:700; display:inline-block; margin-top:4px; }
-      .cv-price-row { display:flex; justify-content:space-between; padding:0.6rem 0;
-                      border-bottom:1px solid #f5f5f5; font-size:0.95rem; }
-      .cv-price-label { color:#555; }
-      .cv-price-val   { font-weight:600; color:#1f1450; }
-      .cv-total-box { background:linear-gradient(135deg,#1f1450,#2d1f6e); border-radius:12px;
-                      padding:1.5rem 2rem; margin-top:1rem; text-align:center; }
-      .cv-total-label { color:rgba(255,255,255,0.6); font-size:0.8rem; font-weight:700;
-                        text-transform:uppercase; letter-spacing:0.08em; }
-      .cv-total-val   { color:#ffffff; font-family:'Syne',sans-serif; font-size:2.5rem;
-                        font-weight:800; margin-top:0.3rem; }
-      .cv-total-note  { color:rgba(255,255,255,0.5); font-size:0.8rem; margin-top:0.3rem; }
-      .cv-include-item { font-size:0.85rem; padding:0.25rem 0; color:#444; }
-    </style>
-    """, unsafe_allow_html=True)
 
     # Header
     st.markdown(f"""
@@ -4212,7 +4131,7 @@ with tab4:
                         cat = info.get("cat", "Desktop")
                         icon_map = {"Desktop":"📱","DECT":"📞","Wi-Fi":"📡","Switch":"🔌","Router":"🌐","Software":"💻","IT":"🖥️","Mobile":"📱","Headset":"🎧"}
                         icon = icon_map.get(cat, PRODUCT_ICONS.get(cat, "📱"))
-                        img_html = f'<div style="height:100px;background:linear-gradient(135deg,#2d1f6e,#3b2882);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2.8rem">{icon}</div>'
+                        img_html = f'<div style="height:100px;background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2.8rem">{icon}</div>'
 
                     st.markdown(f"""
                     <div class="cv-hw-card">
@@ -4224,7 +4143,7 @@ with tab4:
 
         # Auto-included note (simplified)
         st.markdown(f"""
-        <div style="margin-top:0.75rem;padding:0.6rem 1rem;background:#f8f9ff;border-radius:8px;font-size:0.82rem;color:#555">
+        <div style="margin-top:0.75rem;padding:0.6rem 1rem;background:var(--surface-2);border-radius:8px;font-size:0.82rem;color:var(--muted)">
           <strong>{total_voice_channels} Voice Channel Licence{"s" if total_voice_channels != 1 else ""}</strong> included
           &nbsp;&middot;&nbsp; {LEASE_TERM_LABELS[lease_term]} agreement
         </div>
@@ -4239,7 +4158,7 @@ with tab4:
         st.markdown("---")
         st.markdown('''
         <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;
-             color:#1f1450;margin:1rem 0 0.6rem">📊 Cost Comparison</div>
+             color:var(--text);margin:1rem 0 0.6rem">📊 Cost Comparison</div>
         ''', unsafe_allow_html=True)
 
         saving_mo  = current_total - total_mo
@@ -4281,8 +4200,8 @@ with tab4:
             comp_rows.append(("Software Charges", 0.0, sw_sell_total))
 
         # Comparison table - built as a flat string to avoid markdown code-block indentation
-        _saving_bg  = "#e8f8f0"  # always green — increase is also a positive investment
-        _saving_col = "#1a7a40"  # always green
+        _saving_bg  = "rgba(52,211,153,.12)"  # always green — increase is also a positive investment
+        _saving_col = "#34D399"  # always green
         if saving_mo >= 0:
             _saving_lbl  = "Annual Saving"
             _saving_disp = f"{chr(163)}{abs(saving_yr):,.2f}"
@@ -4294,8 +4213,8 @@ with tab4:
             _saving_sub  = "per day"
         _arrow = "-" if saving_mo >= 0 else "+"
 
-        _tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">'
-        _tbl += '<thead><tr style="background:#1f1450;color:#fff">'
+        _tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:var(--surface);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">'
+        _tbl += '<thead><tr style="background:var(--surface-3);color:#fff">'
         _tbl += '<th style="padding:10px 12px;text-align:left">Category</th>'
         _tbl += '<th style="padding:10px 12px;text-align:right">Current</th>'
         _tbl += '<th style="padding:10px 12px;text-align:right">SY Comms</th>'
@@ -4304,19 +4223,19 @@ with tab4:
 
         for _label, _curr_v, _new_v in comp_rows:
             _diff  = _curr_v - _new_v
-            _dcol  = "#1a7a40" if _diff >= 0 else "#c0392b"
+            _dcol  = "#34D399" if _diff >= 0 else "#F87171"
             _dstr  = f"-{chr(163)}{_diff:.2f}" if _diff >= 0 else f"+{chr(163)}{abs(_diff):.2f}"
             _tbl += f'<tr>'
-            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee">{_label}</td>'
-            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#888">{chr(163)}{_curr_v:.2f}</td>'
-            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#1f1450;font-weight:600">{chr(163)}{_new_v:.2f}</td>'
-            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:{_dcol};font-weight:700">{_dstr}</td>'
+            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border)">{_label}</td>'
+            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right;color:var(--muted)">{chr(163)}{_curr_v:.2f}</td>'
+            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right;color:var(--text);font-weight:600">{chr(163)}{_new_v:.2f}</td>'
+            _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right;color:{_dcol};font-weight:700">{_dstr}</td>'
             _tbl += "</tr>"
 
-        _tbl += f'<tr style="background:#f5f5f5;font-weight:700">'
+        _tbl += f'<tr style="background:var(--surface-2);font-weight:700">'
         _tbl += f'<td style="padding:10px 12px">Total Monthly (excl. VAT)</td>'
         _tbl += f'<td style="padding:10px 12px;text-align:right">{chr(163)}{current_total:.2f}</td>'
-        _tbl += f'<td style="padding:10px 12px;text-align:right;color:#1f1450">{chr(163)}{total_mo:.2f}</td>'
+        _tbl += f'<td style="padding:10px 12px;text-align:right;color:var(--text)">{chr(163)}{total_mo:.2f}</td>'
         _tbl += f'<td style="padding:10px 12px;text-align:right;color:{_saving_col}">{_arrow}{chr(163)}{abs(saving_mo):.2f}</td>'
         _tbl += "</tr></tbody></table>"
 
@@ -4329,8 +4248,8 @@ with tab4:
         st.markdown(_tbl, unsafe_allow_html=True)
     else:
         st.markdown('''
-    <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f0f4ff;border-radius:8px;
-         font-size:0.83rem;color:#555;text-align:center;border:1px dashed #c0cce0">
+    <div style="margin-top:1rem;padding:0.8rem 1rem;background:var(--surface-2);border-radius:8px;
+         font-size:0.83rem;color:var(--muted);text-align:center;border:1px dashed var(--border-strong)">
       💡 Fill in the customer's <strong>Current Customer Costs</strong> in the sidebar
       to show a cost comparison here.
     </div>
@@ -4392,18 +4311,18 @@ with tab4:
                     b64_sw, ext_sw = get_product_image_b64(addon_name)
                     if b64_sw:
                         st.markdown(
-                            f'<div style="background:#f8f9ff;border-radius:10px;padding:0.6rem;text-align:center;margin-bottom:0.5rem">'
+                            f'<div style="background:var(--surface-2);border-radius:10px;padding:0.6rem;text-align:center;margin-bottom:0.5rem">'
                             f'<img src="data:image/{ext_sw};base64,{b64_sw}" style="max-height:70px;max-width:100%;object-fit:contain;border-radius:6px"/>'
-                            f'<div style="font-size:0.75rem;color:#1f1450;font-weight:600;margin-top:0.3rem">{addon_name}</div>'
-                            f'<div style="font-size:0.7rem;color:#888">x{addon_qty}</div></div>',
+                            f'<div style="font-size:0.75rem;color:var(--text);font-weight:600;margin-top:0.3rem">{addon_name}</div>'
+                            f'<div style="font-size:0.7rem;color:var(--muted)">x{addon_qty}</div></div>',
                             unsafe_allow_html=True
                         )
                     else:
                         st.markdown(
-                            f'<div style="background:#f0f4ff;border-radius:10px;padding:0.8rem;text-align:center;margin-bottom:0.5rem">'
+                            f'<div style="background:var(--surface-2);border-radius:10px;padding:0.8rem;text-align:center;margin-bottom:0.5rem">'
                             f'<div style="font-size:1.6rem">💻</div>'
-                            f'<div style="font-size:0.75rem;color:#1f1450;font-weight:600;margin-top:0.3rem">{addon_name}</div>'
-                            f'<div style="font-size:0.7rem;color:#888">x{addon_qty}</div></div>',
+                            f'<div style="font-size:0.75rem;color:var(--text);font-weight:600;margin-top:0.3rem">{addon_name}</div>'
+                            f'<div style="font-size:0.7rem;color:var(--muted)">x{addon_qty}</div></div>',
                             unsafe_allow_html=True
                         )
 
@@ -4413,41 +4332,41 @@ with tab4:
         st.markdown(f"""
         <div class="cv-price-row">
           <span class="cv-price-label">{"Hardware Lease (monthly rental)" if is_spread else "Hardware (one-off)"}</span>
-          <span class="cv-price-val" style="color:#1f1450;font-weight:700">
+          <span class="cv-price-val" style="color:var(--text);font-weight:700">
             {"£" + f"{hw_monthly_spread:.2f}" + "/mo" if is_spread else "£" + f"{upfront:.2f}"}
           </span>
         </div>
         <div class="cv-price-row">
           <span class="cv-price-label">Network &amp; Services</span>
-          <span class="cv-price-val" style="color:#1f1450;font-weight:700">£{svc["total_sell"]:.2f}/mo</span>
+          <span class="cv-price-val" style="color:var(--text);font-weight:700">£{svc["total_sell"]:.2f}/mo</span>
         </div>
-        <div class="cv-price-row" style="font-weight:700;border-top:2px solid #1f1450;margin-top:4px;padding-top:8px">
-          <span style="color:#1f1450">Total (excl. VAT)</span>
-          <span style="color:#1f1450;font-size:1.1rem">£{total_mo - _bb_yr1_saving:.2f}/mo</span>
+        <div class="cv-price-row" style="font-weight:700;border-top:2px solid var(--border-strong);margin-top:4px;padding-top:8px">
+          <span style="color:var(--text)">Total (excl. VAT)</span>
+          <span style="color:var(--text);font-size:1.1rem">£{total_mo - _bb_yr1_saving:.2f}/mo</span>
         </div>
         """, unsafe_allow_html=True)
         if bb_free_year and _bb_yr1_saving > 0:
             st.markdown(f"""
-            <div style="background:#e8f8f0;border-left:3px solid #1a7a40;border-radius:6px;
-                 padding:0.5rem 0.8rem;font-size:0.8rem;color:#1a7a40;margin-top:0.3rem">
+            <div style="background:rgba(52,211,153,.12);border-left:3px solid var(--good);border-radius:6px;
+                 padding:0.5rem 0.8rem;font-size:0.8rem;color:var(--good);margin-top:0.3rem">
               🎁 <strong>Broadband FREE for the first 12 months</strong><br>
               From month 13: £{total_mo:.2f}/mo (broadband £{_bb_full_sell:.2f}/mo resumes)
             </div>""", unsafe_allow_html=True)
         if st.session_state.get("cs_ai_portal_free", False):
             st.markdown("""
-            <div style="background:#e8f8f0;border-left:3px solid #1a7a40;border-radius:6px;
-                 padding:0.5rem 0.8rem;font-size:0.8rem;color:#1a7a40;margin-top:0.3rem">
+            <div style="background:rgba(52,211,153,.12);border-left:3px solid var(--good);border-radius:6px;
+                 padding:0.5rem 0.8rem;font-size:0.8rem;color:var(--good);margin-top:0.3rem">
               🎁 <strong>AI Integration Portal — first month free</strong> (500 min bundle)<br>
               <span style="font-size:0.75rem">From month 2: £25.00/mo (500 min bundle)</span>
             </div>""", unsafe_allow_html=True)
         st.markdown(f"""
-        <div style="text-align:center;padding:0.5rem 0;font-size:0.8rem;color:#aaa">
-          Agreement term: <strong style="color:#555">{lease_term} months</strong>
+        <div style="text-align:center;padding:0.5rem 0;font-size:0.8rem;color:var(--muted)">
+          Agreement term: <strong style="color:var(--muted)">{lease_term} months</strong>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown(f"""
-        <div style="margin-top:1rem;padding:0.8rem 1rem;background:#f8f9ff;border-radius:8px;font-size:0.82rem;color:#555;text-align:center">
+        <div style="margin-top:1rem;padding:0.8rem 1rem;background:var(--surface-2);border-radius:8px;font-size:0.82rem;color:var(--muted);text-align:center">
           All figures exclude VAT.<br>
           Subject to survey & credit approval.
         </div>
@@ -4470,7 +4389,10 @@ with tab5:
                                  label_visibility="collapsed", key="consultant_pw")
         with c_col2:
             if st.button("Unlock 💼", type="primary", use_container_width=True, key="c_unlock"):
-                if c_pw == "SYComms2026!!":
+                _cons_pw = _secret("CONSULTANT_PASSWORD")
+                if not _cons_pw:
+                    st.error("Consultant sign-in isn't set up yet. Add CONSULTANT_PASSWORD to the app's Secrets.")
+                elif hmac.compare_digest(c_pw.encode(), _cons_pw.encode()):
                     st.session_state.consultant_unlocked = True
                     st.rerun()
                 else:
@@ -4485,14 +4407,14 @@ with tab5:
 
         # ── Deal snapshot strip ────────────────────────────────────────────
         st.markdown(f"""
-        <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);border-radius:12px;
+        <div style="background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);border-radius:12px;
              padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;
              justify-content:space-between;align-items:center;color:#fff">
           <div><div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">CUSTOMER</div>
-               <div style="font-size:1rem;font-weight:700">{comp_name or "-"}</div></div>
+               <div style="font-size:1rem;font-weight:700">{esc(comp_name or "-")}</div></div>
           <div style="text-align:center">
                <div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">BASE MONTHLY</div>
-               <div style="font-size:1.4rem;font-weight:800;color:#00b5a3">£{total_mo:.2f}</div></div>
+               <div style="font-size:1.4rem;font-weight:800;color:var(--accent)">£{total_mo:.2f}</div></div>
           <div style="text-align:right">
                <div style="font-size:0.72rem;color:rgba(255,255,255,0.55)">TERM</div>
                <div style="font-size:1rem;font-weight:700">{LEASE_TERM_LABELS[lease_term]}</div></div>
@@ -4535,8 +4457,8 @@ with tab5:
             est_earnings = commission
 
         with c_right:
-            _adj_colour = "#1a7a40" if rental_adjustment >= 0 else "#c0392b"
-            _adj_bg     = "#e8f8f0" if rental_adjustment >= 0 else "#fdf0f0"
+            _adj_colour = "#34D399" if rental_adjustment >= 0 else "#F87171"
+            _adj_bg     = "rgba(52,211,153,.12)" if rental_adjustment >= 0 else "rgba(248,113,113,.12)"
             _adj_label  = "Premium vs Calculated" if rental_adjustment >= 0 else "Discount vs Calculated"
             _adj_prefix = "+" if rental_adjustment >= 0 else ""
             st.markdown(f"""
@@ -4544,7 +4466,7 @@ with tab5:
                  border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
               <div style="font-size:0.72rem;color:{_adj_colour};font-weight:700;text-transform:uppercase">{_adj_label}</div>
               <div style="font-size:1.6rem;font-weight:800;color:{_adj_colour}">{_adj_prefix}£{rental_adjustment:.2f}/mo</div>
-              <div style="font-size:0.8rem;color:#555;margin-top:0.2rem">
+              <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem">
                 Calculated: £{base_rental:.2f}/mo &nbsp;·&nbsp; Desired: £{_desired_rental:.2f}/mo
               </div>
             </div>
@@ -4556,31 +4478,31 @@ with tab5:
         with r1a:
             if current_system > 0:
                 st.markdown(f"""
-                <div style="background:#fff;border:2px solid #e0e8f0;border-radius:12px;
+                <div style="background:var(--surface);border:2px solid var(--border);border-radius:12px;
                      padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Phone System / Lease (Current)</div>
-                  <div style="font-size:2rem;font-weight:800;color:#c0392b">£{current_system:.2f}</div>
-                  <div style="font-size:0.78rem;color:#aaa">per month + VAT</div>
+                       letter-spacing:.08em;color:var(--muted);margin-bottom:0.5rem">Phone System / Lease (Current)</div>
+                  <div style="font-size:2rem;font-weight:800;color:var(--bad)">£{current_system:.2f}</div>
+                  <div style="font-size:0.78rem;color:var(--muted)">per month + VAT</div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown("""
-                <div style="background:#f8f9ff;border:2px dashed #d0d8e8;border-radius:12px;
+                <div style="background:var(--surface-2);border:2px dashed var(--border-strong);border-radius:12px;
                      padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Phone System / Lease (Current)</div>
-                  <div style="font-size:1rem;color:#aaa">Enter under<br>Current Costs →</div>
+                       letter-spacing:.08em;color:var(--muted);margin-bottom:0.5rem">Phone System / Lease (Current)</div>
+                  <div style="font-size:1rem;color:var(--muted)">Enter under<br>Current Costs →</div>
                 </div>
                 """, unsafe_allow_html=True)
 
         with r1b:
             st.markdown(f"""
-            <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);
-                 border-radius:12px;padding:1.2rem;text-align:center;border:2px solid #00b5a3">
+            <div style="background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);
+                 border-radius:12px;padding:1.2rem;text-align:center;border:2px solid var(--accent)">
               <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
                    letter-spacing:.08em;color:rgba(255,255,255,0.6);margin-bottom:0.5rem">New Monthly Lease with SY Comms</div>
-              <div style="font-size:2rem;font-weight:800;color:#00b5a3">£{_desired_rental:.2f}</div>
+              <div style="font-size:2rem;font-weight:800;color:var(--accent)">£{_desired_rental:.2f}</div>
               <div style="font-size:0.78rem;color:rgba(255,255,255,0.5)">hardware lease per month + VAT</div>
             </div>
             """, unsafe_allow_html=True)
@@ -4588,8 +4510,8 @@ with tab5:
         with r1c:
             if current_system > 0:
                 _ls_saving = current_system - _desired_rental
-                _ls_col    = "#1a7a40" if _ls_saving >= 0 else "#c0392b"
-                _ls_bg     = "#e8f8f0" if _ls_saving >= 0 else "#fdf0f0"
+                _ls_col    = "#34D399" if _ls_saving >= 0 else "#F87171"
+                _ls_bg     = "rgba(52,211,153,.12)" if _ls_saving >= 0 else "rgba(248,113,113,.12)"
                 _ls_lbl    = "Lease Saving" if _ls_saving >= 0 else "Lease Increase"
                 _ls_pfx    = "-" if _ls_saving >= 0 else "+"
                 st.markdown(f"""
@@ -4603,11 +4525,11 @@ with tab5:
                 """, unsafe_allow_html=True)
             else:
                 st.markdown("""
-                <div style="background:#f8f9ff;border:2px dashed #d0d8e8;border-radius:12px;
+                <div style="background:var(--surface-2);border:2px dashed var(--border-strong);border-radius:12px;
                      padding:1.2rem;text-align:center">
                   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                       letter-spacing:.08em;color:#888;margin-bottom:0.5rem">Lease Saving</div>
-                  <div style="font-size:1rem;color:#aaa">Add current costs<br>to calculate</div>
+                       letter-spacing:.08em;color:var(--muted);margin-bottom:0.5rem">Lease Saving</div>
+                  <div style="font-size:1rem;color:var(--muted)">Add current costs<br>to calculate</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -4615,24 +4537,24 @@ with tab5:
         # Use adjusted values from breakdown if consultant has made changes
         _c_adj_total = svc["total_sell"] + _desired_rental
         _diff_total    = current_total - _c_adj_total
-        _diff_col      = "#1a7a40" if _diff_total >= 0 else "#c0392b"
+        _diff_col      = "#34D399" if _diff_total >= 0 else "#F87171"
         _curr_total_str = f"£{current_total:.2f}" if current_total > 0 else "-"
         _curr_sys_str   = f"£{current_system:.2f}" if current_system > 0 else "-"
         st.markdown(f"""
-        <div style="background:#f0f4ff;border:1px solid #c0cce0;border-radius:10px;
+        <div style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;
              padding:0.8rem 1.2rem;margin-top:0.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div style="flex:1;text-align:center;border-right:1px solid #c0cce0;padding-right:1rem">
-              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#888">Customer Current Total</div>
-              <div style="font-size:1.4rem;font-weight:800;color:#c0392b">{_curr_total_str}<span style="font-size:0.75rem;font-weight:400"> /mo</span></div>
-              <div style="font-size:0.72rem;color:#aaa">Lease {_curr_sys_str} + other spend</div>
+            <div style="flex:1;text-align:center;border-right:1px solid var(--border-strong);padding-right:1rem">
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted)">Customer Current Total</div>
+              <div style="font-size:1.4rem;font-weight:800;color:var(--bad)">{_curr_total_str}<span style="font-size:0.75rem;font-weight:400"> /mo</span></div>
+              <div style="font-size:0.72rem;color:var(--muted)">Lease {_curr_sys_str} + other spend</div>
             </div>
             <div style="flex:1;text-align:center;padding:0 1rem">
-              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#1f1450">New Monthly Total (Lease + Services)</div>
-              <div style="font-size:1.6rem;font-weight:800;color:#1f1450">£{_c_adj_total:.2f}<span style="font-size:0.75rem;font-weight:400"> + VAT</span></div>
-              <div style="font-size:0.72rem;color:#555">£{_desired_rental:.2f} lease + £{svc["total_sell"]:.2f} services</div>
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text)">New Monthly Total (Lease + Services)</div>
+              <div style="font-size:1.6rem;font-weight:800;color:var(--text)">£{_c_adj_total:.2f}<span style="font-size:0.75rem;font-weight:400"> + VAT</span></div>
+              <div style="font-size:0.72rem;color:var(--muted)">£{_desired_rental:.2f} lease + £{svc["total_sell"]:.2f} services</div>
             </div>
-            <div style="flex:1;text-align:center;border-left:1px solid #c0cce0;padding-left:1rem">
+            <div style="flex:1;text-align:center;border-left:1px solid var(--border-strong);padding-left:1rem">
               <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:{_diff_col}">{"Total Saving" if _diff_total >= 0 else "Total Increase"}</div>
               <div style="font-size:1.4rem;font-weight:800;color:{_diff_col}">{"+" if _diff_total < 0 else "-"}£{abs(_diff_total):.2f}<span style="font-size:0.75rem;font-weight:400"> /mo</span></div>
               <div style="font-size:0.72rem;color:{_diff_col}">£{abs(_diff_total*12):.0f}/yr</div>
@@ -4654,7 +4576,7 @@ with tab5:
                  letter-spacing:.1em;color:rgba(255,255,255,0.6)">Your Estimated Commission</div>
             <div style="font-size:2.2rem;font-weight:800;color:#fff">£{est_earnings:.2f}</div>
           <div style="font-size:0.82rem;color:rgba(255,255,255,0.55)">{commission_units:.2f} units × £{commission_per_unit:.0f} - {LEASE_TERM_LABELS[lease_term]}</div>\n          </div>
-          {"<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5);'>Rate Uplift Applied</div><div style='font-size:1.3rem;font-weight:700;color:#7fe8a0'>+£" + f"{rate_uplift:.2f}" + "/mo</div></div>" if rate_uplift > 0 else "<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5)'>Tip</div><div style='font-size:0.88rem;color:rgba(255,255,255,0.7)'>Increase the monthly<br>rate above to earn more</div></div>"}
+          {"<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5);'>Rate Uplift Applied</div><div style='font-size:1.3rem;font-weight:700;color:var(--good)'>+£" + f"{rate_uplift:.2f}" + "/mo</div></div>" if rate_uplift > 0 else "<div style='text-align:right'><div style='font-size:0.75rem;color:rgba(255,255,255,0.5)'>Tip</div><div style='font-size:0.88rem;color:rgba(255,255,255,0.7)'>Increase the monthly<br>rate above to earn more</div></div>"}
         </div>
         """, unsafe_allow_html=True)
 
@@ -4682,13 +4604,13 @@ with tab5:
 
             def _svc_row(label, list_price, new_price, note=""):
                 _chg = new_price < list_price - 0.005
-                _was = (f"<span style='color:#aaa;text-decoration:line-through;margin-right:0.5rem'>£{list_price:.2f}</span>"
+                _was = (f"<span style='color:var(--muted);text-decoration:line-through;margin-right:0.5rem'>£{list_price:.2f}</span>"
                         if _chg else "")
-                _nt  = f"<span style='color:#aaa;font-size:0.75rem'> {note}</span>" if note else ""
+                _nt  = f"<span style='color:var(--muted);font-size:0.75rem'> {note}</span>" if note else ""
                 return (f"<div style='display:flex;justify-content:space-between;padding:0.35rem 0;"
-                        f"border-bottom:1px solid #f0f0f0;font-size:0.88rem'>"
-                        f"<span style='color:#555'>{label}{_nt}</span>"
-                        f"<span>{_was}<strong style='color:#1f1450'>£{new_price:.2f}/mo</strong></span></div>")
+                        f"border-bottom:1px solid var(--border);font-size:0.88rem'>"
+                        f"<span style='color:var(--muted)'>{label}{_nt}</span>"
+                        f"<span>{_was}<strong style='color:var(--text)'>£{new_price:.2f}/mo</strong></span></div>")
 
             _svc_saving = ((lic_list_total - svc["lic_monthly"]) + (sw_list_total - sw_sell_total) +
                            (bb1_list + bb2_list - svc["bb_sell"]))
@@ -4708,23 +4630,23 @@ with tab5:
             if svc.get("mobile_sell", 0) > 0:
                 _rows += _svc_row("Mobiles", svc["mobile_sell"], svc["mobile_sell"], "(fixed)")
             if not _rows:
-                _rows = "<div style='color:#aaa;font-size:0.85rem'>No licences or services on this deal yet.</div>"
+                _rows = "<div style='color:var(--muted);font-size:0.85rem'>No licences or services on this deal yet.</div>"
             st.markdown(_rows + _svc_row("<strong>Total monthly services</strong>",
                                          svc["total_sell"] + _svc_saving,
                                          svc["total_sell"]),
                         unsafe_allow_html=True)
 
         with _sd_col2:
-            _cm_col = "#c0392b" if commission_lost > 0 else "#1a7a40"
-            _cm_bg  = "#fdf0f0" if commission_lost > 0 else "#e8f8f0"
+            _cm_col = "#F87171" if commission_lost > 0 else "#34D399"
+            _cm_bg  = "rgba(248,113,113,.12)" if commission_lost > 0 else "rgba(52,211,153,.12)"
             st.markdown(f"""
             <div style="background:{_cm_bg};border-left:4px solid {_cm_col};
                  border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
               <div style="font-size:0.72rem;color:{_cm_col};font-weight:700;text-transform:uppercase">Commission Impact</div>
-              <div style="font-size:0.85rem;color:#555;margin-top:0.3rem">Before discount: <strong>£{commission_full:.2f}</strong></div>
+              <div style="font-size:0.85rem;color:var(--muted);margin-top:0.3rem">Before discount: <strong>£{commission_full:.2f}</strong></div>
               <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
-              <div style="font-size:1.5rem;font-weight:800;color:#1f1450;margin-top:0.3rem">£{commission:.2f}</div>
-              <div style="font-size:0.75rem;color:#888">Services saving to customer: £{_svc_saving:.2f}/mo</div>
+              <div style="font-size:1.5rem;font-weight:800;color:var(--text);margin-top:0.3rem">£{commission:.2f}</div>
+              <div style="font-size:0.75rem;color:var(--muted)">Services saving to customer: £{_svc_saving:.2f}/mo</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -4739,8 +4661,8 @@ with tab5:
         _feas_lease_total   = max(adj_rental - _buyout_rental, 0) * lease_term
         _feas_max_settle    = round(_feas_lease_total * 0.70, 2)
         _settle_ok          = termination_cost <= _feas_max_settle
-        _f_col  = "#1a7a40" if _settle_ok else "#c0392b"
-        _f_bg   = "#e8f8f0" if _settle_ok else "#fdf0f0"
+        _f_col  = "#34D399" if _settle_ok else "#F87171"
+        _f_bg   = "rgba(52,211,153,.12)" if _settle_ok else "rgba(248,113,113,.12)"
         _f_icon = "✅" if _settle_ok else "🔴"
         _f_msg  = "Settlement feasible" if _settle_ok else "Settlement exceeds 70% - review"
         _f_diff = _feas_max_settle - termination_cost
@@ -4765,13 +4687,13 @@ with tab5:
 
         # Summary bar ────────────────────────────────────────────────────────────
         st.markdown(f"""
-        <div style="background:#1f1450;border-radius:10px;padding:0.8rem 1.2rem;margin-top:0.6rem;
+        <div style="background:var(--surface-3);border-radius:10px;padding:0.8rem 1.2rem;margin-top:0.6rem;
              display:flex;justify-content:space-between;align-items:center;color:#fff">
           <div><span style="font-size:0.8rem;color:rgba(255,255,255,0.6)">ADJUSTED TOTAL</span>
-               <div style="font-size:1.6rem;font-weight:800;color:#00b5a3">£{adj_total_mo:.2f}/mo</div></div>
+               <div style="font-size:1.6rem;font-weight:800;color:var(--accent)">£{adj_total_mo:.2f}/mo</div></div>
           <div style="text-align:right">
                <span style="font-size:0.8rem;color:rgba(255,255,255,0.6)">COMMISSION ON ADJ. RENTAL</span>
-               <div style="font-size:1.4rem;font-weight:700;color:#7fe8a0">£{_adj_commission:.2f}
+               <div style="font-size:1.4rem;font-weight:700;color:var(--good)">£{_adj_commission:.2f}
                <span style="font-size:0.8rem;font-weight:400"> ({_adj_units:.2f} units)</span></div>
           </div>
         </div>
@@ -4787,45 +4709,45 @@ with tab5:
         sc1, sc2 = st.columns(2)
         with sc1:
             st.markdown(f"""
-            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
                  padding:1rem;font-size:0.85rem">
               <table style="width:100%;border-collapse:collapse">
-                <tr><td style="color:#888;padding:3px 0">Cash Sale?</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Cash Sale?</td>
                     <td style="font-weight:600;text-align:right">No (Lease)</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Term</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Term</td>
                     <td style="font-weight:600;text-align:right">1+{lease_term-1}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Rental (Calculated)</td>
-                    <td style="font-weight:600;text-align:right;color:#1f1450">£{pl_data["rental"]:.2f}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Adjustment</td>
-                    <td style="font-weight:600;text-align:right;color:{"#1a7a40" if rental_adjustment>=0 else "#c0392b"}">{"+" if rental_adjustment>=0 else ""}£{rental_adjustment:.2f}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Units</td>
-                    <td style="font-weight:600;text-align:right;color:#00b5a3">{commission_units:.2f}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Desired Rental</td>
-                    <td style="font-weight:600;text-align:right;color:#1f1450">£{_desired_rental:.2f}</td></tr>
-                <tr style="border-top:1px solid #eee">
-                    <td style="color:#888;padding:3px 0">Adjustment Required</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Rental (Calculated)</td>
+                    <td style="font-weight:600;text-align:right;color:var(--text)">£{pl_data["rental"]:.2f}</td></tr>
+                <tr><td style="color:var(--muted);padding:3px 0">Adjustment</td>
+                    <td style="font-weight:600;text-align:right;color:{"#34D399" if rental_adjustment>=0 else "#F87171"}">{"+" if rental_adjustment>=0 else ""}£{rental_adjustment:.2f}</td></tr>
+                <tr><td style="color:var(--muted);padding:3px 0">Units</td>
+                    <td style="font-weight:600;text-align:right;color:var(--accent)">{commission_units:.2f}</td></tr>
+                <tr><td style="color:var(--muted);padding:3px 0">Desired Rental</td>
+                    <td style="font-weight:600;text-align:right;color:var(--text)">£{_desired_rental:.2f}</td></tr>
+                <tr style="border-top:1px solid var(--border)">
+                    <td style="color:var(--muted);padding:3px 0">Adjustment Required</td>
                     <td style="font-weight:600;text-align:right">£{abs(rental_adjustment):.2f}</td></tr>
               </table>
             </div>
             """, unsafe_allow_html=True)
         with sc2:
             st.markdown(f"""
-            <div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
                  padding:1rem;font-size:0.85rem">
               <table style="width:100%;border-collapse:collapse">
-                <tr><td style="color:#888;padding:3px 0">Cash Adjustment</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Cash Adjustment</td>
                     <td style="font-weight:600;text-align:right">£0.00</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Cash Price</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Cash Price</td>
                     <td style="font-weight:600;text-align:right">£{_cash_price:.2f}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Cash Units</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Cash Units</td>
                     <td style="font-weight:600;text-align:right">{_cash_units:.2f}</td></tr>
-                <tr style="border-top:1px solid #eee">
-                    <td style="color:#888;padding:3px 0">Other Costs</td>
+                <tr style="border-top:1px solid var(--border)">
+                    <td style="color:var(--muted);padding:3px 0">Other Costs</td>
                     <td style="font-weight:600;text-align:right">£{termination_cost:.2f}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Sub Total</td>
+                <tr><td style="color:var(--muted);padding:3px 0">Sub Total</td>
                     <td style="font-weight:600;text-align:right">£{pl_data["sub_total"]:.2f}</td></tr>
-                <tr><td style="color:#888;padding:3px 0">Gross Profit</td>
-                    <td style="font-weight:600;text-align:right;color:#1a7a40">£{pl_data["gross_profit"]:.2f}</td></tr>
+                <tr><td style="color:var(--muted);padding:3px 0">Gross Profit</td>
+                    <td style="font-weight:600;text-align:right;color:var(--good)">£{pl_data["gross_profit"]:.2f}</td></tr>
               </table>
             </div>
             """, unsafe_allow_html=True)
@@ -4857,23 +4779,23 @@ with tab5:
         feas_col1, feas_col2 = st.columns(2)
         with feas_col1:
             st.markdown(f"""
-            <div style='background:#fff;border:1px solid #e0e8f0;border-radius:12px;padding:1.2rem'>
-              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>New Monthly Rental</div>
-              <div style='font-size:2rem;font-weight:800;color:#1f1450'>£{_new_rental:.2f}</div>
-              <div style='font-size:0.8rem;color:#aaa'>per month over {LEASE_TERM_LABELS[lease_term]}</div>
+            <div style='background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem'>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>New Monthly Rental</div>
+              <div style='font-size:2rem;font-weight:800;color:var(--text)'>£{_new_rental:.2f}</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>per month over {LEASE_TERM_LABELS[lease_term]}</div>
               <hr style='margin:0.8rem 0'>
-              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Total Lease Value</div>
-              <div style='font-size:1.3rem;font-weight:700;color:#1f1450'>£{_lease_total:.2f}</div>
-              <div style='font-size:0.8rem;color:#aaa'>({lease_term} months × £{_new_rental:.2f})</div>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Total Lease Value</div>
+              <div style='font-size:1.3rem;font-weight:700;color:var(--text)'>£{_lease_total:.2f}</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>({lease_term} months × £{_new_rental:.2f})</div>
               <hr style='margin:0.8rem 0'>
-              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#888'>Max Settlement (70%)</div>
-              <div style='font-size:1.6rem;font-weight:800;color:#1a7a40'>£{_max_settlement:.2f}</div>
-              <div style='font-size:0.8rem;color:#aaa'>70% of total lease value</div>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement (70%)</div>
+              <div style='font-size:1.6rem;font-weight:800;color:var(--good)'>£{_max_settlement:.2f}</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>70% of total lease value</div>
             </div>
             """, unsafe_allow_html=True)
         with feas_col2:
-            _col  = '#1a7a40' if _settlement_ok else '#c0392b'
-            _bg   = '#e8f8f0' if _settlement_ok else '#fdf0f0'
+            _col  = '#34D399' if _settlement_ok else '#F87171'
+            _bg   = 'rgba(52,211,153,.12)' if _settlement_ok else 'rgba(248,113,113,.12)'
             _icon = '✅' if _settlement_ok else '🔴'
             _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% - Review Required'
             _diff = _max_settlement - termination_cost
@@ -4917,16 +4839,16 @@ with tab6:
 
     # ── Deal summary strip ────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style="background:linear-gradient(135deg,#1f1450,#2d1f6e);border-radius:12px;
+    <div style="background:linear-gradient(160deg,var(--surface-3) 0%,var(--surface-2) 100%);border-radius:12px;
             padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;
             justify-content:space-between;align-items:center;color:#fff">
       <div>
     <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Customer</div>
-    <div style="font-size:1.1rem;font-weight:700">{comp_name}</div>
+    <div style="font-size:1.1rem;font-weight:700">{esc(comp_name)}</div>
       </div>
       <div style="text-align:center">
     <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Monthly Services</div>
-    <div style="font-size:1.4rem;font-weight:800;color:#00b5a3">£{total_mo:.2f} + VAT</div>
+    <div style="font-size:1.4rem;font-weight:800;color:var(--accent)">£{total_mo:.2f} + VAT</div>
       </div>
       <div style="text-align:right">
     <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Upfront</div>
@@ -5135,7 +5057,13 @@ with tab7:
         with pw_col2:
             if st.button("Unlock 🔓", use_container_width=True):
                 h = hashlib.sha256(entered_pw.encode()).hexdigest()
-                if h == st.session_state.active_config["meta"]["password_hash"]:
+                _adm_secret = _secret("ADMIN_PASSWORD")
+                _cfg_hash   = st.session_state.active_config["meta"].get("password_hash", "")
+                _cfg_ok     = bool(_cfg_hash) and _cfg_hash != _DEFAULT_PWD_HASH  # ignore built-in default
+                if not _adm_secret and not _cfg_ok:
+                    st.error("Admin sign-in isn't set up yet. Add ADMIN_PASSWORD to the app's Secrets.")
+                elif ((_adm_secret and hmac.compare_digest(entered_pw.encode(), _adm_secret.encode()))
+                      or (_cfg_ok and hmac.compare_digest(h, _cfg_hash))):
                     st.session_state.admin_unlocked = True
                     st.rerun()
                 else:
@@ -5333,11 +5261,11 @@ with tab7:
                     for _idx, (_pname, _pb64) in enumerate(_assigned.items()):
                         with _img_cols[_idx % 4]:
                             st.markdown(
-                                f'<div style="background:#f8f9ff;border-radius:8px;padding:0.4rem;'
+                                f'<div style="background:var(--surface-2);border-radius:8px;padding:0.4rem;'
                                 f'text-align:center;margin-bottom:0.4rem">'
                                 f'<img src="data:image/jpeg;base64,{_pb64}" '
                                 f'style="max-height:60px;max-width:100%;object-fit:contain;border-radius:4px"/>'
-                                f'<div style="font-size:0.65rem;color:#555;margin-top:0.2rem;'
+                                f'<div style="font-size:0.65rem;color:var(--muted);margin-top:0.2rem;'
                                 f'word-break:break-word">{_pname}</div></div>',
                                 unsafe_allow_html=True
                             )
@@ -5760,7 +5688,7 @@ if st.session_state.admin_unlocked:
     with fi4:
         st.markdown(f'''<div class="metric-card">
           <div class="metric-label">Commission ({commission_units:.2f} units)</div>
-          <div class="metric-value" style="font-size:1.3rem;color:#00b5a3">£{commission:.0f}</div>
+          <div class="metric-value" style="font-size:1.3rem;color:var(--accent)">£{commission:.0f}</div>
           <div class="metric-sub">£{commission_per_unit:.0f}/unit · £{commission_unit_size:.0f} GP = 1 unit</div>
         </div>''', unsafe_allow_html=True)
     st.markdown("---")
@@ -5772,21 +5700,21 @@ if st.session_state.admin_unlocked:
     _total_gp        = round(pl_data["gross_profit"] + _svc_profit_term, 2)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
-        st.markdown(f'''<div class="metric-card" style="border-left:4px solid #1f1450">
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--border-strong)">
           <div class="metric-label">Lease Profit</div>
-          <div class="metric-value" style="color:#1f1450">£{pl_data["gross_profit"]:.0f}</div>
+          <div class="metric-value" style="color:var(--text)">£{pl_data["gross_profit"]:.0f}</div>
           <div class="metric-sub">From pricebook P&L formula</div>
         </div>''', unsafe_allow_html=True)
     with pb2:
-        st.markdown(f'''<div class="metric-card" style="border-left:4px solid #00b5a3">
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
           <div class="metric-label">Services Profit</div>
-          <div class="metric-value" style="color:#00b5a3">£{_svc_profit_term:.0f}</div>
+          <div class="metric-value" style="color:var(--accent)">£{_svc_profit_term:.0f}</div>
           <div class="metric-sub">£{_svc_margin_pm:.2f}/mo × {lease_term}mo  ·  sell £{_svc_sell_pm:.2f} cost £{_svc_cost_pm:.2f}</div>
         </div>''', unsafe_allow_html=True)
     with pb3:
-        st.markdown(f'''<div class="metric-card" style="border-left:4px solid #1a7a40;background:#f0faf4">
-          <div class="metric-label" style="color:#1a7a40">Total Gross Profit</div>
-          <div class="metric-value" style="color:#1a7a40">£{_total_gp:.0f}</div>
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--good);background:#f0faf4">
+          <div class="metric-label" style="color:var(--good)">Total Gross Profit</div>
+          <div class="metric-value" style="color:var(--good)">£{_total_gp:.0f}</div>
           <div class="metric-sub">Lease £{pl_data["gross_profit"]:.0f} + Services £{_svc_profit_term:.0f}</div>
         </div>''', unsafe_allow_html=True)
     if termination_cost > 0:
@@ -5799,3 +5727,85 @@ if st.session_state.admin_unlocked:
         st.markdown(f'<div class="warning-box">{pat_warn}</div>', unsafe_allow_html=True)
     if override_bb_sell > 0:
         st.markdown(f'<div class="info-box">🔐 BB Override by: {override_initials or "?"} | Customer: {override_customer or "?"}</div>', unsafe_allow_html=True)
+
+
+# ─── END OF RUN: hero, live summary, sign out ───────────────────────────────
+try:
+    _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
+    _n_hw = (_n_handsets + sum(headset_quantities.values())
+             + sum(q for q in other_quantities.values() if q))
+    _n_routers = sum(router_quantities.values()) if add_router else 0
+    _n_bb = (0 if bb_provider == "None / Customer Supplied" else 1) + extra_bb_count
+    _svc_mo = float(svc.get("total_sell", 0) or 0)
+    _has_customer, _has_hw, _has_svc = bool(comp_name), (_n_hw + _n_routers) > 0, _svc_mo > 0
+except Exception:
+    _n_handsets = _n_hw = _n_routers = _n_bb = 0
+    _svc_mo, _has_customer, _has_hw, _has_svc = 0.0, bool(st.session_state.get("q_comp_name")), False, False
+
+# Hero + stepper
+_steps = [("Customer", _has_customer), ("Hardware", _has_hw), ("Services", _has_svc), ("Paperwork", False)]
+_active = next((i for i, (_, d) in enumerate(_steps) if not d), len(_steps) - 1)
+_step_html = []
+for _i, (_lbl, _done) in enumerate(_steps):
+    _cls = "done" if _done else ("active" if _i == _active else "")
+    _num = "&#10003;" if _done else str(_i + 1)
+    _step_html.append(f'<div class="pe-step {_cls}"><div class="num">{_num}</div>{_lbl}</div>')
+_eyebrow = f"Quoting for {comp_name}" if comp_name else "New quote"
+render_html(
+    f'<div class="pe-hero"><div>'
+    f'<div class="pe-eyebrow"><span class="dot"></span>{esc(_eyebrow)}</div>'
+    f'<div class="pe-title">{esc(_CO)} <span>quote builder</span></div>'
+    f'<div class="pe-sub">Build the system, price the deal and produce the full paperwork pack.</div>'
+    f'</div><div class="pe-stepper">' + '<div class="pe-step-sep"></div>'.join(_step_html) + '</div></div>',
+    target=_hero_ph)
+
+# Live summary (customer-safe: no margins or commission)
+with _sum_card:
+    if not (_has_hw or _has_svc):
+        render_html(
+            '<div class="pe-empty"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+            'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/>'
+            '<line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg></div>'
+            '<div class="t">Nothing priced yet</div><ol>'
+            '<li>Add the customer in the sidebar</li>'
+            '<li>Pick phones and hardware</li>'
+            '<li>Choose broadband and services</li></ol></div>')
+    else:
+        _term_lbl = LEASE_TERM_LABELS.get(lease_term, "") if is_spread else "Upfront purchase"
+        _rows = []
+        if is_spread:
+            _rows.append(("Hardware lease", f"£{hw_monthly_spread:,.2f}/mo"))
+        else:
+            _rows.append(("Hardware (one-off)", f"£{upfront:,.2f}"))
+        _rows += [("Services", f"£{_svc_mo:,.2f}/mo"),
+                  ("Handsets", str(_n_handsets)),
+                  ("Broadband lines", str(_n_bb)),
+                  ("Routers", str(_n_routers)),
+                  ("User licences", str(total_voice_channels))]
+        _chips = []
+        try:
+            _cur = float(current_total or 0)
+            if _cur > 0:
+                _diff = _cur - total_mo
+                _chips.append(chip(f"Saving £{_diff * 12:,.0f}/yr", "good") if _diff >= 0
+                              else chip(f"£{abs(_diff) / 30.44:,.2f}/day investment", "accent"))
+        except Exception:
+            pass
+        if st.session_state.get("c_desired_rental", 0) > 0:
+            _chips.append(chip("Rental adjusted", "warn"))
+        render_html(
+            f'<div class="pe-sum-head"><div class="t">Live summary</div>{chip(_term_lbl, "accent")}</div>'
+            f'<div class="pe-sum-total"><div class="l">Total monthly</div>'
+            f'<div class="v">£{total_mo:,.2f} <small>+ VAT</small></div></div>'
+            f'<div class="pe-sum-rows">'
+            + "".join(f'<div class="pe-sum-row"><span class="k">{k}</span><span class="v">{v}</span></div>'
+                      for k, v in _rows)
+            + '</div>' + (f'<div class="pe-sum-foot">{"".join(_chips)}</div>' if _chips else ""))
+
+with st.sidebar:
+    st.markdown("")
+    if st.button("Log out", key="btn_logout", **FULL_WIDTH):
+        for _k in ("app_authenticated", "admin_unlocked", "consultant_unlocked"):
+            st.session_state[_k] = False
+        st.rerun()
