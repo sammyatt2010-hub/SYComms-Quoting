@@ -846,7 +846,7 @@ SERVICE_UPLIFT = 0.40
 
 
 # ─── HEADER (hero is filled at the end of the script) ────────────────────────
-_hero_ph = st.empty()
+_hero_ph = st.container(key="hero")  # keeps the old header on screen during a refresh, so the page never jumps
 
 # ── Apply any pending quote load (must happen before widgets render) ────────────
 if "_pending_quote" in st.session_state:
