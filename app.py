@@ -2388,6 +2388,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         if _sr.get("qty", 0) > 0:
             svc_items.append((s(_sr["name"]), _sr["qty"],
                               f"£{_sr['sell']*_sr['qty']:.2f}/mo"))
+    # Mobile SIMs
+    for _mr in mobile_rows:
+        if _mr.get("qty", 0) > 0:
+            svc_items.append((s(f"Mobile - {_mr['network']} {_mr['package']}"), _mr["qty"],
+                              f"£{_mr['sell']*_mr['qty']:.2f}/mo"))
 
     pdf.set_fill_color(31, 20, 80)
     pdf.set_text_color(255, 255, 255)
@@ -2914,50 +2919,48 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
              extra="If alarm works via the main system lines then a new standalone line may need to be added.")
     _crf_q(3,f"This agreement includes: {_vc_desc} voice channels and {_bb_desc} broadband service(s) as agreed. "
              "Additional services will be added at our standard tariffs.")
-    _crf_q(4,f"I am aware, if we have signed up for {_CO_LEGAL} line provision, a single figure code such as '9' "
-             "must be used to make external calls. Other methods may result in these calls being charged by other providers.")
-    _crf_q(5,f"I can confirm that I currently have {num_employees or '______'} employees")
-    _crf_q(6,f"{_CO_LEGAL} are unable to make any representations to any carrier or service provider on our behalf. "
+    _crf_q(4,f"I can confirm that I currently have {num_employees or '______'} employees")
+    _crf_q(5,f"{_CO_LEGAL} are unable to make any representations to any carrier or service provider on our behalf. "
              f"I appreciate that {_CO_LEGAL} can provide advice, but understand that any correspondence with current providers is ultimately our responsibility.")
-    _crf_q(7,"I am aware that there may be a delay in switching chosen carrier after installation has taken place "
+    _crf_q(6,"I am aware that there may be a delay in switching chosen carrier after installation has taken place "
              "and that calls during this period may be routed through your existing provider.")
-    _crf_q(8,"I understand that in the event that our telephone numbers do not exist within the BT network, "
-             f"Cloud5 Comms Network Services Ltd cannot guarantee that they will be ported to the {_CO_LEGAL} Network.")
-    _crf_q(9,"I am aware that the engineer will conduct a physical line check on site to help identify all available lines "
+    _crf_q(7,"I understand that in the event that our telephone numbers do not exist within the BT network, "
+             f"{_CO_LEGAL} cannot guarantee that they will be ported to the {_CO_LEGAL} Network.")
+    _crf_q(8,"I am aware that the engineer will conduct a physical line check on site to help identify all available lines "
              "coming into the premises. It is ultimately my responsibility to ensure all lines are accounted for.")
     if termination_cost > 0:
-        _crf_q(10,f"We acknowledge that in entering into the above agreement you have agreed to not only rent new equipment "
+        _crf_q(9,f"We acknowledge that in entering into the above agreement you have agreed to not only rent new equipment "
                  f"supplied by {_CO_LEGAL}, but also settlement of an existing agreement to the maximum sum of: "
                  f"£{termination_cost:.2f} as per the figure agreed on the order forms.")
     else:
-        _crf_q(10,"We acknowledge that in entering into the above agreement you have agreed to rent new equipment "
+        _crf_q(9,"We acknowledge that in entering into the above agreement you have agreed to rent new equipment "
                  f"supplied by {_CO_LEGAL} as per the figure agreed on the order forms.")
-    _crf_q(11,"I have confirmed the number of months remaining on existing contracts to the sales consultant")
-    _crf_q(12,"I understand that only the cash back for ETC charges agreed & listed on the order forms will be paid "
+    _crf_q(10,"I have confirmed the number of months remaining on existing contracts to the sales consultant")
+    _crf_q(11,"I understand that only the settlement for ETC charges agreed & listed on the order forms will be paid "
              f"by {_CO_LEGAL} upon receipt of a copy invoice & contract from the previous supplier")
-    _crf_q(13,f"I understand that any 'Special Conditions' agreed by {_CO_LEGAL} representative may not be considered "
+    _crf_q(12,f"I understand that any 'Special Conditions' agreed by {_CO_LEGAL} representative may not be considered "
              f"valid by {_CO_LEGAL} unless stated on the Order Form and clearly initialled by their representative.")
-    _crf_q(14,"I understand that UK Local, UK National and UK Mobile call costs only have been accounted for on my "
+    _crf_q(13,"I understand that UK Local, UK National and UK Mobile call costs only have been accounted for on my "
              f"call cost proposal with {_CO_LEGAL}")
-    _crf_q(15,f"I understand that if I do not take {_CO_LEGAL} mobiles after my current contract ends "
+    _crf_q(14,f"I understand that if I do not take {_CO_LEGAL} mobiles after my current contract ends "
              f"{_CO_LEGAL} cannot guarantee the mobile savings.")
-    _crf_q(16,"I agree that the rentals due under the Rental Agreement have been calculated based on the full purchase "
+    _crf_q(15,"I agree that the rentals due under the Rental Agreement have been calculated based on the full purchase "
              "price of the Equipment. We agree and accept that our obligation to pay the Rentals in full on their due "
              "dates without reduction, deduction, withholding, or offset whatsoever, shall apply notwithstanding any "
              "failure on the part of the Supplier or the Equipment.")
-    _crf_q(17,f"I fully understand that {_CO_LEGAL} will be and will at all times remain solely responsible for "
+    _crf_q(16,f"I fully understand that {_CO_LEGAL} will be and will at all times remain solely responsible for "
              "providing any maintenance or service provision in respect of the Equipment in a separate agreement. "
              "We are fully aware that if the Supplier stops providing maintenance for any reason we must fully "
              "comply with all obligations under the Rental Agreement to keep the Equipment maintained.")
-    _crf_q(18,f"I understand that due to the data protection act, {_CO_LEGAL} have no authority to cancel any "
+    _crf_q(17,f"I understand that due to the data protection act, {_CO_LEGAL} have no authority to cancel any "
              "existing agreements with 3rd party suppliers. I am aware that (where applicable) it is my responsibility "
              "to cancel any existing agreements.")
-    _crf_q(19,"Any settlement charges other than those on the Order Form can only be settled with supporting contracts "
+    _crf_q(18,"Any settlement charges other than those on the Order Form can only be settled with supporting contracts "
              f"from existing providers which must be provided to {_CO_LEGAL} on request.")
-    _crf_q(20,f"I understand that due to current trading climate {_CO_LEGAL} may require supportive additional "
+    _crf_q(19,f"I understand that due to current trading climate {_CO_LEGAL} may require supportive additional "
              "financial information prior to installation.")
-    _crf_q(22,f"I have provided a copy of bills relevant to the new services to be provided by {_CO_LEGAL}.")
-    _crf_q(23,"I am fully aware that the CTI (screen popping) may not fully integrate with my current database "
+    _crf_q(20,f"I have provided a copy of bills relevant to the new services to be provided by {_CO_LEGAL}.")
+    _crf_q(21,"I am fully aware that the CTI (screen popping) may not fully integrate with my current database "
              "and that screen popping may not be possible.")
 
     # Received forms checklist
@@ -3937,6 +3940,9 @@ with tab2:
             config_fields["Note"] = "Install & setup included in lease rental"
         else:
             config_fields["Upfront Hardware"] = f"£{upfront:.2f} (one-off)"
+        if mobile_rows:
+            config_fields["Mobile SIMs"] = (f"{sum(r['qty'] for r in mobile_rows)} connections - "
+                                            f"£{svc.get('mobile_sell', 0.0):.2f}/mo")
         config_fields["Monthly Services"] = f"£{svc['total_sell']:.2f} + VAT"
         config_fields["Total Monthly"]    = f"£{total_mo:.2f} + VAT"
         if credits_months > 0:
@@ -3972,6 +3978,9 @@ with tab2:
         for r in sec_rows:
             if r.get("qty", 0) > 0:
                 all_equip.append((r["name"], r["qty"]))
+        for r in mobile_rows:
+            if r["qty"] > 0:
+                all_equip.append((f"Mobile SIM: {r['network']} - {r['package']}", r["qty"]))
         for name, qty in all_equip:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:var(--muted)'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
@@ -4274,9 +4283,10 @@ with tab4:
             svc_lines.append(("Dark Web Monitoring", "£10.00/mo (after 3m FOC)"))
         if proactive_bb:
             svc_lines.append(("Proactive Broadband Management", "£10.00/mo (after 3m FOC)"))
-        if mobile_rows:
-            mob_total = sum(r["sell"] * r["qty"] for r in mobile_rows)
-            svc_lines.append((f"Mobile SIMs ({sum(r['qty'] for r in mobile_rows)} connections)", f"£{mob_total:.2f}/mo"))
+        for r in mobile_rows:
+            if r["qty"] > 0:
+                svc_lines.append((f"Mobile - {r['network']} {r['package']} x{r['qty']}",
+                                  f"£{r['sell'] * r['qty']:.2f}/mo"))
 
         for label, val in svc_lines:
             st.markdown(f"""
