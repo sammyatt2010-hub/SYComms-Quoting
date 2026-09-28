@@ -4234,7 +4234,7 @@ with tab4:
             if abs(_diff) < 0.005:
                 _dcol, _dstr = "var(--muted)", f"{chr(163)}0.00"
             else:
-                _dcol  = "#34D399" if _diff > 0 else "#F87171"
+                _dcol  = "#34D399"  # always green - an increase is presented as an investment, not a warning
                 _dstr  = f"-{chr(163)}{_diff:.2f}" if _diff > 0 else f"+{chr(163)}{abs(_diff):.2f}"
             _tbl += f'<tr>'
             _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border)">{_label}</td>'
