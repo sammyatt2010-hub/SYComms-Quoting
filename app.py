@@ -515,7 +515,7 @@ hw_uplift_upfront_override = C.get("hw_uplift_upfront_pct", 20)  # upfront purch
 # Mirrors the P&L cos_ex formula; keeps sidebar in sync with termination cost etc.
 def _early_rental_estimate():
     """Quick rental estimate using session-state widget values (no UI needed)."""
-    _term     = float(st.session_state.get("q_termination", 0))
+    _term     = float(st.session_state.get("q_termination", 0)) + sum(float(st.session_state.get(f"xc_amt_{_k}", 0) or 0) for _k in range(6))
     _lease    = int(st.session_state.get("q_lease_term", 36))
     _lr_map   = {24: 46.94, 36: 39.45, 48: 31.00, 60: 26.26, 72: 21.90, 84: 20.58}
     _sr       = _lr_map.get(_lease, 39.45)
@@ -533,7 +533,7 @@ _early_est = _early_rental_estimate()
 if _early_est > 0:
     st.session_state["_prev_base_rental"] = _early_est
 # Store current termination cost so next rerun can compute delta
-st.session_state["_prev_termination_cost"] = float(st.session_state.get("q_termination", 0))
+st.session_state["_prev_termination_cost"] = float(st.session_state.get("q_termination", 0)) + sum(float(st.session_state.get(f"xc_amt_{_k}", 0) or 0) for _k in range(6))
 _no_switch = False  # default - overridden by sidebar switch radio button
 switch_quantities = {}  # for manual multi-switch mode
 cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
@@ -542,6 +542,7 @@ mobile_rows = []   # default - overridden by sidebar
 current_calls = current_lines = current_bb = current_system = 0.0
 current_support = current_hosted = current_onhold = current_other = current_it = 0.0
 current_mobile = current_total = 0.0
+extra_costs, extra_costs_total = [], 0.0
 commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
 commission_per_unit  = C.get("commission_per_unit", 1000)   # £ per unit
@@ -583,7 +584,7 @@ QUOTE_KEYS = [
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp","q_ll_cost","q_ll_sell","q_ll_install",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
-    "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_termination","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
+    "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_termination","xc_desc_0","xc_amt_0","xc_desc_1","xc_amt_1","xc_desc_2","xc_amt_2","xc_desc_3","xc_amt_3","xc_desc_4","xc_amt_4","xc_desc_5","xc_amt_5","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
     "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
     "q_rep_name","q_rep_position",
     "c_svc_disc",
@@ -1028,6 +1029,30 @@ with st.sidebar:
             current_other   = st.number_input("Other / Misc (£/mo)",      0.0, step=5.0, key="q_curr_other")
         current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other + current_it + current_hosted
 
+    _xc_open = any(float(st.session_state.get(f"xc_amt_{_i}", 0) or 0) > 0 for _i in range(6))
+    with st.expander("🔒 Additional Costs (Internal)", expanded=_xc_open):
+        st.caption("Anything out of scope we need to cover, e.g. a long cable run, scaffold hire or a site survey. "
+                   "Added to our lease costings and never shown to the customer.")
+        extra_costs = []
+        for _i in range(6):
+            if _i > 0 and not (float(st.session_state.get(f"xc_amt_{_i-1}", 0) or 0) > 0
+                               or str(st.session_state.get(f"xc_desc_{_i-1}", "")).strip()):
+                break   # show the next row only once the previous one is used
+            _xc1, _xc2 = st.columns([1.5, 1])
+            _xd = _xc1.text_input("Description", key=f"xc_desc_{_i}", placeholder="e.g. Scaffold hire",
+                                  label_visibility="visible" if _i == 0 else "collapsed")
+            _xa = _xc2.number_input("Cost (£)", min_value=0.0, step=25.0, key=f"xc_amt_{_i}",
+                                    label_visibility="visible" if _i == 0 else "collapsed")
+            if _xa > 0:
+                extra_costs.append((_xd.strip() or "Additional cost", float(_xa)))
+        extra_costs_total = round(sum(_a for _, _a in extra_costs), 2)
+        if extra_costs_total > 0:
+            if "Lease" in payment_model:
+                _xrate = LEASE_RATES.get(lease_term, 0) or 0
+                st.caption(f"Total £{extra_costs_total:,.2f}  ·  adds about £{_xrate / 1000 * extra_costs_total:,.2f}/mo to the lease")
+            else:
+                st.caption(f"Total £{extra_costs_total:,.2f}  ·  added to the upfront price")
+
     st.markdown("### 🏦 Bank Details")
     bank_name  = st.text_input("Bank Name", key="q_bank_name")
     acc_holder = st.text_input("Account Holder", key="q_acc_holder")
@@ -1219,6 +1244,8 @@ with col_hw2:
                 "Broadband Router",
                 "Call Scope AI Setup (one-off)",
                 "Bluetooth Headset",
+                # Call Scope items are chosen in the Call Scope section; Platform Setup is added automatically
+                "Call Answer (500 mins)", "Website Widget", "Call Scope Platform Setup",
             ):
                 continue
             qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
@@ -1400,7 +1427,15 @@ with col_hw2:
             "Additional wired network ports", min_value=0,
             value=st.session_state.get("add_wired_ports", 0),
             step=1, key="add_wired_ports",
-            help="Extra POE ports needed beyond desk phones - affects switch auto-selection")
+            help="Extra ports beyond desk phones. Sizes the switch and adds one socket & cable run per port to the lease costs")
+        # Each extra wired port = one cable run, priced from the Other Hardware catalogue (editable in Admin)
+        _CABLE_ITEM = next((n for n in OTHER_HARDWARE if "cat5" in n.lower() or "cabling" in n.lower()), None)
+        if _CABLE_ITEM is None:
+            _CABLE_ITEM = "CAT5 Socket & Cabling (ea)"
+            OTHER_HARDWARE[_CABLE_ITEM] = {"buy": 65.00}
+        if additional_wired_ports > 0:
+            other_quantities[_CABLE_ITEM] = other_quantities.get(_CABLE_ITEM, 0) + int(additional_wired_ports)
+            st.caption(f"Adds {int(additional_wired_ports)} x {_CABLE_ITEM} to the lease costs")
 
     with st.expander("📱 Mobiles", expanded=False):
         mobile_rows = []
@@ -3622,7 +3657,7 @@ def compute_pricebook_pl():
     hw_rrp     = _hw_buy  * 1.5
     hw_srrp    = _hw_sell * 1.5
     maintenance_annual = 0.2 * hw_rrp
-    cos_ex     = maintenance_annual + 200.0 + compute_install_cost() + termination_cost + 400.0
+    cos_ex     = maintenance_annual + 200.0 + compute_install_cost() + termination_cost + extra_costs_total + 400.0
     sub_total  = cos_ex + hw_srrp
     rental     = (sales_rate / 1000.0) * sub_total
     disc_turn  = (rental / true_rate) * 1000.0
@@ -3708,7 +3743,7 @@ else:
     _bb_inst   = BROADBAND[bb_provider][bb_package]["install"]
     if bb_package == "Leased Line / Other":
         _bb_inst = ll_install
-    upfront    = hw_sell + compute_install_cost() + _bb_inst + extra_bb_install_total() + termination_cost
+    upfront    = hw_sell + compute_install_cost() + _bb_inst + extra_bb_install_total() + termination_cost + extra_costs_total
     if override_upfront > 0:
         upfront = override_upfront           # manager override
     total_mo   = svc["total_sell"]
@@ -4159,13 +4194,6 @@ with tab4:
                 {"cat": "Mobile"}
             ))
 
-        # Add additional wired ports as a card
-        if additional_wired_ports > 0:
-            all_selected.append((
-                "Extra Network Ports",
-                additional_wired_ports,
-                {"cat": "Switch"}
-            ))
 
         # Show in rows of 4
         for row_start in range(0, len(all_selected), 4):
