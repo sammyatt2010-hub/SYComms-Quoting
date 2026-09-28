@@ -3625,7 +3625,11 @@ _sec_svc_sell = sum(r["sell"] * r["qty"] for r in sec_rows)
 _sec_svc_cost = sum(r["buy"]  * r["qty"] for r in sec_rows)
 svc["cs_sell"]  = _cs_svc_sell
 svc["sec_sell"] = _sec_svc_sell
-svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell
+# IT Services (M365, Exclaimer, support etc.) are billed monthly, so they belong in the total
+_it_svc_sell = round(sum(r["sell"] * r["qty"] for r in it_rows), 2)
+_it_svc_cost = round(sum(r["cost"] * r["qty"] for r in it_rows), 2)
+svc["it_sell"] = _it_svc_sell
+svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell + _it_svc_sell
 
 # ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
 # Applies to hosted user licences, software add-ons and broadband (broadband is capped
@@ -3649,7 +3653,7 @@ if svc_disc_pct > 0:
     svc["bb_sell"]     = svc["bb1_sell"] + svc["bb2_sell"]
     svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
                           svc.get("mobile_sell", 0.0) + sw_sell_total +
-                          _cs_svc_sell + _sec_svc_sell)
+                          _cs_svc_sell + _sec_svc_sell + _it_svc_sell)
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
@@ -4177,36 +4181,31 @@ with tab4:
         # Build comparison rows
         # Build comparison using pricebook category structure
         # SY Comms side matches: Call Charges | Hosted Licences | Software | BB | Equipment Rental
-        comp_rows = []
-        if current_calls > 0:
-            comp_rows.append(("Call Charges", current_calls, 0.0))  # calls included in licence
-        if current_lines > 0:
-            comp_rows.append(("Line Rental & Associated", current_lines, 0.0))
-        if current_bb > 0:
-            comp_rows.append(("Broadband Charges", current_bb, svc["bb_sell"]))
-        if current_system > 0:
-            sys_new = hw_monthly_spread if is_spread else 0
-            comp_rows.append(("Equipment Rental", current_system, sys_new))
-        if current_support > 0:
-            _cv_it_sell = sum(r["sell"]*r["qty"] for r in it_rows) if it_rows else 0.0
-            if current_it > 0 or _cv_it_sell > 0:
-                comp_rows.append(("IT Services / M365",
-                                   current_it if current_it > 0 else 0.0,
-                                   _cv_it_sell if _cv_it_sell > 0 else 0.0))
-            comp_rows.append(("Maintenance & Support", current_support, 0.0))
-        if current_hosted > 0:
-            comp_rows.append(("Hosted System / User Licences", current_hosted, svc["lic_monthly"]))
-        else:
-            # Always show our hosted licences if we have them
-            if svc["lic_monthly"] > 0:
-                comp_rows.append(("Hosted User Licences", 0.0, svc["lic_monthly"]))
-        if current_onhold > 0:
-            comp_rows.append(("On Hold Marketing", current_onhold, 0.0))
-        # Software add-ons
-        if current_other > 0 or sw_sell_total > 0:
-            comp_rows.append(("Software Charges / Other", current_other, sw_sell_total))
-        elif sw_sell_total > 0:
-            comp_rows.append(("Software Charges", 0.0, sw_sell_total))
+        # One row per category whenever either side has a value. New services are
+        # grouped (e.g. all Call Scope in one row) so the table stays compact, and any
+        # remainder goes to "Other" so both columns always add up to the totals.
+        _cmp = [
+            ("Phone System / Hardware",   current_system,  hw_monthly_spread if is_spread else 0.0),
+            ("User Licences",             current_hosted,  svc["lic_monthly"]),
+            ("Call Charges",              current_calls,   0.0),
+            ("Broadband",                 current_bb,      svc["bb_sell"]),
+            ("Mobiles",                   current_mobile,  svc.get("mobile_sell", 0.0)),
+            ("IT Services / M365",        current_it,      svc.get("it_sell", 0.0)),
+            ("Support & Maintenance",     current_support, 0.0),
+            ("Software & Add-ons",        0.0,             sw_sell_total + svc.get("wallboard_mo", 0.0)),
+            ("Call Scope",                0.0,             svc.get("cs_sell", 0.0)),
+            ("System Security",           0.0,             svc.get("sec_sell", 0.0)),
+            ("Other",                     current_other,   0.0),
+        ]
+        comp_rows = [(l, round(cv, 2), round(nv, 2)) for l, cv, nv in _cmp if cv > 0.004 or nv > 0.004]
+        _cur_gap = round(current_total - sum(r[1] for r in comp_rows), 2)
+        _new_gap = round(total_mo      - sum(r[2] for r in comp_rows), 2)
+        if abs(_cur_gap) >= 0.01 or abs(_new_gap) >= 0.01:
+            _oth = next((i for i, r in enumerate(comp_rows) if r[0] == "Other"), None)
+            if _oth is None:
+                comp_rows.append(("Other", _cur_gap, _new_gap))
+            else:
+                comp_rows[_oth] = ("Other", comp_rows[_oth][1] + _cur_gap, comp_rows[_oth][2] + _new_gap)
 
         # Comparison table - built as a flat string to avoid markdown code-block indentation
         _saving_bg  = "rgba(52,211,153,.12)"  # always green — increase is also a positive investment
@@ -4226,14 +4225,17 @@ with tab4:
         _tbl += '<thead><tr style="background:var(--surface-3);color:#fff">'
         _tbl += '<th style="padding:10px 12px;text-align:left">Category</th>'
         _tbl += '<th style="padding:10px 12px;text-align:right">Current</th>'
-        _tbl += '<th style="padding:10px 12px;text-align:right">SY Comms</th>'
+        _tbl += f'<th style="padding:10px 12px;text-align:right">{esc(_CO)}</th>'
         _tbl += '<th style="padding:10px 12px;text-align:right">Difference</th>'
         _tbl += "</tr></thead><tbody>"
 
         for _label, _curr_v, _new_v in comp_rows:
             _diff  = _curr_v - _new_v
-            _dcol  = "#34D399" if _diff >= 0 else "#F87171"
-            _dstr  = f"-{chr(163)}{_diff:.2f}" if _diff >= 0 else f"+{chr(163)}{abs(_diff):.2f}"
+            if abs(_diff) < 0.005:
+                _dcol, _dstr = "var(--muted)", f"{chr(163)}0.00"
+            else:
+                _dcol  = "#34D399" if _diff > 0 else "#F87171"
+                _dstr  = f"-{chr(163)}{_diff:.2f}" if _diff > 0 else f"+{chr(163)}{abs(_diff):.2f}"
             _tbl += f'<tr>'
             _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border)">{_label}</td>'
             _tbl += f'<td style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right;color:var(--muted)">{chr(163)}{_curr_v:.2f}</td>'
@@ -5703,7 +5705,8 @@ if st.session_state.admin_unlocked:
         </div>''', unsafe_allow_html=True)
     st.markdown("---")
     # Row 2 - Profit breakdown cards
-    _svc_cost_pm    = svc["bb_cost"] + total_voice_channels * C.get("vc_cost_per_seat",2.95) + sw_cost_total + svc.get("mobile_cost",0.0)
+    _svc_cost_pm    = (svc["bb_cost"] + total_voice_channels * C.get("vc_cost_per_seat",2.95) + sw_cost_total
+                       + svc.get("mobile_cost",0.0) + _cs_svc_cost + _sec_svc_cost + _it_svc_cost)
     _svc_sell_pm    = svc["total_sell"]
     _svc_margin_pm  = _svc_sell_pm - _svc_cost_pm
     _svc_profit_term = round(_svc_margin_pm * lease_term, 2)
