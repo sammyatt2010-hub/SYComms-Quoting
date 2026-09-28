@@ -443,6 +443,11 @@ def _hw_quote_keys():
     for n in HANDSETS_CORDLESS: keys.append(f"cord_{n}")
     for n in HEADSETS:          keys.append(f"hs_{n}")
     for n in OTHER_HARDWARE:    keys.append(f"oth_{n}")
+    for _prov, _pkgs in BROADBAND.items():
+        for _pk in _pkgs:
+            if f"bb_extra_{_pk}" not in keys: keys.append(f"bb_extra_{_pk}")
+    for n in ROUTERS:           keys.append(f"rt_qty_{n}")
+    keys.append("router_mode")
     keys += ["standalone_softphones_key","wallboard_users_key",
              "auto_switch_key","manual_switch_key","router_type_key",
              "add_router_key","hw_fund_key","wired_ports_key"]
@@ -986,10 +991,22 @@ with st.sidebar:
     else:
         ll_cost = ll_sell = ll_install = 0.0
     bb_care      = st.selectbox("Care Level", ["Standard (FOC)", "Business (+£8/mo)"], key="q_bb_care")
-    second_fttp  = st.checkbox("Add 2nd Broadband Line", key="q_second_fttp")
-    second_fttp_pkg = None
-    if second_fttp:
-        second_fttp_pkg = st.selectbox("2nd Line Package", list(BROADBAND[bb_provider].keys()), key="bb2")
+    # ── Additional broadband lines (multi-site) ──────────────────────────────
+    extra_bb_lines = {}   # {package_name: qty}
+    if bb_provider != "None / Customer Supplied":
+        _extra_pkgs = [p for p in BROADBAND[bb_provider].keys() if p != "Leased Line / Other"]
+        _extra_open = any(st.session_state.get(f"bb_extra_{p}", 0) > 0 for p in _extra_pkgs)
+        with st.expander("➕ Additional Broadband Lines", expanded=_extra_open):
+            st.caption("Extra lines on top of the main line above (e.g. other sites).")
+            for _p in _extra_pkgs:
+                _q = st.number_input(_p, min_value=0, max_value=50, value=0, step=1,
+                                     key=f"bb_extra_{_p}")
+                if _q > 0:
+                    extra_bb_lines[_p] = int(_q)
+    extra_bb_count  = sum(extra_bb_lines.values())
+    # Legacy aliases so any older references stay safe
+    second_fttp     = extra_bb_count > 0
+    second_fttp_pkg = next(iter(extra_bb_lines), None)
 
     st.markdown("### 💰 Pricing Controls")
     def _sync_sidebar_to_cons():
@@ -1387,16 +1404,35 @@ with col_hw2:
         else:
             # FTTC, ADSL etc — no auto router (ISP provides modem/router)
             _default_router = None
+        def _router_for_pkg(_pkg):
+            _pl = (_pkg or "").lower()
+            if "fttp" in _pl and "Grandstream GWN7062E (FTTP)" in ROUTERS:
+                return "Grandstream GWN7062E (FTTP)"
+            if "fttp" in _pl and "Grandstream GWN 706 (FTTP)" in ROUTERS:
+                return "Grandstream GWN 706 (FTTP)"
+            if "sogea" in _pl and "Technicolour DGA Series (SoGEA)" in ROUTERS:
+                return "Technicolour DGA Series (SoGEA)"
+            if any(x in _pl for x in ("sogea", "fttp", "leased", "etherway")):
+                return next((k for k in ROUTERS if "Draytek" in k), list(ROUTERS.keys())[0])
+            return None   # FTTC / ADSL - ISP supplied
         router_quantities = {}
         add_router = False
         if _router_mode == "None / Customer Supplied":
             router_type = "None / Customer Supplied"
             add_router  = False
         elif _router_mode == "Auto-select":
-            if bb_provider != "None / Customer Supplied" and _default_router:
-                router_type = _default_router
-                router_quantities = {_default_router: 1}
-                add_router = True
+            if bb_provider != "None / Customer Supplied":
+                # Main line + every additional line gets a matching router
+                if _default_router:
+                    router_quantities[_default_router] = 1
+                for _xp, _xq in extra_bb_lines.items():
+                    _xr = _router_for_pkg(_xp)
+                    if _xr:
+                        router_quantities[_xr] = router_quantities.get(_xr, 0) + _xq
+            if router_quantities:
+                router_type = _default_router or next(iter(router_quantities))
+                add_router  = True
+                st.caption("Auto: " + ", ".join(f"{q} x {n}" for n, q in router_quantities.items()))
             else:
                 router_type = "None / Customer Supplied"
                 add_router  = False
@@ -1862,7 +1898,7 @@ def build_proposal_pdf():
             svc_rows.append((f"Broadband — {bb_provider} {bb_package} (FREE yr 1)",
                              f"GBP 0.00/mo (then GBP {_bb_full_sell:.2f})"))
         else:
-            svc_rows.append((f"Broadband — {bb_provider} {bb_package}", f"GBP {svc['bb_sell']:.2f}/mo"))
+            svc_rows.append((f"Broadband — {bb_provider} {bb_package}" + (f" + {extra_bb_count} additional line(s)" if extra_bb_count else ""), f"GBP {svc['bb_sell']:.2f}/mo"))
     if svc["lic_monthly"] > 0:
         svc_rows.append((f"Hosted User Licences ({total_voice_channels} users)", f"GBP {svc['lic_monthly']:.2f}/mo"))
     if sw_sell_total > 0:
@@ -2262,10 +2298,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     if svc["bb_sell"] > 0:
         all_equip_pdf.append((f"Broadband - {bb_provider} {bb_package}", 1,
                                f"£{svc['bb1_sell']:.2f}/mo"))
-    if second_fttp and second_fttp_pkg:
-        bb2 = svc["bb2_sell"]
-        all_equip_pdf.append((f"Broadband - {bb_provider} {second_fttp_pkg} (2nd line)", 1,
-                               f"£{bb2:.2f}/mo"))
+    for _xp, _xq, _xs in extra_bb_display():
+        all_equip_pdf.append((f"Broadband - {bb_provider} {_xp} (additional)", _xq, f"£{_xs:.2f}/mo"))
     for r in mobile_rows:
         if r["qty"] > 0:
             all_equip_pdf.append((f"{r['network']} - {r['package']}", r["qty"],
@@ -2388,9 +2422,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         svc_items = [(f"{bb_provider} - {bb_package}", 1, f"£{svc['bb1_sell']:.2f}/mo")]
     if st.session_state.get("cs_ai_portal_free", False):
         svc_items.append(("AI Integration Portal - 1st month FREE (500 mins)", 1, "£0.00 month 1 only"))
-    if second_fttp and second_fttp_pkg:
-        bb2_sell = svc["bb2_sell"]
-        svc_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
+    for _xp, _xq, _xs in extra_bb_display():
+        svc_items.append((f"{bb_provider} - {_xp} (additional)", _xq, f"£{_xs:.2f}/mo"))
     if total_voice_channels > 0:
         svc_items.append((f"User / Voice Licences x{total_voice_channels}", total_voice_channels, f"£{svc['lic_monthly']:.2f}/mo"))
     if ooh_support:
@@ -2775,18 +2808,35 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(45,5,"Qty",fill=True,ln=False,align="C")
     pdf.cell(0,5,"Billing",fill=True,ln=True,align="C")
     pdf.set_font("Helvetica","",8)
-    _cs_names = {r["name"] for r in cs_svc_rows}  # exclude CS software from warranty
-    for _name, _qty, _billing in all_equip_pdf:
-        _is_cs       = _name in _cs_names or "Call Scope" in _name
-        _is_svc_line = (_name.startswith("Broadband -") or
-                        _name.startswith("User / Voice Licences") or
-                        "Mobile" in _name or
-                        _name.startswith("IT:"))
-        if _qty > 0 and not _is_cs and not _is_svc_line:
-            pdf.set_fill_color(248,249,255)
-            pdf.cell(95,5,f"  {s(_name)}",fill=True,ln=False)
-            pdf.cell(45,5,str(_qty),fill=True,ln=False,align="C")
-            pdf.cell(0,5,s(_billing),fill=True,ln=True,align="C")
+    # Warranty covers PHYSICAL HARDWARE ONLY. Built from the hardware catalogues
+    # directly, so licences, software add-ons (e.g. Wallboard), broadband, mobiles,
+    # IT services and Call Scope can never appear here.
+    _NON_PHYSICAL = ("call scope", "call answer", "website widget", "my pa",
+                     "wallboard", "licence", "license", "setup (one-off)")
+    def _is_physical(_n):
+        return not any(k in _n.lower() for k in _NON_PHYSICAL)
+    warranty_items = []
+    for _name, _qty in {**desktop_quantities, **cordless_quantities,
+                        **headset_quantities, **other_quantities}.items():
+        if _qty > 0 and _is_physical(_name):
+            warranty_items.append((_name, _qty))
+    if auto_switch and not _no_switch:
+        warranty_items.append((f"Switch: {rec_switch['name']}", 1))
+    if add_router:
+        if router_quantities:
+            for _rn, _rq in router_quantities.items():
+                warranty_items.append((_rn, _rq))
+        elif router_type not in ("None / Customer Supplied", ""):
+            warranty_items.append((router_type, 1))
+    if not warranty_items:
+        pdf.set_font("Helvetica","I",8)
+        pdf.cell(0,5,"  No physical hardware on this order.",ln=True)
+        pdf.set_font("Helvetica","",8)
+    for _name, _qty in warranty_items:
+        pdf.set_fill_color(248,249,255)
+        pdf.cell(95,5,f"  {s(_name)}",fill=True,ln=False)
+        pdf.cell(45,5,str(_qty),fill=True,ln=False,align="C")
+        pdf.cell(0,5,s(_pdf_hw_billing),fill=True,ln=True,align="C")
     pdf.ln(4)
 
     # Warranty terms
@@ -3484,7 +3534,6 @@ def compute_hw_sell(uplift_pct=None):
                 if _rn in ROUTERS: total += ROUTERS[_rn] * (1 + hw_uplift_override / 100) * _rq
         elif router_type not in ("None / Customer Supplied", "") and router_type in ROUTERS:
             total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
-            total += ROUTERS[router_type] * (1 + hw_uplift_override / 100)
     return round(total, 2)
 
 def compute_install_cost():
@@ -3500,7 +3549,7 @@ def compute_upfront():
     # Override with bespoke pricing for Leased Line / Other
     if bb_package == "Leased Line / Other":
         bb_inst = ll_install
-    return compute_hw_sell() + compute_install_cost() + bb_inst
+    return compute_hw_sell() + compute_install_cost() + bb_inst + extra_bb_install_total()
 
 def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     """Compute all monthly service charges. sw_sell/sw_cost come from software add-ons."""
@@ -3521,10 +3570,10 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
         bb1_sell  += 8.0
         bb1_floor += 8.0                     # care charge passed through, not discountable
     bb2_sell = bb2_floor = 0.0
-    if second_fttp and second_fttp_pkg:
-        bb_cost2  = BROADBAND[bb_provider][second_fttp_pkg]["cost"]
-        bb2_sell  = bb_cost2 * (1.0 + uplift)
-        bb2_floor = bb_cost2
+    for _xp, _xq in extra_bb_lines.items():
+        _xcost     = BROADBAND[bb_provider][_xp]["cost"]
+        bb2_sell  += _xcost * (1.0 + uplift) * _xq
+        bb2_floor += _xcost * _xq
     bb_sell = bb1_sell + bb2_sell
 
     # Voice channels - fixed sell price from pricebook (Professional Bundle)
@@ -3554,6 +3603,22 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
         "sw_cost":        sw_cost,
         "total_sell":     total_sell,
     }
+
+
+def extra_bb_display():
+    """[(package, qty, monthly_total)] for each additional line, after discount.
+    Uses the same ratio as the aggregate bb2 price so rows always sum to svc['bb2_sell']."""
+    _rows = []
+    _list_total = sum(BROADBAND[bb_provider][p]["cost"] * (1.0 + service_uplift_pct / 100.0) * q
+                      for p, q in extra_bb_lines.items())
+    _ratio = (svc["bb2_sell"] / _list_total) if _list_total > 0 else 0.0
+    for p, q in extra_bb_lines.items():
+        _line_list = BROADBAND[bb_provider][p]["cost"] * (1.0 + service_uplift_pct / 100.0) * q
+        _rows.append((p, q, round(_line_list * _ratio, 2)))
+    return _rows
+
+def extra_bb_install_total():
+    return sum(BROADBAND[bb_provider][p]["install"] * q for p, q in extra_bb_lines.items())
 
 
 def compute_pricebook_pl():
@@ -3654,7 +3719,7 @@ else:
     _bb_inst   = BROADBAND[bb_provider][bb_package]["install"]
     if bb_package == "Leased Line / Other":
         _bb_inst = ll_install
-    upfront    = hw_sell + compute_install_cost() + _bb_inst + termination_cost
+    upfront    = hw_sell + compute_install_cost() + _bb_inst + extra_bb_install_total() + termination_cost
     if override_upfront > 0:
         upfront = override_upfront           # manager override
     total_mo   = svc["total_sell"]
@@ -3775,9 +3840,8 @@ with tab1:
             if addon_qty > 0:
                 net_items.append((addon_name, addon_qty, f"£{addon_sell * addon_qty:.2f}/mo"))
         # 2nd line BB
-        if second_fttp and second_fttp_pkg:
-            bb2_sell = svc["bb2_sell"]
-            net_items.append((f"{bb_provider} - {second_fttp_pkg} (2nd line)", 1, f"£{bb2_sell:.2f}/mo"))
+        for _xp, _xq, _xs in extra_bb_display():
+            net_items.append((f"{bb_provider} - {_xp} (additional)", _xq, f"£{_xs:.2f}/mo"))
         # Mobile rows
 
         net_df = pd.DataFrame(net_items, columns=["Service", "Qty", "Charge"])
@@ -4281,9 +4345,8 @@ with tab4:
         svc_lines = [
             (f"Business Broadband - {bb_provider} {bb_package}", f"£{svc['bb1_sell']:.2f}/mo"),
         ]
-        if second_fttp and second_fttp_pkg:
-            bb2_sell = svc["bb2_sell"]
-            svc_lines.append((f"2nd Line - {bb_provider} {second_fttp_pkg}", f"£{bb2_sell:.2f}/mo"))
+        for _xp, _xq, _xs in extra_bb_display():
+            svc_lines.append((f"Additional line x{_xq} - {bb_provider} {_xp}", f"£{_xs:.2f}/mo"))
         if total_voice_channels > 0:
             svc_lines.append((f"User / Voice Licences ({total_voice_channels} users)", f"£{svc['lic_monthly']:.2f}/mo"))
         if ooh_support:
@@ -4640,7 +4703,7 @@ with tab5:
                 _rows += _svc_row(f"Broadband - {bb_package}", bb1_list, svc["bb1_sell"],
                                   "(at wholesale floor)" if svc_disc_pct > 0 and svc["bb1_sell"] <= svc["bb1_floor"] + 0.005 else "")
             if bb2_list > 0:
-                _rows += _svc_row(f"Broadband 2nd line - {second_fttp_pkg}", bb2_list, svc["bb2_sell"],
+                _rows += _svc_row(f"Broadband additional lines ({extra_bb_count})", bb2_list, svc["bb2_sell"],
                                   "(at wholesale floor)" if svc_disc_pct > 0 and svc["bb2_sell"] <= svc["bb2_floor"] + 0.005 else "")
             if svc.get("mobile_sell", 0) > 0:
                 _rows += _svc_row("Mobiles", svc["mobile_sell"], svc["mobile_sell"], "(fixed)")
