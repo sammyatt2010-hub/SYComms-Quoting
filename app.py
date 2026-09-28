@@ -1604,332 +1604,332 @@ def s(text):
 
 
 def build_proposal_pdf():
-    """Visually rich two-page proposal matching brand identity."""
+    """Two-page proposal in the app's dark style, using the logged-in brand's accent.
+    Page 1: headline saving / daily investment + full cost comparison.
+    Page 2: new system, monthly services, agreement terms, why us, call to action."""
     from fpdf import FPDF
 
     def _ps(text):
-        return str(text or "").encode("latin-1", errors="replace").decode("latin-1")
+        t = str(text or "").replace("\u2014", "-").replace("\u2013", "-").replace("\u2019", "'")
+        return t.encode("latin-1", errors="replace").decode("latin-1")
 
-    p = FPDF()
-    p.set_auto_page_break(True, margin=15)
-    _p_logo_bytes = base64.b64decode(SYCOMMS_LOGO_B64) if _BRAND["logo_key"] else None
-    _p_logo_buf   = io.BytesIO(_p_logo_bytes) if _p_logo_bytes else None
+    def _rgb(h):
+        h = h.lstrip("#")
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
-    PW = 210  # page width mm
+    def gbp(v):
+        return f"\u00a3{v:,.2f}"
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # PAGE 1 — ABOUT SY COMMS
-    # ─────────────────────────────────────────────────────────────────────────────
-    p.add_page()
+    BG, SURF, SURF2, SURF3 = (10, 14, 26), (17, 24, 39), (22, 31, 51), (28, 39, 64)
+    LINE, TEXT, MUTED, FAINT = (41, 50, 71), (231, 234, 243), (140, 152, 176), (94, 106, 130)
+    GOOD = (52, 211, 153)
+    ACC  = _rgb(_BRAND.get("ui_accent", "#1CC8B4"))
+    ACC2 = _rgb(_BRAND.get("ui_accent2", "#6EE7D8"))
+    ACC_SOFT = tuple(int(SURF[i] + (ACC[i] - SURF[i]) * 0.18) for i in range(3))
+    STAGE = (236, 240, 247)
+    PW, PH, M = 210, 297, 15
+    CW = PW - 2 * M
 
-    # ── Full-bleed hero (deep purple, 85mm) ──────────────────────────────────────
-    p.set_fill_color(31, 20, 80)
-    p.rect(0, 0, PW, 85, "F")
-    # Teal diagonal accent strip
-    p.set_fill_color(0, 181, 163)
-    p.rect(0, 82, PW, 3, "F")
-    # Logo
-    try:
-        if _p_logo_buf: p.image(_p_logo_buf, x=10, y=8, h=28); _p_logo_buf.seek(0)
-    except Exception: pass
-    # Hero headline
-    p.set_text_color(255, 255, 255)
-    p.set_font("Helvetica", "B", 22)
-    p.set_y(18); p.set_x(48)
-    p.cell(0, 10, s(_CO_LEGAL.upper()), ln=True)
-    p.set_font("Helvetica", "", 11); p.set_x(48)
-    p.set_text_color(0, 200, 180)
-    p.cell(0, 7, "Short term contracts, long term relationships.", ln=True)
-    p.set_font("Helvetica", "", 8.5); p.set_x(48)
-    p.set_text_color(180, 190, 220)
-    p.multi_cell(PW - 60, 4.5, _ps(
-        "Empowering local businesses through reliable telecoms, IT services, "
-        "high-speed internet and streamlined communication systems."))
-    # Teal tag pills
-    p.set_text_color(255, 255, 255)
-    p.set_font("Helvetica", "B", 7.5)
-    tags = ["All-Inclusive", "Fully Managed", "Local Engineers", "12-Month Contracts"]
-    tx = 48
-    for tag in tags:
-        tw = len(tag) * 2.5 + 6
-        p.set_fill_color(0, 140, 130)
-        p.rect(tx, 62, tw, 6, "F")
-        p.set_xy(tx + 2, 62.5)
-        p.cell(tw - 4, 5, tag, ln=False)
-        tx += tw + 3
-    p.set_text_color(0, 0, 0)
+    _logo_raw = base64.b64decode(SYCOMMS_LOGO_B64) if _BRAND.get("logo_key") else None
 
-    # ── Why SY Comms — 3-col icon cards ─────────────────────────────────────────
-    p.set_y(90)
-    p.set_font("Helvetica", "B", 10); p.set_text_color(31, 20, 80)
-    p.cell(0, 6, s(f"Why businesses trust {_CO}"), ln=True); p.ln(1)
+    class _Dark(FPDF):
+        def header(self):
+            self.set_fill_color(*BG)
+            self.rect(0, 0, PW, PH, "F")
 
-    vals3 = [
-        ("ONE BILL",         "Hardware, licences, broadband and support - one monthly payment."),
-        ("FULLY MANAGED",    "We handle installation, programming, warranty and helpdesk."),
-        ("UK CONNECTIVITY",  "FTTP, SoGEA, leased line and 4G/5G solutions available."),
-        ("LOCAL ENGINEERS",  "On-site support from engineers who know your area."),
-        ("NO LOCK-IN FEAR",  "Flexible terms - you stay because the service is great."),
-        ("CALL SCOPE AI",    "AI-powered call analytics built for modern business."),
-    ]
-    COL = 3; BW = (PW - 20 - (COL-1)*3) / COL; BH = 28
-    bx0 = p.l_margin
-    by  = p.get_y()  # initialise before loop
-    for n, (title, desc) in enumerate(vals3):
-        col = n % COL; row = n // COL
-        bx  = bx0 + col * (BW + 3)
-        if col == 0 and row > 0: by += BH + 3
-        # Card bg
-        p.set_fill_color(245, 247, 255)
-        p.rect(bx, by, BW, BH, "F")
-        # Teal left border
-        p.set_fill_color(0, 181, 163)
-        p.rect(bx, by, 2.5, BH, "F")
-        # Title
-        p.set_xy(bx + 5, by + 4)
-        p.set_font("Helvetica", "B", 7.5); p.set_text_color(31, 20, 80)
-        p.cell(BW - 6, 4, _ps(title), ln=True)
-        # Desc
-        p.set_x(bx + 5)
-        p.set_font("Helvetica", "", 6.8); p.set_text_color(80, 80, 80)
-        p.multi_cell(BW - 7, 3.5, _ps(desc))
-        if col == COL - 1:
-            p.set_y(by + BH + 3)
+        def footer(self):
+            self.set_y(-11)
+            self.set_draw_color(*LINE); self.set_line_width(0.2)
+            self.line(M, PH - 13, PW - M, PH - 13)
+            self.set_font("Helvetica", "", 6.8); self.set_text_color(*FAINT)
+            self.cell(CW * 0.8, 5, _ps(f"{_CO_LEGAL}  \u00b7  {_CO_EMAIL}  \u00b7  {_CO_PHONE}  \u00b7  {_CO_WEB}"))
+            self.cell(CW * 0.2, 5, f"{self.page_no()}", align="R")
 
-    p.set_text_color(0, 0, 0)
-    p.set_y(by + BH + 5)
+    p = _Dark(format="A4")
+    p.set_margins(M, M, M)
+    p.set_auto_page_break(True, margin=18)
 
-    # ── Contact strip ────────────────────────────────────────────────────────────
-    p.set_fill_color(31, 20, 80); p.set_text_color(255, 255, 255)
-    p.set_font("Helvetica", "B", 8)
-    p.cell(0, 7, "  Get in touch today", fill=True, ln=True)
-    p.set_font("Helvetica", "", 8)
-    contacts = [
-        ("Email",   _CO_EMAIL),
-        ("Phone",   _CO_PHONE),
-        ("Address", "Suite C Jupiter House, Shrewsbury Business Park, SY2 6LG"),
-        ("Web",     _CO_WEB),
-    ]
-    for lbl, val in contacts:
-        p.set_fill_color(45, 31, 110)
-        p.cell(22, 5.5, _ps(f"  {lbl}:"), fill=True, ln=False)
-        p.set_fill_color(55, 40, 130)
-        p.cell(0, 5.5, _ps(val), fill=True, ln=True)
-    p.set_text_color(0, 0, 0)
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # PAGE 2 — PERSONALISED PROPOSAL
-    # ─────────────────────────────────────────────────────────────────────────────
-    p.add_page()
-
-    # ── Compact header ────────────────────────────────────────────────────────────
-    p.set_fill_color(31, 20, 80); p.rect(0, 0, PW, 22, "F")
-    try:
-        if _p_logo_buf: p.image(_p_logo_buf, x=8, y=3, h=16); _p_logo_buf.seek(0)
-    except Exception: pass
-    p.set_text_color(255, 255, 255); p.set_font("Helvetica", "B", 13)
-    p.set_y(4); p.set_x(34)
-    p.cell(0, 8, "Your Personalised Proposal", ln=True)
-    p.set_font("Helvetica", "", 8); p.set_x(34)
-    p.set_text_color(160, 180, 220)
-    p.cell(0, 5, _ps(f"Prepared for: {s(comp_name or 'Your Company')}   |   {date.today().strftime('%d %B %Y')}"), ln=True)
-    p.set_fill_color(0, 181, 163); p.rect(0, 22, PW, 2, "F")
-    p.set_text_color(0, 0, 0); p.set_y(27)
-
-    # ── COST COMPARISON — 3 cards side by side ────────────────────────────────────
-    CW = 60; CH = 38; CG = 4; cy = p.get_y()
-    cx1, cx2, cx3 = p.l_margin, p.l_margin + CW + CG, p.l_margin + (CW + CG) * 2
-
-    def _big_card(cx, cy, cw, ch, bg, accent_col, label, value, sub=""):
-        p.set_fill_color(*bg); p.rect(cx, cy, cw, ch, "F")
-        p.set_fill_color(*accent_col); p.rect(cx, cy, cw, 2.5, "F")
-        p.set_xy(cx + 3, cy + 5)
-        p.set_font("Helvetica", "", 6)
-        if bg == (31, 20, 80):
-            p.set_text_color(160, 160, 180)
+    # ── small building blocks ────────────────────────────────────────────────
+    def topbar(right_text):
+        y = 12
+        if _logo_raw:
+            p.set_fill_color(255, 255, 255)
+            p.rect(M, y, 10, 10, "F", round_corners=True, corner_radius=2.5)
+            p.image(io.BytesIO(_logo_raw), x=M + 0.6, y=y + 0.6, w=8.8, h=8.8, keep_aspect_ratio=True)
         else:
-            p.set_text_color(100, 100, 100)
-        p.cell(cw - 6, 3.5, _ps(label), ln=True)
-        p.set_x(cx + 3)
-        p.set_font("Helvetica", "B", 13)
-        tc = (0, 220, 180) if bg == (31, 20, 80) else (31, 20, 80)
-        p.set_text_color(*tc)
-        p.cell(cw - 6, 8, _ps(value), ln=True)
+            p.set_fill_color(*ACC)
+            p.rect(M, y, 10, 10, "F", round_corners=True, corner_radius=2.5)
+            p.set_font("Helvetica", "B", 7.5); p.set_text_color(*BG)
+            p.set_xy(M, y + 2.5); p.cell(10, 5, _ps(_BRAND.get("mono", _CO[:2])), align="C")
+        p.set_xy(M + 13, y + 0.8); p.set_font("Helvetica", "B", 11); p.set_text_color(*TEXT)
+        p.cell(90, 5, _ps(_CO))
+        p.set_xy(M + 13, y + 5.6); p.set_font("Helvetica", "", 7); p.set_text_color(*MUTED)
+        p.cell(90, 4, "Customer proposal")
+        p.set_xy(M, y + 2.6); p.set_font("Helvetica", "", 8); p.set_text_color(*MUTED)
+        p.cell(CW, 5, _ps(right_text), align="R")
+        p.set_draw_color(*LINE); p.set_line_width(0.2)
+        p.line(M, y + 15, PW - M, y + 15)
+        return y + 15
+
+    def eyebrow(text, y):
+        p.set_fill_color(*GOOD); p.ellipse(M, y + 1.1, 2.2, 2.2, "F")
+        p.set_xy(M + 4, y); p.set_font("Helvetica", "B", 7.5); p.set_text_color(*ACC2)
+        p.set_char_spacing(1.1); p.cell(CW - 4, 4.5, _ps(text.upper())); p.set_char_spacing(0)
+
+    def section(num, title, sub=""):
+        if p.get_y() > PH - 55:
+            p.add_page(); p.set_y(topbar(comp_name or "") + 8)
+        y = p.get_y()
+        p.set_fill_color(*ACC_SOFT); p.set_draw_color(*ACC); p.set_line_width(0.25)
+        p.rect(M, y, 9, 9, "DF", round_corners=True, corner_radius=2.2)
+        p.set_xy(M, y + 2.2); p.set_font("Helvetica", "B", 8); p.set_text_color(*ACC)
+        p.cell(9, 4.6, num, align="C")
+        p.set_xy(M + 12, y + (0.4 if sub else 2)); p.set_font("Helvetica", "B", 12); p.set_text_color(*TEXT)
+        p.cell(CW - 12, 5.5, _ps(title))
         if sub:
-            p.set_x(cx + 3)
-            p.set_font("Helvetica", "", 6.5)
-            if bg == (31, 20, 80):
-                p.set_text_color(130, 140, 160)
-            else:
-                p.set_text_color(100, 100, 100)
-            p.cell(cw - 6, 4, _ps(sub), ln=True)
-        p.set_text_color(0, 0, 0)
+            p.set_xy(M + 12, y + 5.4); p.set_font("Helvetica", "", 7.8); p.set_text_color(*MUTED)
+            p.cell(CW - 12, 4, _ps(sub))
+        p.set_y(y + 13)
 
-    curr_hw  = f"GBP {current_system:.2f}" if current_system > 0 else "Not entered"
-    new_lease = f"GBP {hw_monthly_spread:.2f}"
-    _sv = current_system - hw_monthly_spread if current_system > 0 else 0
+    def card(x, y, w, h, fill=SURF, border=LINE, r=3):
+        p.set_fill_color(*fill); p.set_draw_color(*border); p.set_line_width(0.2)
+        p.rect(x, y, w, h, "DF", round_corners=True, corner_radius=r)
 
-    _ = _big_card(cx1, cy, CW, CH, (248, 248, 252), (200, 200, 210),
-              "CURRENT LEASE / SYSTEM", curr_hw, "per month"); _ = None
-    _ = _big_card(cx2, cy, CW, CH, (31, 20, 80), (0, 181, 163),
-              f"NEW MONTHLY LEASE  ({LEASE_TERM_LABELS[lease_term]})", new_lease + "/mo", "hardware spread over term"); _ = None
-    if current_system > 0:
-        sv_bg = (232, 250, 240) if _sv >= 0 else (255, 240, 240)
-        sv_ac = (0, 160, 80)   if _sv >= 0 else (180, 30, 30)
-        sv_lb = "MONTHLY LEASE SAVING" if _sv >= 0 else "MONTHLY INCREASE"
-        _ = _big_card(cx3, cy, CW, CH, sv_bg, sv_ac, sv_lb,
-                  f"{'GBP ' + f'{abs(_sv):.2f}' + '/mo'}", f"GBP {abs(_sv*12):.0f} per year")
+    has_cur   = current_total > 0
+    saving_mo = current_total - total_mo
+    term_lbl  = LEASE_TERM_LABELS.get(lease_term, "") if is_spread else "Upfront hardware"
+
+    # ════════════════════════════════════════════════════════════════════════
+    # PAGE 1 — the headline and the full comparison
+    # ════════════════════════════════════════════════════════════════════════
+    p.add_page()
+    y = topbar(date.today().strftime("%d %B %Y")) + 9
+    eyebrow(f"Prepared for {comp_name or 'your business'}", y)
+    p.set_xy(M, y + 6.5); p.set_font("Helvetica", "B", 24); p.set_text_color(*TEXT)
+    _t1 = _ps(f"Your {_CO} "); p.cell(p.get_string_width(_t1), 11, _t1)
+    p.set_text_color(*ACC); p.cell(0, 11, "proposal", new_x="LMARGIN", new_y="NEXT")
+    p.set_font("Helvetica", "", 10); p.set_text_color(*MUTED)
+    p.cell(0, 6, _ps("What you pay today, side by side with what you'll pay with us." if has_cur
+                     else "Everything included in your new system, in one monthly figure."),
+           new_x="LMARGIN", new_y="NEXT")
+
+    # Hero: the one number that matters
+    hy, hh = p.get_y() + 7, 48
+    card(M, hy, CW, hh, fill=SURF2, r=4)
+    hero_col = GOOD if has_cur else ACC
+    p.set_fill_color(*hero_col); p.rect(M + 5, hy, CW - 10, 0.9, "F")
+    if has_cur and saving_mo >= 0:
+        lbl, big, sub = "Annual saving", gbp(saving_mo * 12), f"{gbp(saving_mo)} less every month"
+    elif has_cur:
+        lbl, big, sub = "Daily investment", gbp(abs(saving_mo) / 30.44), "per day, for everything included"
     else:
-        _ = _big_card(cx3, cy, CW, CH, (248,248,252), (0,181,163), "FULL MONTHLY TOTAL", f"GBP {total_mo:.2f}/mo", "all services + lease")
+        lbl, big, sub = "Total monthly", gbp(total_mo), "+ VAT, all services and hardware"
+    lx = M + 9
+    p.set_xy(lx, hy + 9); p.set_font("Helvetica", "B", 8); p.set_text_color(*hero_col)
+    p.set_char_spacing(1.1); p.cell(95, 4, lbl.upper()); p.set_char_spacing(0)
+    p.set_xy(lx, hy + 15); p.set_font("Helvetica", "B", 32); p.set_text_color(*hero_col)
+    p.cell(100, 15, _ps(big))
+    p.set_xy(lx, hy + 33); p.set_font("Helvetica", "", 9); p.set_text_color(*MUTED)
+    p.cell(100, 5, _ps(sub))
+    rx = M + CW * 0.58; rw = PW - M - 9 - rx
+    p.set_draw_color(*LINE); p.line(rx - 6, hy + 9, rx - 6, hy + hh - 9)
+    stats = ([("Today", f"{gbp(current_total)}/mo")] if has_cur else []) + [
+        (f"With {_CO}", f"{gbp(total_mo)}/mo"), ("Agreement", term_lbl)]
+    sy = hy + 9 + (0 if has_cur else 5)
+    for i, (k, v) in enumerate(stats):
+        p.set_xy(rx, sy); p.set_font("Helvetica", "", 8.5); p.set_text_color(*MUTED)
+        p.cell(rw * 0.45, 6, _ps(k))
+        p.set_font("Helvetica", "B", 10.5); p.set_text_color(*TEXT)
+        p.cell(rw * 0.55, 6, _ps(v), align="R")
+        if i < len(stats) - 1:
+            p.set_draw_color(*LINE); p.line(rx, sy + 8.8, rx + rw, sy + 8.8)
+        sy += 10.5
 
-    p.set_y(cy + CH + 3)
+    # 01 Cost comparison
+    p.set_y(hy + hh + 10)
+    rows = build_comparison_rows()
+    if has_cur:
+        section("01", "Cost comparison", "Monthly costs by category, excluding VAT")
+        W = [CW - 108, 36, 36, 36]
+        ty = p.get_y()
+        p.set_fill_color(*SURF3)
+        p.rect(M, ty, CW, 8.5, "F", round_corners=True, corner_radius=2.5)
+        p.set_xy(M, ty); p.set_font("Helvetica", "B", 7); p.set_text_color(*MUTED); p.set_char_spacing(0.8)
+        for w, h, al in zip(W, ("CATEGORY", "CURRENT", _CO.upper(), "DIFFERENCE"), "LRRR"):
+            p.cell(w, 8.5, _ps(("   " if al == "L" else "") + h + ("   " if al == "R" else "")), align=al)
+        p.set_char_spacing(0); p.ln(8.5)
+        for label, cur, new in rows:
+            d = cur - new
+            if abs(d) < 0.005:
+                dtxt, dcol = gbp(0), MUTED
+            else:
+                dtxt, dcol = (f"-{gbp(d)}" if d > 0 else f"+{gbp(abs(d))}"), GOOD
+            yy = p.get_y()
+            p.set_font("Helvetica", "", 9); p.set_text_color(*TEXT); p.cell(W[0], 7.6, _ps("   " + label))
+            p.set_text_color(*MUTED); p.cell(W[1], 7.6, _ps(gbp(cur) + "   "), align="R")
+            p.set_font("Helvetica", "B", 9); p.set_text_color(*TEXT); p.cell(W[2], 7.6, _ps(gbp(new) + "   "), align="R")
+            p.set_text_color(*dcol); p.cell(W[3], 7.6, _ps(dtxt + "   "), align="R")
+            p.ln(7.6)
+            p.set_draw_color(*LINE); p.line(M, yy + 7.6, PW - M, yy + 7.6)
+        ty = p.get_y() + 1.5
+        p.set_fill_color(*SURF2); p.rect(M, ty, CW, 9.5, "F", round_corners=True, corner_radius=2.5)
+        p.set_fill_color(*ACC); p.rect(M, ty, 1.2, 9.5, "F")
+        p.set_xy(M, ty); p.set_font("Helvetica", "B", 9.5); p.set_text_color(*TEXT)
+        p.cell(W[0], 9.5, "   Total monthly (excl. VAT)")
+        p.set_text_color(*MUTED); p.cell(W[1], 9.5, _ps(gbp(current_total) + "   "), align="R")
+        p.set_text_color(*TEXT); p.cell(W[2], 9.5, _ps(gbp(total_mo) + "   "), align="R")
+        p.set_text_color(*GOOD)
+        p.cell(W[3], 9.5, _ps((f"-{gbp(saving_mo)}" if saving_mo >= 0 else f"+{gbp(abs(saving_mo))}") + "   "), align="R")
+        p.set_y(ty + 13)
+        p.set_font("Helvetica", "", 7); p.set_text_color(*FAINT)
+        p.multi_cell(CW, 3.6, _ps("Current costs are as provided by you. Calls are included in your user licences. "
+                                  "All figures exclude VAT."))
+    else:
+        section("01", "Your monthly investment", "Excluding VAT")
+        for label, _cur, new in rows:
+            yy = p.get_y()
+            p.set_font("Helvetica", "", 9); p.set_text_color(*TEXT); p.cell(CW - 50, 7.6, _ps("   " + label))
+            p.set_font("Helvetica", "B", 9); p.cell(50, 7.6, _ps(gbp(new) + "/mo   "), align="R")
+            p.ln(7.6); p.set_draw_color(*LINE); p.line(M, yy + 7.6, PW - M, yy + 7.6)
 
-    # ── TOTAL MONTHLY BANNER ─────────────────────────────────────────────────────
-    p.set_fill_color(31, 20, 80); p.rect(p.l_margin, p.get_y(), 189, 12, "F")
-    p.set_fill_color(0, 181, 163); p.rect(p.l_margin, p.get_y(), 3, 12, "F")
-    p.set_font("Helvetica", "", 7.5); p.set_text_color(160, 180, 220)
-    p.set_xy(p.l_margin + 7, p.get_y() + 2.5)
-    p.cell(80, 4, "TOTAL ALL-INCLUSIVE MONTHLY COMMITMENT (excl. VAT)", ln=False)
-    p.set_font("Helvetica", "B", 12); p.set_text_color(0, 230, 190)
-    p.cell(0, 4, _ps(f"GBP {total_mo:.2f} / month"), ln=True, align="R")
-    p.set_text_color(0, 0, 0)
-    p.ln(5)
+    # ════════════════════════════════════════════════════════════════════════
+    # PAGE 2 — what's included
+    # ════════════════════════════════════════════════════════════════════════
+    p.add_page()
+    p.set_y(topbar(comp_name or "") + 9)
 
-    # ── PHONE IMAGES — larger, proper aspect ratio ────────────────────────────────
-    _phone_items = [(n, q) for n, q in list(desktop_quantities.items()) + list(cordless_quantities.items()) if q > 0]
-    if _phone_items:
-        p.set_font("Helvetica", "B", 9); p.set_text_color(31, 20, 80)
-        p.cell(0, 5, "Your New Phone System", ln=True)
-        p.set_fill_color(0, 181, 163); p.rect(p.l_margin, p.get_y(), 40, 1, "F")
-        p.ln(4)
-        _tw = 32; _th_fixed = 24; _tgap = 3
-        _tx = p.l_margin
-        _thumb_start_y = p.get_y()
-        for idx, (_pname, _pqty) in enumerate(_phone_items[:5]):
-            _pb64, _pext = get_product_image_b64(_pname)
-            _card_h = _th_fixed + 8
-            # Card background
-            p.set_fill_color(245, 247, 255)
-            p.rect(_tx, _thumb_start_y, _tw, _card_h, "F")
-            p.set_fill_color(0, 181, 163)
-            p.rect(_tx, _thumb_start_y, _tw, 1.5, "F")
-            if _pb64:
+    _phones = [(n, q) for n, q in list(desktop_quantities.items()) + list(cordless_quantities.items()) if q > 0]
+    _n_handsets = sum(q for _, q in _phones)
+    section("02", "Your new system",
+            (f"{_n_handsets} handset{'s' if _n_handsets != 1 else ''}  \u00b7  " if _n_handsets else "")
+            + (f"hardware lease {gbp(hw_monthly_spread)}/mo over {term_lbl}" if is_spread
+               else f"hardware {gbp(upfront)} one-off"))
+    if _phones:
+        n = min(len(_phones), 5); gap = 4
+        cw_ = (CW - gap * 4) / 5; ch_ = 38; cy_ = p.get_y()
+        for i, (name, qty) in enumerate(_phones[:5]):
+            cx_ = M + i * (cw_ + gap)
+            card(cx_, cy_, cw_, ch_, r=3)
+            p.set_fill_color(*STAGE); p.rect(cx_ + 2, cy_ + 2, cw_ - 4, 23, "F", round_corners=True, corner_radius=2)
+            b64, ext = get_product_image_b64(name)
+            _drawn = False
+            if b64:
                 try:
-                    import tempfile as _ptf, os as _pos
-                    _praw = base64.b64decode(_pb64)
-                    with _ptf.NamedTemporaryFile(suffix=f".{_pext}", delete=False) as _ptmp:
-                        _ptmp.write(_praw); _ptmp_path = _ptmp.name
-                    p.image(_ptmp_path, x=_tx+2, y=_thumb_start_y+3,
-                            w=_tw-4, h=_th_fixed-2)
-                    _pos.unlink(_ptmp_path)
-                except Exception: pass
-            # Label below image inside card
-            p.set_xy(_tx, _thumb_start_y + _th_fixed + 2)
-            p.set_font("Helvetica", "B", 5.5); p.set_text_color(31, 20, 80)
-            _short = _pname.split("(")[0].strip()[:18]
-            p.cell(_tw, 4, _ps(f"{_short} x{_pqty}"), ln=False, align="C")
-            _tx += _tw + _tgap
-        p.set_text_color(0, 0, 0)
-        # Always advance past image cards before next section
-        p.set_y(_thumb_start_y + _th_fixed + 12)
+                    p.image(io.BytesIO(base64.b64decode(b64)), x=cx_ + 4, y=cy_ + 3.5, w=cw_ - 8, h=20,
+                            keep_aspect_ratio=True)
+                    _drawn = True
+                except Exception:
+                    pass
+            if not _drawn:   # simple desk-phone drawing on the stage
+                bx, by = cx_ + cw_ / 2 - 9, cy_ + 7
+                p.set_fill_color(58, 66, 84)
+                p.rect(bx, by + 4, 18, 11, "F", round_corners=True, corner_radius=1.5)       # body
+                p.rect(bx - 1.5, by + 1, 4.5, 14, "F", round_corners=True, corner_radius=1.5)  # handset
+                p.set_fill_color(*ACC); p.rect(bx + 5, by + 5.5, 11, 4, "F", round_corners=True, corner_radius=0.8)  # screen
+                p.set_fill_color(150, 160, 178)
+                for kr in range(2):
+                    for kc in range(4):
+                        p.rect(bx + 5.2 + kc * 2.8, by + 10.8 + kr * 2, 1.6, 1.1, "F")
+            p.set_xy(cx_ + 1, cy_ + 26.5); p.set_font("Helvetica", "B", 6.4); p.set_text_color(*TEXT)
+            p.cell(cw_ - 2, 3.5, _ps(name.split("(")[0].strip()[:22]), align="C")
+            chip_w = 9; p.set_fill_color(*ACC_SOFT)
+            p.rect(cx_ + (cw_ - chip_w) / 2, cy_ + 31.2, chip_w, 4.4, "F", round_corners=True, corner_radius=2.2)
+            p.set_xy(cx_ + (cw_ - chip_w) / 2, cy_ + 31.4); p.set_font("Helvetica", "B", 6.5); p.set_text_color(*ACC2)
+            p.cell(chip_w, 4, f"x{qty}", align="C")
+        p.set_y(cy_ + ch_ + 3)
+        if len(_phones) > 5:
+            p.set_font("Helvetica", "", 7.5); p.set_text_color(*MUTED)
+            p.cell(0, 4, _ps(f"+ {len(_phones) - 5} more handset model(s) on your order form"),
+                   new_x="LMARGIN", new_y="NEXT")
+        p.ln(5)
 
-    # ── SERVICES TABLE ───────────────────────────────────────────────────────────
-    p.set_fill_color(31, 20, 80); p.set_text_color(255, 255, 255)
-    p.set_font("Helvetica", "B", 8)
-    p.cell(0, 6, "  Monthly Services Included", fill=True, ln=True)
+    # 03 Monthly services
     svc_rows = []
-    # Broadband — with free year note if active
     if svc["bb_sell"] > 0:
         if bb_free_year and _bb_yr1_saving > 0:
-            svc_rows.append((f"Broadband — {bb_provider} {bb_package} (FREE yr 1)",
-                             f"GBP 0.00/mo (then GBP {_bb_full_sell:.2f})"))
+            svc_rows.append((f"Broadband - {bb_provider} {bb_package} (FREE year 1)",
+                             f"{gbp(0)} then {gbp(_bb_full_sell)}/mo", True))
         else:
-            svc_rows.append((f"Broadband — {bb_provider} {bb_package}" + (f" + {extra_bb_count} additional line(s)" if extra_bb_count else ""), f"GBP {svc['bb_sell']:.2f}/mo"))
+            svc_rows.append((f"Broadband - {bb_provider} {bb_package}"
+                             + (f" + {extra_bb_count} additional line(s)" if extra_bb_count else ""),
+                             f"{gbp(svc['bb_sell'])}/mo", False))
     if svc["lic_monthly"] > 0:
-        svc_rows.append((f"Hosted User Licences ({total_voice_channels} users)", f"GBP {svc['lic_monthly']:.2f}/mo"))
-    if sw_sell_total > 0:
-        svc_rows.append(("Software / Add-ons", f"GBP {sw_sell_total:.2f}/mo"))
-    # Call Scope services
-    for _csr in cs_svc_rows:
-        if _csr.get("qty", 0) > 0:
-            _csr_label = _csr["name"]
-            _csr_sell  = _csr["sell"] * _csr["qty"]
-            svc_rows.append((_csr_label, f"GBP {_csr_sell:.2f}/mo"))
-    # AI Portal first month free note
+        svc_rows.append((f"User licences ({total_voice_channels} users, calls included)",
+                         f"{gbp(svc['lic_monthly'])}/mo", False))
+    if sw_sell_total + svc.get("wallboard_mo", 0.0) > 0:
+        svc_rows.append(("Software & add-ons", f"{gbp(sw_sell_total + svc.get('wallboard_mo', 0.0))}/mo", False))
+    for _r in cs_svc_rows:
+        if _r.get("qty", 0) > 0:
+            svc_rows.append((_r["name"], f"{gbp(_r['sell'] * _r['qty'])}/mo", False))
     if st.session_state.get("cs_ai_portal_free", False):
-        svc_rows.append(("  AI Portal 500 mins — 1st month FREE", "GBP 0.00 month 1"))
-    # System Security
-    for _sr in sec_rows:
-        if _sr.get("qty", 0) > 0:
-            svc_rows.append((f"{_sr['name']} x{_sr['qty']}",
-                             f"GBP {_sr['sell']*_sr['qty']:.2f}/mo"))
-    # IT Services
-    for _ir in it_rows:
-        if _ir.get("qty", 0) > 0:
-            svc_rows.append((f"IT: {_ir['service']} x{_ir['qty']}",
-                             f"GBP {_ir.get('sell', _ir.get('cost',0)) * _ir['qty']:.2f}/mo"))
-    # Mobile SIMs
-    for _mr in mobile_rows:
-        if _mr.get("qty", 0) > 0:
-            svc_rows.append((f"Mobile — {_mr['network']} {_mr['package']} x{_mr['qty']}",
-                             f"GBP {_mr['sell']*_mr['qty']:.2f}/mo"))
-    for i, (lbl, val) in enumerate(svc_rows):
-        if i % 2 == 0:
-            p.set_fill_color(245, 247, 255)
-        else:
-            p.set_fill_color(255, 255, 255)
-        _lbl_safe = _ps(lbl.replace("—", "-").replace("–", "-"))
-        p.set_text_color(60, 60, 60); p.set_font("Helvetica", "", 8)
-        p.cell(140, 5.5, f"  {_lbl_safe}", fill=True, ln=False)
-        p.set_font("Helvetica", "B", 8); p.set_text_color(31, 20, 80)
-        p.cell(0, 5.5, _ps(val), fill=True, ln=True, align="R")
-    p.set_text_color(0, 0, 0)
-    p.ln(3)
+        svc_rows.append(("AI Portal 500 mins - first month FREE", f"{gbp(0)} month 1", True))
+    for _r in sec_rows:
+        if _r.get("qty", 0) > 0:
+            svc_rows.append((f"{_r['name']} x{_r['qty']}", f"{gbp(_r['sell'] * _r['qty'])}/mo", False))
+    for _r in it_rows:
+        if _r.get("qty", 0) > 0:
+            svc_rows.append((f"{_r['service']} x{_r['qty']}", f"{gbp(_r['sell'] * _r['qty'])}/mo", False))
+    for _r in mobile_rows:
+        if _r.get("qty", 0) > 0:
+            svc_rows.append((f"Mobile - {mobile_label(_r)} x{_r['qty']}",
+                             f"{gbp(_r['sell'] * _r['qty'])}/mo", False))
+    if svc_rows:
+        section("03", "Monthly services included", "Excluding VAT")
+        for label, val, promo in svc_rows:
+            yy = p.get_y()
+            p.set_font("Helvetica", "", 8.8); p.set_text_color(*TEXT); p.cell(CW - 55, 7, _ps("   " + label))
+            p.set_font("Helvetica", "B", 8.8); p.set_text_color(*(GOOD if promo else TEXT))
+            p.cell(55, 7, _ps(val + "   "), align="R")
+            p.ln(7); p.set_draw_color(*LINE); p.line(M, yy + 7, PW - M, yy + 7)
+        ty = p.get_y() + 1.5
+        p.set_fill_color(*SURF2); p.rect(M, ty, CW, 9, "F", round_corners=True, corner_radius=2.5)
+        p.set_fill_color(*ACC); p.rect(M, ty, 1.2, 9, "F")
+        p.set_xy(M, ty); p.set_font("Helvetica", "B", 9.2); p.set_text_color(*TEXT)
+        p.cell(CW - 55, 9, "   Total monthly services")
+        p.cell(55, 9, _ps(f"{gbp(svc['total_sell'])}/mo   "), align="R")
+        p.set_y(ty + 15)
 
-    # ── AGREEMENT TERMS — 2-col ──────────────────────────────────────────────────
-    p.set_fill_color(31, 20, 80); p.set_text_color(255, 255, 255)
-    p.set_font("Helvetica", "B", 8)
-    p.cell(0, 6, "  Agreement at a Glance", fill=True, ln=True)
-    terms = [
-        ("Term", LEASE_TERM_LABELS[lease_term]),     ("Installation", install_type),
-        ("On-site Warranty", "12 months inclusive"), ("Support", "Remote diagnostics included"),
-    ]
-    HW = 91
-    for i in range(0, len(terms), 2):
-        pair = terms[i:i+2]
-        if (i // 2) % 2 == 0:
-            p.set_fill_color(245, 247, 255)
-        else:
-            p.set_fill_color(255, 255, 255)
-        for j, (lbl, val) in enumerate(pair):
-            cx = p.l_margin + j * HW
-            p.set_xy(cx, p.get_y())
-            p.set_font("Helvetica", "B", 7.5); p.set_text_color(31, 20, 80)
-            p.cell(28, 5, _ps(f"  {lbl}:"), fill=True, ln=False)
-            p.set_font("Helvetica", "", 7.5); p.set_text_color(60, 60, 60)
-            p.cell(HW - 28, 5, _ps(val), fill=True, ln=False)
-        p.ln(5)
-    p.set_text_color(0, 0, 0)
+    # 04 Agreement at a glance
+    section("04", "Agreement at a glance")
+    tiles = [("Agreement", term_lbl), ("Installation", install_type),
+             ("On-site warranty", "12 months inclusive"), ("Support", "Remote diagnostics")]
+    tw_ = (CW - 3 * 4) / 4; ty_ = p.get_y()
+    for i, (k, v) in enumerate(tiles):
+        tx_ = M + i * (tw_ + 4)
+        card(tx_, ty_, tw_, 15, r=2.5)
+        p.set_xy(tx_ + 3.5, ty_ + 3); p.set_font("Helvetica", "B", 6.3); p.set_text_color(*MUTED)
+        p.set_char_spacing(0.7); p.cell(tw_ - 6, 3.5, _ps(k.upper())); p.set_char_spacing(0)
+        p.set_xy(tx_ + 3.5, ty_ + 8); p.set_font("Helvetica", "B", 8.3); p.set_text_color(*TEXT)
+        p.cell(tw_ - 6, 4, _ps(v))
+    p.set_y(ty_ + 21)
 
-    # ── SAVING BANNER ────────────────────────────────────────────────────────────
-    if current_total > 0 and total_mo < current_total:
-        _sv_tot = current_total - total_mo
-        p.ln(2)
-        p.set_fill_color(0, 181, 163); p.set_text_color(255, 255, 255)
-        p.set_font("Helvetica", "B", 10)
-        p.cell(0, 9, _ps(f"  Estimated Total Monthly Saving:  GBP {_sv_tot:.2f}   (GBP {_sv_tot*12:.0f} / year)"),
-               fill=True, ln=True)
-        p.set_text_color(0, 0, 0)
+    # 05 Why us
+    section("05", f"Why businesses choose {_CO}")
+    vals = [("One bill", "Hardware, licences, broadband and support in one monthly payment."),
+            ("Fully managed", "We handle installation, programming, warranty and helpdesk."),
+            ("Local engineers", "On-site support from engineers who know your area.")]
+    vw = (CW - 2 * 4) / 3; vy = p.get_y()
+    for i, (t, d) in enumerate(vals):
+        vx = M + i * (vw + 4)
+        card(vx, vy, vw, 21, r=2.5)
+        p.set_fill_color(*ACC); p.rect(vx, vy + 3, 1.2, 15, "F")
+        p.set_xy(vx + 5, vy + 3.5); p.set_font("Helvetica", "B", 8.5); p.set_text_color(*ACC2)
+        p.cell(vw - 8, 4.5, _ps(t))
+        p.set_xy(vx + 5, vy + 9); p.set_font("Helvetica", "", 7.2); p.set_text_color(*MUTED)
+        p.multi_cell(vw - 8, 3.6, _ps(d), align="L")
+    p.set_y(vy + 27)
 
-    # ── CTA FOOTER ───────────────────────────────────────────────────────────────
-    p.ln(3)
-    p.set_fill_color(31, 20, 80); p.set_text_color(255, 255, 255)
-    p.set_font("Helvetica", "B", 8)
-    p.cell(0, 6, "  Ready to proceed? We're here to help.", fill=True, ln=True)
-    p.set_font("Helvetica", "", 8); p.set_fill_color(45, 31, 110)
-    p.cell(0, 6, s(f"  {_CO_EMAIL}   |   {_CO_PHONE}   |   {_CO_WEB}"),
-           fill=True, ln=True)
-    p.set_text_color(0, 0, 0)
+    # Call to action
+    if p.get_y() > PH - 45:
+        p.add_page(); p.set_y(topbar(comp_name or "") + 9)
+    cy_ = p.get_y()
+    card(M, cy_, CW, 24, fill=SURF2, border=ACC, r=4)
+    p.set_xy(M + 8, cy_ + 5); p.set_font("Helvetica", "B", 12.5); p.set_text_color(*TEXT)
+    p.cell(CW - 16, 6, "Ready to go ahead?")
+    p.set_xy(M + 8, cy_ + 11.5); p.set_font("Helvetica", "", 8.5); p.set_text_color(*MUTED)
+    p.cell(CW - 16, 4.5, _ps("Reply to this proposal or give us a call, and we'll take care of the rest."))
+    p.set_xy(M + 8, cy_ + 16.8); p.set_font("Helvetica", "B", 8.5); p.set_text_color(*ACC2)
+    p.cell(CW - 16, 4.5, _ps(f"{_CO_EMAIL}   \u00b7   {_CO_PHONE}   \u00b7   {_CO_WEB}"))
 
     return bytes(p.output())
 
@@ -2391,7 +2391,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     # Mobile SIMs
     for _mr in mobile_rows:
         if _mr.get("qty", 0) > 0:
-            svc_items.append((s(f"Mobile - {_mr['network']} {_mr['package']}"), _mr["qty"],
+            svc_items.append((s(f"Mobile - {mobile_label(_mr)}"), _mr["qty"],
                               f"£{_mr['sell']*_mr['qty']:.2f}/mo"))
 
     pdf.set_fill_color(31, 20, 80)
@@ -3570,6 +3570,42 @@ def extra_bb_install_total():
     return sum(BROADBAND[bb_provider][p]["install"] * q for p, q in extra_bb_lines.items())
 
 
+def mobile_label(r):
+    """'EE Unlimited Voice & Data' rather than 'EE EE Unlimited Voice & Data'."""
+    net, pkg = str(r.get("network", "")), str(r.get("package", ""))
+    return pkg if net and net.lower() in pkg.lower() else f"{net} {pkg}".strip()
+
+
+def build_comparison_rows():
+    """Current vs new monthly cost by category: [(label, current, new)].
+    One row per category whenever either side has a value; new services are grouped
+    (e.g. all Call Scope in one row). Any remainder goes to "Other" so both columns
+    always add up to current_total and total_mo."""
+    _cmp = [
+        ("Phone System / Hardware",   current_system,  hw_monthly_spread if is_spread else 0.0),
+        ("User Licences",             current_hosted,  svc["lic_monthly"]),
+        ("Call Charges",              current_calls,   0.0),
+        ("Broadband",                 current_bb,      svc["bb_sell"]),
+        ("Mobiles",                   current_mobile,  svc.get("mobile_sell", 0.0)),
+        ("IT Services / M365",        current_it,      svc.get("it_sell", 0.0)),
+        ("Support & Maintenance",     current_support, 0.0),
+        ("Software & Add-ons",        0.0,             sw_sell_total + svc.get("wallboard_mo", 0.0)),
+        ("Call Scope",                0.0,             svc.get("cs_sell", 0.0)),
+        ("System Security",           0.0,             svc.get("sec_sell", 0.0)),
+        ("Other",                     current_other,   0.0),
+    ]
+    rows = [(l, round(cv, 2), round(nv, 2)) for l, cv, nv in _cmp if cv > 0.004 or nv > 0.004]
+    _cur_gap = round(current_total - sum(r[1] for r in rows), 2)
+    _new_gap = round(total_mo      - sum(r[2] for r in rows), 2)
+    if abs(_cur_gap) >= 0.01 or abs(_new_gap) >= 0.01:
+        _oth = next((i for i, r in enumerate(rows) if r[0] == "Other"), None)
+        if _oth is None:
+            rows.append(("Other", _cur_gap, _new_gap))
+        else:
+            rows[_oth] = ("Other", rows[_oth][1] + _cur_gap, rows[_oth][2] + _new_gap)
+    return rows
+
+
 def compute_pricebook_pl():
     """P&L using exact pricebook formula (verified against P & L Calcs sheet).
     hw_rrp=hw_buy×1.5 | maintenance=0.2×hw_rrp | hw_srrp=hw_sell×1.5
@@ -4045,7 +4081,7 @@ with tab3:
         st.markdown("")
         st.markdown("---")
         st.markdown("#### 📋 One-Page Proposal")
-        st.caption(f"Clean two-page summary: About {_CO} + deal breakdown. Great for emailing to a prospect before the full paperwork.")
+        st.caption("Two-page summary in the app's dark style: the customer's saving (or daily investment) and full cost comparison, then everything included. Great for emailing before the full paperwork.")
         proposal_bytes = build_proposal_pdf()
         st.download_button(
             label=f"📋 Download Proposal Summary - {comp_name}",
@@ -4181,31 +4217,7 @@ with tab4:
         # Build comparison rows
         # Build comparison using pricebook category structure
         # SY Comms side matches: Call Charges | Hosted Licences | Software | BB | Equipment Rental
-        # One row per category whenever either side has a value. New services are
-        # grouped (e.g. all Call Scope in one row) so the table stays compact, and any
-        # remainder goes to "Other" so both columns always add up to the totals.
-        _cmp = [
-            ("Phone System / Hardware",   current_system,  hw_monthly_spread if is_spread else 0.0),
-            ("User Licences",             current_hosted,  svc["lic_monthly"]),
-            ("Call Charges",              current_calls,   0.0),
-            ("Broadband",                 current_bb,      svc["bb_sell"]),
-            ("Mobiles",                   current_mobile,  svc.get("mobile_sell", 0.0)),
-            ("IT Services / M365",        current_it,      svc.get("it_sell", 0.0)),
-            ("Support & Maintenance",     current_support, 0.0),
-            ("Software & Add-ons",        0.0,             sw_sell_total + svc.get("wallboard_mo", 0.0)),
-            ("Call Scope",                0.0,             svc.get("cs_sell", 0.0)),
-            ("System Security",           0.0,             svc.get("sec_sell", 0.0)),
-            ("Other",                     current_other,   0.0),
-        ]
-        comp_rows = [(l, round(cv, 2), round(nv, 2)) for l, cv, nv in _cmp if cv > 0.004 or nv > 0.004]
-        _cur_gap = round(current_total - sum(r[1] for r in comp_rows), 2)
-        _new_gap = round(total_mo      - sum(r[2] for r in comp_rows), 2)
-        if abs(_cur_gap) >= 0.01 or abs(_new_gap) >= 0.01:
-            _oth = next((i for i, r in enumerate(comp_rows) if r[0] == "Other"), None)
-            if _oth is None:
-                comp_rows.append(("Other", _cur_gap, _new_gap))
-            else:
-                comp_rows[_oth] = ("Other", comp_rows[_oth][1] + _cur_gap, comp_rows[_oth][2] + _new_gap)
+        comp_rows = build_comparison_rows()
 
         # Comparison table - built as a flat string to avoid markdown code-block indentation
         _saving_bg  = "rgba(52,211,153,.12)"  # always green — increase is also a positive investment
@@ -4287,7 +4299,7 @@ with tab4:
             svc_lines.append(("Proactive Broadband Management", "£10.00/mo (after 3m FOC)"))
         for r in mobile_rows:
             if r["qty"] > 0:
-                svc_lines.append((f"Mobile - {r['network']} {r['package']} x{r['qty']}",
+                svc_lines.append((f"Mobile - {mobile_label(r)} x{r['qty']}",
                                   f"£{r['sell'] * r['qty']:.2f}/mo"))
 
         for label, val in svc_lines:
