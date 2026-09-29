@@ -3799,7 +3799,11 @@ MAX_TERMINATION_PCT = float(C.get("max_termination_pct", 70))
 # Lease value = total rentals over the term for the EQUIPMENT AND TERM ALONE (pricebook calculated rental,
 # with any buyout taken out at source). A buyout or a target rental never changes it - only adding/removing
 # hardware or changing the term does. Max termination is a fixed % of it.
-lease_value_ex_buyout  = round(_calc_rental_ex_buyout * lease_term, 2) if is_spread else 0.0
+# Lease value = what the FUNDER PAYS for the equipment-only calculated rental (rental / funder rate x 1000).
+# That's the real cash a settlement comes out of, so the maximum is a % of it.
+lease_value_ex_buyout  = (round(_calc_rental_ex_buyout / true_rate * 1000.0, 2)
+                          if (is_spread and true_rate > 0) else 0.0)
+_customer_total_ex_buyout = round(_calc_rental_ex_buyout * lease_term, 2) if is_spread else 0.0
 lease_value            = lease_value_ex_buyout
 max_termination        = round(lease_value_ex_buyout * MAX_TERMINATION_PCT / 100.0, 2)
 termination_over       = is_spread and (termination_cost - max_termination) >= 1.0            # £1 tolerance for rounding
@@ -4879,9 +4883,9 @@ with tab5:
               <div style='font-size:2rem;font-weight:800;color:var(--text)'>£{_new_rental:.2f}</div>
               <div style='font-size:0.8rem;color:var(--muted)'>per month over {LEASE_TERM_LABELS[lease_term]}</div>
               <hr style='margin:0.8rem 0'>
-              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Total Lease Value</div>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Lease Value (funder pays)</div>
               <div style='font-size:1.3rem;font-weight:700;color:var(--text)'>£{_lease_total:.2f}</div>
-              <div style='font-size:0.8rem;color:var(--muted)'>({lease_term} months × £{_calc_rental_ex_buyout:.2f} calculated rental, equipment & term only)</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>(£{_calc_rental_ex_buyout:.2f}/mo ÷ {true_rate:.2f} × 1,000 - equipment & term only)</div>
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement ({MAX_TERMINATION_PCT:.0f}%)</div>
               <div style='font-size:1.6rem;font-weight:800;color:var(--good)'>£{_max_settlement:.2f}</div>
@@ -5803,14 +5807,14 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
           <div class="metric-label">Lease Value</div>
           <div class="metric-value">{"£" + format(lease_value, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("Equipment & term only (no target rental or buyout): " + str(lease_term) + " x £" + format(_calc_rental_ex_buyout, ",.2f") + "/mo") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: ' + str(lease_term) + " x £" + format(_desired_rental, ",.2f") + "/mo = £" + format(_desired_rental * lease_term, ",.0f") + (" (target rental" + (" + buyout)" if termination_cost > 0 else ")") if _lp_is_target else " (incl. buyout)") + "</div>") if (is_spread and abs(_desired_rental - _calc_rental_ex_buyout) > 0.01) else ""}
+          <div class="metric-sub">{("What the funder pays for £" + format(_calc_rental_ex_buyout, ",.2f") + "/mo (÷ " + format(true_rate, ".2f") + " rate × 1,000) - equipment & term only, no target rental or buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + (" (target rental" + (" + buyout)" if termination_cost > 0 else ")") if _lp_is_target else " (incl. buyout)") + "</div>") if (is_spread and abs(_desired_rental - _calc_rental_ex_buyout) > 0.01) else ""}
         </div>''', unsafe_allow_html=True)
     with lv2:
         _over = termination_over
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid {"var(--warn)" if _over else "var(--good)"}">
           <div class="metric-label">Max Termination ({MAX_TERMINATION_PCT:.0f}% of lease value)</div>
           <div class="metric-value" style="color:{"var(--warn)" if _over else "var(--good)"}!important">{"£" + format(max_termination, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else "No buyout on this deal"}</div>
+          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else ("No buyout. At the maximum, lease profit would be £" + format(_gp_before_buyout - max_termination, ",.0f") if is_spread else "No buyout on this deal")}</div>
         </div>''', unsafe_allow_html=True)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
