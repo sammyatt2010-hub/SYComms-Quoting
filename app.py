@@ -589,6 +589,34 @@ QUOTE_KEYS = [
     "q_rep_name","q_rep_position",
     "c_svc_disc",
 ]
+# ── Saved quotes: capture EVERY deal input by name pattern, so new features are
+#    included automatically instead of relying on a hand-kept list.
+_QUOTE_PREFIXES = ("q_", "desk_", "cord_", "hs_", "oth_", "bb_extra_", "rt_qty_", "sw_qty_",
+                   "mob_", "it_", "sec_", "cs_", "cctv_", "xc_")
+_QUOTE_EXTRA = {
+    "c_desired_rental", "c_svc_disc", "c_notes_val",                       # consultant: target rental, discount, special conditions
+    "router_mode", "switch_mode", "add_wired_ports", "standalone_softphones_key",
+    "cs_ai_portal_free",
+    "adm_bb_override", "adm_override_upfront", "adm_override_install",  # manager per-deal overrides
+    "adm_credits_months", "adm_credits_amount", "adm_cashback", "mgr_cust", "mgr_init",
+}
+_QUOTE_EXCLUDE = {
+    "q_sidebar_rental",                                     # display copy of the target rental (restored via sync)
+    "cs_svc_apply", "cs_update", "sec_apply",               # buttons - can't be restored
+    "cs_buy_input", "cs_sell_input",                        # admin catalogue price editors, not deal data
+}
+
+def quote_snapshot():
+    snap = {}
+    for k, v in st.session_state.items():
+        if k in _QUOTE_EXCLUDE or not isinstance(v, (bool, int, float, str)):
+            continue
+        if k in QUOTE_KEYS or k in _QUOTE_EXTRA or k.startswith(_QUOTE_PREFIXES):
+            snap[k] = v
+    snap["_quote_brand"] = st.session_state.get("selected_brand", "")
+    return snap
+
+
 # Hardware quantity keys added dynamically after catalogues load
 def _hw_quote_keys():
     keys = []
@@ -852,8 +880,21 @@ _hero_ph = st.container(key="hero")  # keeps the old header on screen during a r
 # ── Apply any pending quote load (must happen before widgets render) ────────────
 if "_pending_quote" in st.session_state:
     _pq = st.session_state.pop("_pending_quote")
+    if "c_notes" in _pq and "c_notes_val" not in _pq:      # quote files saved before this change
+        _pq["c_notes_val"] = _pq.pop("c_notes")
+    st.session_state.pop("c_notes_w", None)                 # so the notes box refills from the loaded value
     for _k, _v in _pq.items():
-        st.session_state[_k] = _v
+        if _k.startswith("_") or _k in _QUOTE_EXCLUDE:
+            continue
+        try:
+            st.session_state[_k] = _v
+        except Exception:
+            pass   # e.g. an old file containing a button key - skip it rather than fail the load
+    # Target rental: push the loaded figure into both rental boxes (sidebar + consultant view)
+    st.session_state["_sync_rental_to_sidebar"] = True
+    st.session_state["_sync_rental_to_cons"]    = True
+    # Keep the loaded router choice (don't treat the provider change as a reason to reset it)
+    st.session_state["_prev_bb_provider"] = st.session_state.get("q_bb_provider", "None / Customer Supplied")
     st.session_state["_quote_ready"] = False
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
@@ -1079,16 +1120,7 @@ with st.expander("💾 Save / Load Quote", expanded=False):
         if st.button("📥 Prepare Quote for Download", use_container_width=True, key="prep_save"):
             st.session_state["_quote_ready"] = True
         if st.session_state.get("_quote_ready"):
-            snapshot = {k: st.session_state.get(k) for k in QUOTE_KEYS if k in st.session_state}
-            # Also capture hardware quantities
-            for n in list(HANDSETS_DESKTOP.keys()) + list(HANDSETS_CORDLESS.keys()):
-                key = f"desk_{n}" if n in HANDSETS_DESKTOP else f"cord_{n}"
-                if key in st.session_state:
-                    snapshot[key] = st.session_state[key]
-            for n in HEADSETS:
-                if f"hs_{n}" in st.session_state: snapshot[f"hs_{n}"] = st.session_state[f"hs_{n}"]
-            for n in OTHER_HARDWARE:
-                if f"oth_{n}" in st.session_state: snapshot[f"oth_{n}"] = st.session_state[f"oth_{n}"]
+            snapshot = quote_snapshot()   # every deal input, including target rental and services
             import json as _json
             quote_name = (st.session_state.get("q_comp_name") or "quote").replace(" ", "_")
             st.download_button(
@@ -2458,7 +2490,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.ln(6)
 
     # ── Special Conditions (from consultant notes) ───────────────────────────
-    _special_conds = st.session_state.get("c_notes", "").strip()
+    _special_conds = str(st.session_state.get("c_notes_val", "") or "").strip()
     if _special_conds:
         pdf.ln(2)
         pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
@@ -4796,11 +4828,14 @@ with tab5:
         st.markdown("")
         # ── Proposal notes ─────────────────────────────────────────────────
         st.markdown("### 📝 Consultant Notes / Special Conditions")
+        # Notes are stored in c_notes_val (saved with quotes, read by the paperwork);
+        # the box is filled from it, so a loaded quote always shows its notes.
         consultant_notes = st.text_area(
-            "", height=100, key="c_notes",
+            "", height=100, key="c_notes_w", value=st.session_state.get("c_notes_val", ""),
             placeholder="Add any special conditions, agreed credits, or notes for this deal...",
             label_visibility="collapsed"
         )
+        st.session_state["c_notes_val"] = consultant_notes
 
 # ── TAB 6: SIGN & SEND ────────────────────────────────────────────────────────
 
