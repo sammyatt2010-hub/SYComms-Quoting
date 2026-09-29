@@ -75,6 +75,7 @@ BRAND_CONFIGS = {
         "pw_key":     "APP_PASSWORD",
         "address":    "Suite C Jupiter House, Sitka Drive, Shrewsbury Business Park, Shrewsbury SY2 6LG",
         "email":      "hello@sycomms.co.uk",
+        "complaints_email": "complaints@sycomms.co.uk",
         "phone":      "01743 667419",
         "website":    "www.sycomms.co.uk",
         "about":      "SY Comms is a locally owned and operated telecoms and IT services company ",
@@ -2151,6 +2152,129 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.rect(0, 292, 210, 5, 'F')
 
     # ── PAGE 2 onwards: standard proposal pages ───────────────────────────────
+    # ── CONTRACT SUMMARY (Ofcom) - given before signing, generated per deal ──
+    pdf.set_auto_page_break(True, margin=15)
+    pdf.add_page()
+    _add_header(pdf, "Contract Summary")
+
+    def _cs_bar(title):
+        pdf.ln(2)
+        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 6.5, s("  " + title), fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0); pdf.ln(1.5)
+
+    def _cs_row(label, value, bold=False, shade=False):
+        pdf.set_x(pdf.l_margin)
+        if shade:
+            pdf.set_fill_color(245, 247, 255)
+        pdf.set_font("Helvetica", "B" if bold else "", 8.5)
+        pdf.cell(130, 6, s("  " + label), fill=shade, ln=False)
+        pdf.cell(0, 6, s(value), fill=shade, ln=True, align="R")
+
+    def _cs_text(text, size=8.2, style=""):
+        pdf.set_font("Helvetica", style, size); pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 4.2, s(text))
+
+    _cs_months = int(lease_term)
+    _cs_term_lbl = LEASE_TERM_LABELS.get(lease_term, f"{_cs_months} months")
+    _cs_text(f"This summary sets out the main parts of your contract with {_CO_LEGAL}, as required by Ofcom. "
+             "Please read it before you sign. It forms part of your contract together with the Order Form, "
+             "the agreements in this pack and our Terms & Conditions.", 8.5)
+    pdf.ln(1)
+    _cs_text(f"Provider: {_CO_LEGAL}, {_BRAND.get('address', '')}  |  {_CO_PHONE}  |  {_CO_EMAIL}  |  {_CO_WEB}", 7.8)
+    _cs_text(f"Customer: {_comp or '-'}", 7.8)
+
+    # Services & equipment
+    _cs_bar("1. Your services and equipment (monthly, excluding VAT)")
+    _cs_lines = []
+    if svc["bb_sell"] > 0:
+        _cs_lines.append((f"Broadband - {bb_provider} {bb_package}"
+                          + (f" + {extra_bb_count} additional line(s)" if extra_bb_count else ""), svc["bb_sell"]))
+    if svc["lic_monthly"] > 0:
+        _cs_lines.append((f"User licences ({total_voice_channels} users, UK calls included)", svc["lic_monthly"]))
+    if sw_sell_total + svc.get("wallboard_mo", 0.0) > 0:
+        _cs_lines.append(("Software & add-ons", sw_sell_total + svc.get("wallboard_mo", 0.0)))
+    for _r in cs_svc_rows:
+        if _r.get("qty", 0) > 0:
+            _cs_lines.append((_r["name"], _r["sell"] * _r["qty"]))
+    for _r in sec_rows:
+        if _r.get("qty", 0) > 0:
+            _cs_lines.append((f"{_r['name']} x{_r['qty']}", _r["sell"] * _r["qty"]))
+    for _r in it_rows:
+        if _r.get("qty", 0) > 0:
+            _cs_lines.append((f"{_r['service']} x{_r['qty']}", _r["sell"] * _r["qty"]))
+    for _r in mobile_rows:
+        if _r.get("qty", 0) > 0:
+            _cs_lines.append((f"Mobile - {mobile_label(_r)} x{_r['qty']}", _r["sell"] * _r["qty"]))
+    if is_spread:
+        _cs_lines.append((f"Hardware (equipment lease over {_cs_term_lbl})", hw_monthly_spread))
+    for _i, (_l, _v) in enumerate(_cs_lines):
+        _cs_row(_l, f"£{_v:,.2f}", shade=(_i % 2 == 0))
+    _cs_row("Total monthly charge", f"£{total_mo:,.2f}", bold=True)
+    if not is_spread:
+        _cs_row("Hardware - one-off payment", f"£{upfront:,.2f}")
+    _cs_text("Broadband speeds are estimates and depend on the network - see the Network Services & Broadband Agreement.", 7.5, "I")
+
+    # Price schedule in pounds and pence
+    _cs_bar("2. Your prices - fixed for the minimum term")
+    _cs_text("Your prices are fixed for your minimum term. They will not rise with inflation or by any percentage. "
+             "The only changes are the fixed amounts shown below.", 8.3)
+    _years = max(1, -(-_cs_months // 12))
+    _bb_step  = _bb_yr1_saving if (bb_free_year and _bb_yr1_saving > 0) else 0.0
+    _rec_on   = any(("recording" in str(_n).lower()) and (_q or 0) > 0 for _n, _q, _c, _sv in SW_ADDONS)
+    _rec_fee  = 20.00 if _rec_on else 0.0
+    pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_fill_color(230, 233, 245)
+    pdf.cell(45, 6, "  Point in contract", fill=True); pdf.cell(55, 6, "Months", fill=True)
+    pdf.cell(0, 6, "Monthly charge (ex VAT)  ", fill=True, ln=True, align="R")
+    for _y in range(1, _years + 1):
+        _m0, _m1 = (_y - 1) * 12 + 1, min(_y * 12, _cs_months)
+        _val = total_mo - (_bb_step if _y == 1 else 0.0) + (_rec_fee if _y >= 2 else 0.0)
+        pdf.set_font("Helvetica", "", 8.2); pdf.set_x(pdf.l_margin)
+        _fill = (_y % 2 == 1); pdf.set_fill_color(245, 247, 255)
+        pdf.cell(45, 5.6, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6, f"Months {_m0}-{_m1}", fill=_fill)
+        pdf.cell(0, 5.6, f"£{_val:,.2f}  ", fill=_fill, ln=True, align="R")
+    _notes = []
+    if _bb_step:
+        _notes.append(f"Year 1 includes free broadband (saving £{_bb_step:,.2f}/mo); the normal broadband price of "
+                      f"£{_bb_full_sell:,.2f}/mo applies from month 13.")
+    if _rec_fee:
+        _notes.append("Call recording storage is included for 12 months, then £20.00/mo applies from month 13.")
+    if st.session_state.get("cs_ai_portal_free", False):
+        _notes.append("The AI Portal is free for the first month only; its normal price is included above from month 1 "
+                      "and credited in month 1.")
+    for _n in _notes:
+        _cs_text("- " + _n, 7.6)
+    _cs_text("Other fixed charges that may apply (from our Terms & Conditions): engineer call-out £250 minimum then "
+             "£75/hour; remote system changes £35; new or ported-in number £25 per number; late payment £25; "
+             "Direct Debit cancellation £50.", 7.4, "I")
+
+    # Term, leaving early, after the minimum term
+    _cs_bar("3. How long your contract lasts")
+    _cs_text(f"Minimum term: {_cs_term_lbl} ({_cs_months} months) from the date your services go live.", 8.3, "B")
+    _cs_text("Leaving early: if you cancel during the minimum term, a Cancellation Charge applies as set out in our "
+             "Terms & Conditions (broadly, the charges remaining to the end of the minimum term)."
+             + (" Your equipment is on a separate lease with the finance company - see the Equipment Lease Agreement."
+                if is_spread else ""), 8)
+    _cs_text(C.get("contract_after_term_text",
+                   "After the minimum term: your contract continues until you give notice. We will contact you "
+                   "before your minimum term ends to remind you and tell you about our best prices. See our "
+                   "Terms & Conditions for notice periods."), 8)
+
+    # Important information
+    _cs_bar("4. Important information")
+    _cs_text("Emergency calls (999/112): our phone services use your broadband. If there is a power cut or your "
+             "broadband goes down, you may not be able to make calls, including emergency calls. Keep a mobile "
+             "phone or traditional line available for emergencies. Emergency call location may be limited.", 8)
+    pdf.ln(0.5)
+    _cmp_mail = _BRAND.get("complaints_email", _CO_EMAIL)
+    _cs_text(f"Complaints: call {_CO_PHONE} or email {_cmp_mail}. Our complaints policy is at {_CO_WEB}/complaints-policy. "
+             "If your complaint isn't resolved within 8 weeks, or you receive a deadlock letter, you can take it to "
+             "the Communications Ombudsman (www.commsombudsman.org) free of charge.", 8)
+    pdf.ln(0.5)
+    _cs_text(f"Accessibility: if you have accessibility needs or would like this information in another format, "
+             f"contact us on {_CO_PHONE} or {_CO_EMAIL}.", 8)
+
     pdf.set_auto_page_break(True, margin=15)   # re-enable for content pages
     pdf.add_page()
     _add_header(pdf)
@@ -2398,6 +2522,45 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             )
         pdf.ln(3)
 
+    # Documents provided before signing (Ofcom)
+    pdf.ln(1)
+    pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 8.5)
+    pdf.cell(0, 6, "  Documents provided before signing", fill=True, ln=True)
+    pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8); pdf.ln(1)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, 4, s("I confirm that, before signing this Order Form, I was given a copy of the following "
+                                 "documents and had the opportunity to read them:"))
+    _docs = ["Contract Summary", f"Terms & Conditions (summary in this pack; full terms at {_CO_WEB}/terms-conditions)",
+             "Network Services & Broadband Agreement"] + (["Equipment Lease Agreement"] if is_spread else []) + ["This Order Form"]
+    for _d in _docs:
+        _yb = pdf.get_y() + 0.8
+        pdf.set_draw_color(31, 20, 80); pdf.rect(pdf.l_margin + 2, _yb, 3.4, 3.4)
+        _bx = pdf.l_margin + 2; pdf.set_line_width(0.45)                      # pre-ticked
+        pdf.line(_bx + 0.6, _yb + 1.8, _bx + 1.4, _yb + 2.8); pdf.line(_bx + 1.4, _yb + 2.8, _bx + 2.9, _yb + 0.6)
+        pdf.set_line_width(0.2)
+        pdf.set_x(pdf.l_margin + 8); pdf.cell(0, 5, s(_d), ln=True)
+    pdf.set_draw_color(0, 0, 0); pdf.ln(1)
+
+    # Small business 24-month right - separate, express waiver (Ofcom)
+    _small_limit = int(C.get("small_business_max_employees", 9))    # fewer than 10 employees
+    if int(lease_term) > 24 and int(num_employees or 0) <= _small_limit:
+        _wy = pdf.get_y()
+        pdf.set_fill_color(255, 248, 225); pdf.set_draw_color(230, 150, 30); pdf.set_line_width(0.5)
+        pdf.set_x(pdf.l_margin + 3)
+        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.multi_cell(pdf.epw - 6, 5, "Small business - your right to a contract of no more than 24 months", fill=True)
+        pdf.set_x(pdf.l_margin + 3); pdf.set_font("Helvetica", "", 8)
+        pdf.multi_cell(pdf.epw - 6, 4.2, s(
+            f"If your business has fewer than {_small_limit + 1} employees, or is a not-for-profit, Ofcom's rules give you "
+            f"the right to a maximum contract length of 24 months. The minimum term of this contract is {int(lease_term)} "
+            "months, which is longer than 24 months. By initialling here, you separately and expressly confirm that you "
+            "understand this right, and that you choose to waive it in order to enter into this longer contract term."),
+            fill=True)
+        pdf.set_x(pdf.l_margin + 3); pdf.set_font("Helvetica", "B", 8.5)
+        pdf.cell(pdf.epw - 6, 8, "Customer initials:  ____________        Date:  ____________", fill=True, ln=True)
+        pdf.rect(pdf.l_margin + 1.5, _wy - 1, pdf.epw - 3, pdf.get_y() - _wy + 2)
+        pdf.set_draw_color(0, 0, 0); pdf.set_line_width(0.2); pdf.ln(3)
+
     # Signatures
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 7, "Signatures", ln=True)
@@ -2477,7 +2640,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(130, 6, "  TOTAL MONTHLY SERVICE CHARGES", fill=True, ln=False)
     pdf.cell(60, 6, f"£{svc['total_sell']:.2f}/mo", fill=True, ln=True, align="C")
     pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
-    pdf.multi_cell(pdf.epw,3.5,"* Monthly service charges are subject to standard annual price adjustment in accordance with contractual terms.",align="L")
+    pdf.multi_cell(pdf.epw,3.5,"* Prices are fixed for the minimum term - they will not rise with inflation or by any percentage. Your full price schedule is in the Contract Summary.",align="L")
     pdf.set_text_color(0,0,0)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
@@ -2494,6 +2657,17 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     )
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw, 4.5, terms)
+    # Emergency calls warning (hosted voice)
+    pdf.ln(2)
+    pdf.set_fill_color(255, 240, 240); pdf.set_draw_color(200, 60, 60); pdf.set_line_width(0.4)
+    pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.5)
+    pdf.multi_cell(pdf.epw, 5, "Important: emergency calls (999/112)", border="LTR", fill=True)
+    pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "", 8)
+    pdf.multi_cell(pdf.epw, 4.2, s("Our phone services run over your broadband. If there is a power cut or your broadband "
+                                   "goes down, you may not be able to make calls, including calls to 999/112. Please keep "
+                                   "a mobile phone or traditional line available for emergencies. Emergency call location "
+                                   "information may be limited."), border="LBR", fill=True)
+    pdf.set_draw_color(0, 0, 0); pdf.set_line_width(0.2)
     pdf.ln(6)
 
     # ── Special Conditions (from consultant notes) ───────────────────────────
@@ -3083,7 +3257,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         ("3. DURATION & AUTOMATIC RENEWAL", "This contract automatically extends for 12 months at the end of the Minimum Term and each Extended Term unless 90 days written notice is given. You may add Services at any time."),
         ("4. SERVICES", "We provide Services with reasonable skill and care. We do not warrant uninterrupted or error-free service. Service Failures must be reported via our Helpdesk."),
         ("6. USE OF SERVICES", "Services are for business use only and must comply with our Acceptable Use Policy. You must not use Services to breach any law, compromise network security, or degrade service to other customers."),
-        ("10. CHARGES AND PAYMENT", "All Charges exclude VAT. Invoices due within 14 days. Late payment fee £25 after 7 days. DD cancellation fee £50. Annual price increase up to 5% with 30 days notice. Rental invoiced in advance; calls in arrears. Port/activation: £25+VAT per CLI. Engineer callout: min £250+VAT. Remote changes: £35+VAT. Call recording: included 12 months then £20/month+VAT."),
+        ("10. CHARGES AND PAYMENT", "All Charges exclude VAT. Invoices due within 14 days. Late payment fee £25 after 7 days. DD cancellation fee £50. Prices are fixed for the minimum term - no inflation-linked or percentage increases (see Contract Summary). Rental invoiced in advance; calls in arrears. Port/activation: £25+VAT per CLI. Engineer callout: min £250+VAT. Remote changes: £35+VAT. Call recording: included 12 months then £20/month+VAT."),
         ("12. LIABILITY", "No liability for loss of profits, business opportunity, goodwill or indirect loss. Total liability capped at Charges paid in prior 12 months. Nothing limits liability for death or fraud."),
         ("13. CANCELLATION", "90 days notice required. Cancellation during term incurs Cancellation Charge. Introductory credits repayable on early exit. Subsidised early termination charges repayable pro-rata."),
         ("15. TERMINATION FEES", "On termination all invoices become immediately due; Equipment must be returned. Cancellation fee: £299+VAT per CLI. Port-away: £15+VAT per number. Account closure: £250+VAT. We may terminate for non-payment (7+ days), unremedied breach, or insolvency."),
