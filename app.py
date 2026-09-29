@@ -988,21 +988,9 @@ with st.sidebar:
             st.session_state["c_desired_rental"]      = 0.0
             st.session_state["_sync_rental_to_cons"]  = True
             st.rerun()
-    _active_rental = st.session_state.get("c_desired_rental", 0.0)
-    _prev_units    = st.session_state.get("_prev_commission_units", 0.0)
-    _calc_rental  = st.session_state.get("_prev_base_rental", 0.0)
-    _true_rate_ss = st.session_state.get("_prev_true_rate", 0.0)
-    _cos_full_ss  = st.session_state.get("_prev_cos_full", 0.0)
-    # Compute units live from whatever rental is in the box right now
-    _display_rental = _active_rental if _active_rental > 0 else _calc_rental
-    if _true_rate_ss > 0:
-        _live_units = ((_display_rental / _true_rate_ss) * 1000 - _cos_full_ss) / 4000
-    else:
-        _live_units = _prev_units
-    if _active_rental > 0 and abs(_active_rental - _calc_rental) > 0.01:
-        st.caption(f"Override: £{_active_rental:.2f}/mo  ·  ~{_live_units:.2f} units")
-    else:
-        st.caption(f"Calculated: £{_calc_rental:.2f}/mo  ·  ~{_live_units:.2f} units")
+    # Units caption is filled in at the END of the run, from the same final figure the
+    # Consultant view shows (after any services discount), so the two always match.
+    _units_ph = st.container(key="units_caption")
 
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
     termination_cost = st.number_input(
@@ -5783,6 +5771,12 @@ if st.session_state.admin_unlocked:
 
 
 # ─── END OF RUN: hero, live summary, sign out ───────────────────────────────
+# Sidebar rental + units: exactly the numbers used in the Consultant view
+with _units_ph:
+    _is_override = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
+    _disc_note = f"  ·  after {svc_disc_pct:.0f}% services discount" if svc_disc_pct > 0 else ""
+    st.caption(f"{'Override' if _is_override else 'Calculated'}: £{_desired_rental:,.2f}/mo  ·  "
+               f"{commission_units:.2f} units{_disc_note}")
 try:
     _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
     _n_hw = (_n_handsets + sum(headset_quantities.values())
