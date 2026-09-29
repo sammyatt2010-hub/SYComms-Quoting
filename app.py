@@ -3807,6 +3807,16 @@ _customer_total_ex_buyout = round(_calc_rental_ex_buyout * lease_term, 2) if is_
 lease_value            = lease_value_ex_buyout
 max_termination        = round(lease_value_ex_buyout * MAX_TERMINATION_PCT / 100.0, 2)
 termination_over       = is_spread and (termination_cost - max_termination) >= 1.0            # £1 tolerance for rounding
+# ── Safeguards when a target rental is in play ───────────────────────────────
+_target_active       = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
+_rental_to_cover     = _calc_rental_ex_buyout + _buyout_rental_share        # rental that fully covers the buyout
+rental_short_of_buyout = (round(_rental_to_cover - _desired_rental, 2)
+                          if (is_spread and _target_active and termination_cost > 0
+                              and _rental_to_cover - _desired_rental >= 0.01) else 0.0)
+# Largest buyout that keeps lease profit at or above zero at the rental in the deal (never above the max)
+safe_buyout          = round(max(0.0, min(max_termination, _gp_before_buyout)), 2) if is_spread else 0.0
+safe_buyout_limited  = is_spread and (max_termination - safe_buyout) >= 1.0
+lease_profit_negative = is_spread and _adjusted_gp < -0.5
 termination_over_pct   = (max(1.0, round((termination_cost - max_termination) / max_termination * 100.0, 0))
                           if (termination_over and max_termination > 0) else 0.0)
 commission_units       = _adjusted_gp / 4000
@@ -5814,7 +5824,7 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid {"var(--warn)" if _over else "var(--good)"}">
           <div class="metric-label">Max Termination ({MAX_TERMINATION_PCT:.0f}% of lease value)</div>
           <div class="metric-value" style="color:{"var(--warn)" if _over else "var(--good)"}!important">{"£" + format(max_termination, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else ("No buyout. At the maximum, lease profit would be £" + format(_gp_before_buyout - max_termination, ",.0f") if is_spread else "No buyout on this deal")}</div>
+          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else ("No buyout. At the maximum, lease profit would be £" + format(_gp_before_buyout - max_termination, ",.0f") if is_spread else "No buyout on this deal")}</div>{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Safe buyout at this target rental: £" + format(safe_buyout, ",.0f") + "</div>") if safe_buyout_limited else ""}{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Target rental £" + format(rental_short_of_buyout, ",.2f") + "/mo short of covering the buyout</div>") if rental_short_of_buyout > 0 else ""}
         </div>''', unsafe_allow_html=True)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
@@ -5858,6 +5868,13 @@ with _units_ph:
         st.caption(f"Max termination: £{max_termination:,.0f}")
         if termination_over:
             st.caption(f":orange[Buyout is {termination_over_pct:.0f}% over the maximum]")
+        if safe_buyout_limited:
+            st.caption(f":orange[At this target rental the safe buyout is £{safe_buyout:,.0f} - above that, lease profit goes negative]")
+        if rental_short_of_buyout > 0:
+            st.caption(f":orange[Target rental is £{rental_short_of_buyout:,.2f}/mo below what covers the buyout "
+                       f"(£{_rental_to_cover:,.2f}/mo) - we're absorbing it]")
+        if lease_profit_negative:
+            st.caption(f":orange[Lease profit is -£{abs(_adjusted_gp):,.0f} at this rental and buyout]")
 try:
     _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
     _n_hw = (_n_handsets + sum(headset_quantities.values())
