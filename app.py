@@ -3785,6 +3785,18 @@ if _desired_rental <= 0:
 # GP = disc_turnover - cos_full
 _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
 _adjusted_gp           = _desired_disc_turnover - pl_data["cos_full"]
+# Lease value = what the funder pays for the lease at the rental in the deal (incl. any target rental);
+# the most we'd put towards settling a customer's existing agreement is a % of it (default 70%).
+MAX_TERMINATION_PCT = float(C.get("max_termination_pct", 70))
+# Lease value = total of all rentals over the term (rental x months), at the rental in the deal.
+lease_value         = round(_desired_rental * lease_term, 2) if is_spread else 0.0     # incl. any buyout
+# The max is based on the new lease BEFORE any buyout is rolled in - the lease amount is set by the
+# equipment and term, so a buyout must not raise its own limit. Remove the rental that funds the buyout.
+_buyout_rental_share  = (pl_data["sales_rate"] / 1000.0) * termination_cost
+lease_value_ex_buyout = round(max(0.0, _desired_rental - _buyout_rental_share) * lease_term, 2) if is_spread else 0.0
+max_termination     = round(lease_value_ex_buyout * MAX_TERMINATION_PCT / 100.0, 2)
+termination_over_pct = (round((termination_cost - max_termination) / max_termination * 100.0, 0)
+                        if (max_termination > 0 and termination_cost > max_termination) else 0.0)
 commission_units       = _adjusted_gp / 4000
 commission             = round(commission_units * commission_per_unit, 2)
 st.session_state["_prev_commission_units"] = round(commission_units, 2)
@@ -4843,13 +4855,11 @@ with tab5:
     st.markdown('---')
     with st.expander('📊 Feasibility Calculator', expanded=False):
         st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
-        st.markdown('## 📊 Feasibility Calculator')
-        st.caption('Checks whether the customer\'s existing settlement can be absorbed into the new lease.')
-    
-        _new_rental    = float(st.session_state.get('adj_rent', pl_data['rental']))
-        _buyout_rental = (pl_data['sales_rate'] / 1000.0) * termination_cost
-        _lease_total   = max(_new_rental - _buyout_rental, 0) * lease_term
-        _max_settlement = round(_lease_total * 0.70, 2)
+        # Same figures as the sidebar and Admin panel (one shared calculation)
+        _new_rental     = float(_desired_rental)
+        _buyout_rental  = _buyout_rental_share
+        _lease_total    = lease_value_ex_buyout
+        _max_settlement = max_termination
         _settlement_ok  = termination_cost <= _max_settlement
     
         feas_col1, feas_col2 = st.columns(2)
@@ -4862,18 +4872,18 @@ with tab5:
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Total Lease Value</div>
               <div style='font-size:1.3rem;font-weight:700;color:var(--text)'>£{_lease_total:.2f}</div>
-              <div style='font-size:0.8rem;color:var(--muted)'>({lease_term} months × £{_new_rental:.2f})</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>({lease_term} months × £{max(_new_rental - _buyout_rental, 0):.2f}, before buyout)</div>
               <hr style='margin:0.8rem 0'>
-              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement (70%)</div>
+              <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement ({MAX_TERMINATION_PCT:.0f}%)</div>
               <div style='font-size:1.6rem;font-weight:800;color:var(--good)'>£{_max_settlement:.2f}</div>
-              <div style='font-size:0.8rem;color:var(--muted)'>70% of total lease value</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>{MAX_TERMINATION_PCT:.0f}% of total lease value</div>
             </div>
             """, unsafe_allow_html=True)
         with feas_col2:
-            _col  = '#34D399' if _settlement_ok else '#F87171'
-            _bg   = 'rgba(52,211,153,.12)' if _settlement_ok else 'rgba(248,113,113,.12)'
+            _col  = '#34D399' if _settlement_ok else '#FBBF24'
+            _bg   = 'rgba(52,211,153,.12)' if _settlement_ok else 'rgba(251,191,36,.12)'
             _icon = '✅' if _settlement_ok else '🔴'
-            _msg  = 'Settlement FEASIBLE' if _settlement_ok else 'Settlement EXCEEDS 70% - Review Required'
+            _msg  = 'Settlement FEASIBLE' if _settlement_ok else f'Settlement {termination_over_pct:.0f}% over the maximum - review required'
             _diff = _max_settlement - termination_cost
             st.markdown(f"""
             <div style='background:{_bg};border:2px solid {_col};border-radius:12px;padding:1.4rem;text-align:center'>
@@ -4883,7 +4893,7 @@ with tab5:
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:{_col}'>Customer Settlement / Buyout</div>
               <div style='font-size:1.8rem;font-weight:800;color:{_col}'>£{termination_cost:.2f}</div>
               <div style='font-size:0.8rem;color:{_col};margin-top:0.4rem'>
-                {'£' + f'{abs(_diff):.2f}' + ' headroom remaining' if _settlement_ok else '£' + f'{abs(_diff):.2f}' + ' over the 70% limit'}
+                {'£' + f'{abs(_diff):.2f}' + ' headroom remaining' if _settlement_ok else '£' + f'{abs(_diff):.2f}' + ' over the limit'}
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -5742,12 +5752,14 @@ elif pat < 500:
 
 if st.session_state.admin_unlocked:
     # Row 1 - 4 original cards
+    _gp_sub = (f"Rental £{_desired_rental:.2f}/mo (calculated £{pl_data['rental']:.2f})"
+               if abs(_desired_rental - pl_data["rental"]) > 0.01 else f"Rental: £{pl_data['rental']:.2f}/mo")
     fi1, fi2, fi3, fi4 = st.columns(4)
     with fi1:
         st.markdown(f'''<div class="metric-card">
           <div class="metric-label">Gross Profit (Lease)</div>
-          <div class="metric-value {pc}">£{pl_data["gross_profit"]:.0f}</div>
-          <div class="metric-sub">Rental: £{pl_data["rental"]:.2f}/mo</div>
+          <div class="metric-value {pc}">£{_adjusted_gp:.0f}</div>
+          <div class="metric-sub">{_gp_sub}</div>
         </div>''', unsafe_allow_html=True)
     with fi2:
         st.markdown(f'''<div class="metric-card">
@@ -5774,13 +5786,28 @@ if st.session_state.admin_unlocked:
     _svc_sell_pm    = svc["total_sell"]
     _svc_margin_pm  = _svc_sell_pm - _svc_cost_pm
     _svc_profit_term = round(_svc_margin_pm * lease_term, 2)
-    _total_gp        = round(pl_data["gross_profit"] + _svc_profit_term, 2)
+    _total_gp        = round(_adjusted_gp + _svc_profit_term, 2)
+    # Lease value + maximum termination
+    lv1, lv2 = st.columns(2)
+    with lv1:
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
+          <div class="metric-label">Lease Value</div>
+          <div class="metric-value">{"£" + format(lease_value, ",.0f") if is_spread else "n/a"}</div>
+          <div class="metric-sub">{(str(lease_term) + " months x £" + format(_desired_rental, ".2f") + "/mo" + (" (incl. £" + format(termination_cost, ",.0f") + " buyout)" if termination_cost > 0 else "")) if is_spread else "Upfront purchase - no lease"}</div>
+        </div>''', unsafe_allow_html=True)
+    with lv2:
+        _over = is_spread and termination_cost > max_termination
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid {"var(--warn)" if _over else "var(--good)"}">
+          <div class="metric-label">Max Termination ({MAX_TERMINATION_PCT:.0f}% of £{lease_value_ex_buyout:,.0f} before buyout)</div>
+          <div class="metric-value" style="color:{"var(--warn)" if _over else "var(--good)"}!important">{"£" + format(max_termination, ",.0f") if is_spread else "n/a"}</div>
+          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else "No buyout on this deal"}</div>
+        </div>''', unsafe_allow_html=True)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--border-strong)">
           <div class="metric-label">Lease Profit</div>
-          <div class="metric-value" style="color:var(--text)">£{pl_data["gross_profit"]:.0f}</div>
-          <div class="metric-sub">From pricebook P&L formula</div>
+          <div class="metric-value" style="color:var(--text)">£{_adjusted_gp:.0f}</div>
+          <div class="metric-sub">Funder pays £{_desired_disc_turnover:,.0f} less costs £{pl_data["cos_full"]:,.0f}</div>
         </div>''', unsafe_allow_html=True)
     with pb2:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
@@ -5789,10 +5816,10 @@ if st.session_state.admin_unlocked:
           <div class="metric-sub">£{_svc_margin_pm:.2f}/mo × {lease_term}mo  ·  sell £{_svc_sell_pm:.2f} cost £{_svc_cost_pm:.2f}</div>
         </div>''', unsafe_allow_html=True)
     with pb3:
-        st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--good);background:#f0faf4">
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--good);background:rgba(52,211,153,.08)">
           <div class="metric-label" style="color:var(--good)">Total Gross Profit</div>
           <div class="metric-value" style="color:var(--good)">£{_total_gp:.0f}</div>
-          <div class="metric-sub">Lease £{pl_data["gross_profit"]:.0f} + Services £{_svc_profit_term:.0f}</div>
+          <div class="metric-sub">Lease £{_adjusted_gp:.0f} + Services £{_svc_profit_term:.0f}</div>
         </div>''', unsafe_allow_html=True)
     if termination_cost > 0:
         st.markdown(
@@ -5813,6 +5840,10 @@ with _units_ph:
     _disc_note = f"  ·  after {svc_disc_pct:.0f}% services discount" if svc_disc_pct > 0 else ""
     st.caption(f"{'Override' if _is_override else 'Calculated'}: £{_desired_rental:,.2f}/mo  ·  "
                f"{commission_units:.2f} units{_disc_note}")
+    if is_spread and lease_value > 0:
+        st.caption(f"Max termination: £{max_termination:,.0f}")
+        if termination_cost > max_termination:
+            st.caption(f":orange[Buyout is {termination_over_pct:.0f}% over the maximum]")
 try:
     _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
     _n_hw = (_n_handsets + sum(headset_quantities.values())
