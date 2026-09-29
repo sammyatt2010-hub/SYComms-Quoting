@@ -5967,18 +5967,11 @@ with _units_ph:
         if lease_profit_negative:
             st.caption(f":orange[Lease profit is -£{abs(_adjusted_gp):,.0f} at this rental and buyout]")
     if fin_band != "none":
-        _fin_col = {"good": "green", "stretch": "orange", "unlikely": "red"}[fin_band]
-        _fin_txt = {"good": "likely to pass", "stretch": "stretching - may be referred",
-                    "unlikely": "unlikely to pass"}[fin_band]
-        st.caption(f":{_fin_col}[Finance: £{fin_per_handset:,.0f} per handset - {_fin_txt}]")
-        if fin_band == "good":
-            st.caption(f"Room up to about £{fin_rental_ok:,.2f}/mo (£{FIN_OK_PER_HANDSET:,.0f} per handset), "
-                       f"stretch to £{fin_rental_max:,.2f}/mo")
-        elif fin_band == "stretch":
-            st.caption(f"Keep the rental under about £{fin_rental_max:,.2f}/mo (£{FIN_MAX_PER_HANDSET:,.0f} per handset)")
-        else:
-            st.caption(f"Bring the rental down to about £{fin_rental_max:,.2f}/mo or less "
-                       f"(£{FIN_MAX_PER_HANDSET:,.0f} per handset)")
+        # Status only - no figures on screen, so nothing is exposed to the customer
+        _fin_status = {"good": ":green[Finance - Likely to pass]",
+                       "stretch": ":orange[Finance - Possible (stretch)]",
+                       "unlikely": ":red[Finance - Unlikely to pass]"}[fin_band]
+        st.caption(_fin_status)
 try:
     _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
     _n_hw = (_n_handsets + sum(headset_quantities.values())
