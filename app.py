@@ -1756,9 +1756,10 @@ def build_proposal_pdf():
     p.cell(100, 5, _ps(sub))
     rx = M + CW * 0.58; rw = PW - M - 9 - rx
     p.set_draw_color(*LINE); p.line(rx - 6, hy + 9, rx - 6, hy + hh - 9)
+    # The agreement term lives on page 2 ("Agreement at a glance"), so page 1 keeps just the money
     stats = ([("Today", f"{gbp(current_total)}/mo")] if has_cur else []) + [
-        (f"With {_CO}", f"{gbp(total_mo)}/mo"), ("Agreement", term_lbl)]
-    sy = hy + 9 + (0 if has_cur else 5)
+        (f"With {_CO}", f"{gbp(total_mo)}/mo")]
+    sy = hy + (hh - len(stats) * 10.5) / 2 + 1.5   # vertically centred in the card
     for i, (k, v) in enumerate(stats):
         p.set_xy(rx, sy); p.set_font("Helvetica", "", 8.5); p.set_text_color(*MUTED)
         p.cell(rw * 0.45, 6, _ps(k))
