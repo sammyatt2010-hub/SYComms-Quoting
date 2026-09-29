@@ -897,6 +897,10 @@ if "_pending_quote" in st.session_state:
     st.session_state["_prev_bb_provider"] = st.session_state.get("q_bb_provider", "None / Customer Supplied")
     st.session_state["_quote_ready"] = False
 
+# Termination calculator "use as buyout" button: apply before the buyout box is drawn
+if "_pending_termination" in st.session_state:
+    st.session_state["q_termination"] = round(float(st.session_state.pop("_pending_termination")), 2)
+
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -1007,27 +1011,30 @@ with st.sidebar:
     st.markdown("")
     st.markdown("**Desired Lease Rental**")
     # Only sync from consultant side when flag is set
+    # Empty box = use the calculated rental. It only shows a number when a target rental is set.
     if st.session_state.pop("_sync_rental_to_sidebar", False):
-        st.session_state["q_sidebar_rental"] = float(
-            st.session_state.get("c_desired_rental") or
-            st.session_state.get("_prev_base_rental", 0.0))
+        _tr = float(st.session_state.get("c_desired_rental") or 0.0)
+        st.session_state["q_sidebar_rental"] = _tr if _tr > 0 else None
     _sidebar_rental = st.number_input(
         "Target Rental (£/mo)",
-        min_value=0.0,
+        min_value=0.0, value=None,
         step=10.0,
         key="q_sidebar_rental",
-        help="Enter target monthly rental, then click Apply. 0 = use calculated figure."
+        placeholder="Using calculated rental",
+        help="Enter a target monthly rental, then click Apply. Leave empty (or Clear) to use the calculated rental."
     )
     _sr_col1, _sr_col2 = st.columns(2)
     with _sr_col1:
         if st.button("✅ Apply", key="btn_apply_rental", use_container_width=True):
-            st.session_state["c_desired_rental"]      = _sidebar_rental
-            st.session_state["_sync_rental_to_cons"]  = True
+            st.session_state["c_desired_rental"]        = float(_sidebar_rental or 0.0)   # empty = calculated
+            st.session_state["_sync_rental_to_cons"]    = True
+            st.session_state["_sync_rental_to_sidebar"] = True
             st.rerun()
     with _sr_col2:
         if st.button("✖ Clear", key="btn_clear_rental", use_container_width=True):
-            st.session_state["c_desired_rental"]      = 0.0
-            st.session_state["_sync_rental_to_cons"]  = True
+            st.session_state["c_desired_rental"]        = 0.0
+            st.session_state["_sync_rental_to_cons"]    = True
+            st.session_state["_sync_rental_to_sidebar"] = True   # empties this box too
             st.rerun()
     # Units caption is filled in at the END of the run, from the same final figure the
     # Consultant view shows (after any services discount), so the two always match.
@@ -1036,7 +1043,7 @@ with st.sidebar:
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
     termination_cost = st.number_input(
         "Buyout / Termination Cost (£)",
-        min_value=0.0, value=0.0, step=50.0,
+        min_value=0.0, step=50.0,
         key="q_termination",
         help="Cost to exit the customer's existing contract. Added to the lease spread - not shown to customer."
     )
@@ -3784,39 +3791,55 @@ if _desired_rental <= 0:
 # Formula: disc_turnover = (desired_rental / true_rate) × 1000
 # GP = disc_turnover - cos_full
 _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
-# Buyout rule: the customer's rental rises to cover the buyout, but the buyout comes straight off
-# OUR lease profit. Any rental above the equipment-only calculated rental is treated first as funding
-# the buyout (up to the buyout's share), so the funder money it generates isn't counted as profit.
+# ONE RULE for lease value, max termination and lease profit - the "base rental":
+#   * no target rental -> the equipment-only calculated rental (the customer's rental still rises to cover
+#     any buyout, but that uplift is NOT counted as value or profit, so a buyout can't lift its own limit)
+#   * target rental    -> the consultant's rental, counted in full (their choice to add value to the deal)
+# The buyout then comes straight off lease profit.
 _buyout_rental_share   = (pl_data["sales_rate"] / 1000.0) * termination_cost
 _calc_rental_ex_buyout = (pl_data["sales_rate"] / 1000.0) * max(0.0, pl_data["sub_total"] - termination_cost)
-_buyout_funding        = min(max(0.0, _desired_rental - _calc_rental_ex_buyout), _buyout_rental_share)
+_target_active         = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
+_lv_rental             = _desired_rental if _target_active else _calc_rental_ex_buyout
+_buyout_funding        = max(0.0, _desired_rental - _lv_rental)       # rental uplift that only funds the buyout
 _profit_disc_turnover  = ((_desired_rental - _buyout_funding) / true_rate) * 1000 if true_rate > 0 else 0
 _adjusted_gp           = _profit_disc_turnover - pl_data["cos_full"]      # cos_full already includes the buyout
 _gp_before_buyout      = _adjusted_gp + termination_cost
 # Lease value = what the funder pays for the lease at the rental in the deal (incl. any target rental);
 # the most we'd put towards settling a customer's existing agreement is a % of it (default 70%).
 MAX_TERMINATION_PCT = float(C.get("max_termination_pct", 70))
-# Lease value = total rentals over the term for the EQUIPMENT AND TERM ALONE (pricebook calculated rental,
-# with any buyout taken out at source). A buyout or a target rental never changes it - only adding/removing
-# hardware or changing the term does. Max termination is a fixed % of it.
-# Lease value = what the FUNDER PAYS for the equipment-only calculated rental (rental / funder rate x 1000).
-# That's the real cash a settlement comes out of, so the maximum is a % of it.
-lease_value_ex_buyout  = (round(_calc_rental_ex_buyout / true_rate * 1000.0, 2)
+# Lease value = what the FUNDER PAYS (rental / funder rate x 1000) - the cash a settlement comes out of.
+#   * No target rental: the equipment-only calculated rental, with any buyout taken out (so a buyout can't
+#     raise its own limit).
+#   * Target rental set: the consultant's rental - more value in the deal raises the maximum. A buyout
+#     doesn't move a target rental, so there's no circularity.
+lease_value_ex_buyout  = (round(_lv_rental / true_rate * 1000.0, 2)
                           if (is_spread and true_rate > 0) else 0.0)
 _customer_total_ex_buyout = round(_calc_rental_ex_buyout * lease_term, 2) if is_spread else 0.0
 lease_value            = lease_value_ex_buyout
 max_termination        = round(lease_value_ex_buyout * MAX_TERMINATION_PCT / 100.0, 2)
 termination_over       = is_spread and (termination_cost - max_termination) >= 1.0            # £1 tolerance for rounding
 # ── Safeguards when a target rental is in play ───────────────────────────────
-_target_active       = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
 _rental_to_cover     = _calc_rental_ex_buyout + _buyout_rental_share        # rental that fully covers the buyout
 rental_short_of_buyout = (round(_rental_to_cover - _desired_rental, 2)
                           if (is_spread and _target_active and termination_cost > 0
                               and _rental_to_cover - _desired_rental >= 0.01) else 0.0)
 # Largest buyout that keeps lease profit at or above zero at the rental in the deal (never above the max)
 safe_buyout          = round(max(0.0, min(max_termination, _gp_before_buyout)), 2) if is_spread else 0.0
-safe_buyout_limited  = is_spread and (max_termination - safe_buyout) >= 1.0
+safe_buyout_limited  = is_spread and (max_termination - safe_buyout) >= max(100.0, 0.01 * max_termination)   # ignore trivial gaps
 lease_profit_negative = is_spread and _adjusted_gp < -0.5
+# ── Likelihood to pass finance: funded value per handset ────────────────────
+# Rule of thumb: up to £1,500 per handset is comfortable, up to £2,000 is a stretch, above that is
+# likely to be rejected. Stops a deal being "pumped" with a huge target rental. (Admin-adjustable.)
+FIN_OK_PER_HANDSET  = float(C.get("finance_ok_per_handset", 1500))
+FIN_MAX_PER_HANDSET = float(C.get("finance_max_per_handset", 2000))
+fin_handsets        = int(sum(desktop_quantities.values()) + sum(cordless_quantities.values()))
+fin_funded          = (_desired_rental / true_rate * 1000.0) if (is_spread and true_rate > 0) else 0.0
+fin_per_handset     = (fin_funded / fin_handsets) if fin_handsets > 0 else 0.0
+fin_band            = ("none" if (not is_spread or fin_handsets == 0) else
+                       "good" if fin_per_handset <= FIN_OK_PER_HANDSET else
+                       "stretch" if fin_per_handset <= FIN_MAX_PER_HANDSET else "unlikely")
+fin_rental_ok       = FIN_OK_PER_HANDSET  * fin_handsets * true_rate / 1000.0   # rental at the comfortable limit
+fin_rental_max      = FIN_MAX_PER_HANDSET * fin_handsets * true_rate / 1000.0   # rental at the upper limit
 termination_over_pct   = (max(1.0, round((termination_cost - max_termination) / max_termination * 100.0, 0))
                           if (termination_over and max_termination > 0) else 0.0)
 commission_units       = _adjusted_gp / 4000
@@ -4538,7 +4561,7 @@ with tab5:
         c_left, c_right = st.columns([3, 2])
         with c_left:
             # Only sync from sidebar when flag is set
-            if st.session_state.pop("_sync_rental_to_cons", False):
+            if st.session_state.pop("_sync_rental_to_cons", False) or "c_desired_rental_input" not in st.session_state:
                 st.session_state["c_desired_rental_input"] = round(
                     st.session_state.get("c_desired_rental") or base_rental, 2)
             desired_rental_input = st.number_input(
@@ -4874,6 +4897,74 @@ with tab5:
 
 # ── TAB 6: SIGN & SEND ────────────────────────────────────────────────────────
 
+    # ── Termination Calculator ─────────────────────────────────────────
+    st.markdown('---')
+    with st.expander('🧮 Termination Calculator', expanded=False):
+        st.caption("Estimates what the customer owes to leave their current agreements, from the Current "
+                   "Customer Costs in the sidebar and the end date(s). Call charges are usage, so they're left out.")
+
+        def _months_left(end):
+            if not end:
+                return 0
+            t = date.today()
+            m = (end.year - t.year) * 12 + (end.month - t.month) + (1 if end.day > t.day else 0)
+            return max(0, m)
+
+        _tc_lease_mo = float(current_system or 0)
+        _tc_svc_parts = [("Broadband", current_bb), ("User licences", current_hosted), ("Mobiles", current_mobile),
+                         ("IT services / M365", current_it), ("Support & maintenance", current_support),
+                         ("Other", current_other)]
+        _tc_svc_mo = float(sum(v or 0 for _, v in _tc_svc_parts))
+
+        tc1, tc2 = st.columns(2)
+        with tc1:
+            st.markdown("**Phone system lease**")
+            st.caption(f"Current phone system: £{_tc_lease_mo:,.2f}/mo")
+            _tc_lease_end = st.date_input("Lease end date", value=None, key="tc_lease_end", format="DD/MM/YYYY")
+            _tc_lease_pct = st.number_input("% of remaining payments due", 0, 100, 100, 5, key="tc_lease_pct",
+                                            help="Most lease settlements are the remaining rentals; lower this if the "
+                                                 "finance company offers a rebate.")
+        with tc2:
+            st.markdown("**Service contracts**")
+            st.caption(f"Current services: £{_tc_svc_mo:,.2f}/mo")
+            _tc_same = st.checkbox("Same end date as the lease", value=True, key="tc_same_end")
+            _tc_svc_end = (_tc_lease_end if _tc_same else
+                           st.date_input("Services end date", value=None, key="tc_svc_end", format="DD/MM/YYYY"))
+            _tc_svc_pct = st.number_input("% of remaining charges due", 0, 100, 100, 5, key="tc_svc_pct",
+                                          help="Many providers charge the full remaining contract; some charge less.")
+
+        _tc_lease_months = _months_left(_tc_lease_end)
+        _tc_svc_months   = _months_left(_tc_svc_end)
+        _tc_lease_settle = round(_tc_lease_mo * _tc_lease_months * _tc_lease_pct / 100.0, 2)
+        _tc_svc_settle   = round(_tc_svc_mo * _tc_svc_months * _tc_svc_pct / 100.0, 2)
+        _tc_total        = round(_tc_lease_settle + _tc_svc_settle, 2)
+
+        if not (_tc_lease_end or _tc_svc_end):
+            st.info("Enter the end date of the customer's current agreement to see the estimate.")
+        else:
+            k1, k2, k3 = st.columns(3)
+            for _col, _lbl, _val, _sub in (
+                (k1, "Lease settlement", _tc_lease_settle,
+                 f"£{_tc_lease_mo:,.2f} × {_tc_lease_months} months × {_tc_lease_pct}%"),
+                (k2, "Services settlement", _tc_svc_settle,
+                 f"£{_tc_svc_mo:,.2f} × {_tc_svc_months} months × {_tc_svc_pct}%"),
+                (k3, "Total estimated termination", _tc_total, "Lease + services")):
+                with _col:
+                    render_html(f'<div class="pe-kpi"><div class="l">{esc(_lbl)}</div>'
+                                f'<div class="v">£{_val:,.0f}</div>'
+                                f'<div style="color:var(--muted);font-size:.78rem;margin-top:4px">{esc(_sub)}</div></div>')
+            with st.expander("What's included in services", expanded=False):
+                for _n, _v in _tc_svc_parts:
+                    if (_v or 0) > 0:
+                        st.caption(f"{_n}: £{_v:,.2f}/mo")
+            _cmp_max = (f" - the maximum for this deal is £{max_termination:,.0f}"
+                        + (" (this total is over it)" if _tc_total - max_termination >= 1 else "")) if is_spread else ""
+            st.caption(f"Estimate only - confirm with the customer's settlement letters.{_cmp_max}")
+            if st.button(f"Use £{_tc_total:,.2f} as the buyout", type="primary", key="tc_use_btn",
+                         disabled=_tc_total <= 0):
+                st.session_state["_pending_termination"] = _tc_total
+                st.rerun()
+
     # ── Feasibility Calculator ──────────────────────────────────────────
     st.markdown('---')
     with st.expander('📊 Feasibility Calculator', expanded=False):
@@ -4895,7 +4986,7 @@ with tab5:
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Lease Value (funder pays)</div>
               <div style='font-size:1.3rem;font-weight:700;color:var(--text)'>£{_lease_total:.2f}</div>
-              <div style='font-size:0.8rem;color:var(--muted)'>(£{_calc_rental_ex_buyout:.2f}/mo ÷ {true_rate:.2f} × 1,000 - equipment & term only)</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>(£{_lv_rental:.2f}/mo {"target" if _target_active else "calculated"} rental ÷ {true_rate:.2f} × 1,000, before any buyout)</div>
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement ({MAX_TERMINATION_PCT:.0f}%)</div>
               <div style='font-size:1.6rem;font-weight:800;color:var(--good)'>£{_max_settlement:.2f}</div>
@@ -5817,14 +5908,14 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
           <div class="metric-label">Lease Value</div>
           <div class="metric-value">{"£" + format(lease_value, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("What the funder pays for £" + format(_calc_rental_ex_buyout, ",.2f") + "/mo (÷ " + format(true_rate, ".2f") + " rate × 1,000) - equipment & term only, no target rental or buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + (" (target rental" + (" + buyout)" if termination_cost > 0 else ")") if _lp_is_target else " (incl. buyout)") + "</div>") if (is_spread and abs(_desired_rental - _calc_rental_ex_buyout) > 0.01) else ""}
+          <div class="metric-sub">{("What the funder pays for £" + format(_lv_rental, ",.2f") + "/mo " + ("target" if _target_active else "calculated") + " rental (÷ " + format(true_rate, ".2f") + " rate × 1,000), before any buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo incl. buyout, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + "</div>") if (is_spread and abs(_desired_rental - _lv_rental) > 0.01) else ""}
         </div>''', unsafe_allow_html=True)
     with lv2:
         _over = termination_over
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid {"var(--warn)" if _over else "var(--good)"}">
           <div class="metric-label">Max Termination ({MAX_TERMINATION_PCT:.0f}% of lease value)</div>
           <div class="metric-value" style="color:{"var(--warn)" if _over else "var(--good)"}!important">{"£" + format(max_termination, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else ("No buyout. At the maximum, lease profit would be £" + format(_gp_before_buyout - max_termination, ",.0f") if is_spread else "No buyout on this deal")}</div>{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Safe buyout at this target rental: £" + format(safe_buyout, ",.0f") + "</div>") if safe_buyout_limited else ""}{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Target rental £" + format(rental_short_of_buyout, ",.2f") + "/mo short of covering the buyout</div>") if rental_short_of_buyout > 0 else ""}
+          <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else ("No buyout. At the maximum, lease profit would be £" + format(_gp_before_buyout - max_termination, ",.0f") if is_spread else "No buyout on this deal")}</div>{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Safe buyout at this rental: £" + format(safe_buyout, ",.0f") + "</div>") if safe_buyout_limited else ""}{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Target rental £" + format(rental_short_of_buyout, ",.2f") + "/mo short of covering the buyout</div>") if rental_short_of_buyout > 0 else ""}
         </div>''', unsafe_allow_html=True)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
@@ -5869,12 +5960,25 @@ with _units_ph:
         if termination_over:
             st.caption(f":orange[Buyout is {termination_over_pct:.0f}% over the maximum]")
         if safe_buyout_limited:
-            st.caption(f":orange[At this target rental the safe buyout is £{safe_buyout:,.0f} - above that, lease profit goes negative]")
+            st.caption(f":orange[At this rental the safe buyout is £{safe_buyout:,.0f} - above that, lease profit goes negative]")
         if rental_short_of_buyout > 0:
             st.caption(f":orange[Target rental is £{rental_short_of_buyout:,.2f}/mo below what covers the buyout "
                        f"(£{_rental_to_cover:,.2f}/mo) - we're absorbing it]")
         if lease_profit_negative:
             st.caption(f":orange[Lease profit is -£{abs(_adjusted_gp):,.0f} at this rental and buyout]")
+    if fin_band != "none":
+        _fin_col = {"good": "green", "stretch": "orange", "unlikely": "red"}[fin_band]
+        _fin_txt = {"good": "likely to pass", "stretch": "stretching - may be referred",
+                    "unlikely": "unlikely to pass"}[fin_band]
+        st.caption(f":{_fin_col}[Finance: £{fin_per_handset:,.0f} per handset - {_fin_txt}]")
+        if fin_band == "good":
+            st.caption(f"Room up to about £{fin_rental_ok:,.2f}/mo (£{FIN_OK_PER_HANDSET:,.0f} per handset), "
+                       f"stretch to £{fin_rental_max:,.2f}/mo")
+        elif fin_band == "stretch":
+            st.caption(f"Keep the rental under about £{fin_rental_max:,.2f}/mo (£{FIN_MAX_PER_HANDSET:,.0f} per handset)")
+        else:
+            st.caption(f"Bring the rental down to about £{fin_rental_max:,.2f}/mo or less "
+                       f"(£{FIN_MAX_PER_HANDSET:,.0f} per handset)")
 try:
     _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
     _n_hw = (_n_handsets + sum(headset_quantities.values())
