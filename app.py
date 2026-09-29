@@ -5796,13 +5796,14 @@ if st.session_state.admin_unlocked:
     _svc_margin_pm  = _svc_sell_pm - _svc_cost_pm
     _svc_profit_term = round(_svc_margin_pm * lease_term, 2)
     _total_gp        = round(_adjusted_gp + _svc_profit_term, 2)
+    _lp_is_target    = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
     # Lease value + maximum termination
     lv1, lv2 = st.columns(2)
     with lv1:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
           <div class="metric-label">Lease Value</div>
           <div class="metric-value">{"£" + format(lease_value, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{(str(lease_term) + " months x £" + format(_calc_rental_ex_buyout, ".2f") + "/mo calculated rental - equipment & term only") if is_spread else "Upfront purchase - no lease"}</div>
+          <div class="metric-sub">{("Equipment & term only (no target rental or buyout): " + str(lease_term) + " x £" + format(_calc_rental_ex_buyout, ",.2f") + "/mo") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: ' + str(lease_term) + " x £" + format(_desired_rental, ",.2f") + "/mo = £" + format(_desired_rental * lease_term, ",.0f") + (" (target rental" + (" + buyout)" if termination_cost > 0 else ")") if _lp_is_target else " (incl. buyout)") + "</div>") if (is_spread and abs(_desired_rental - _calc_rental_ex_buyout) > 0.01) else ""}
         </div>''', unsafe_allow_html=True)
     with lv2:
         _over = termination_over
@@ -5816,7 +5817,7 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--border-strong)">
           <div class="metric-label">Lease Profit</div>
           <div class="metric-value" style="color:var(--text)">£{_adjusted_gp:.0f}</div>
-          <div class="metric-sub">{("£" + format(_gp_before_buyout, ",.0f") + " before buyout, less £" + format(termination_cost, ",.0f") + " buyout") if termination_cost > 0 else ("Funder pays £" + format(_profit_disc_turnover, ",.0f") + " less costs £" + format(pl_data["cos_full"], ",.0f"))}</div>
+          <div class="metric-sub">At £{_desired_rental:,.2f}/mo {"target" if _lp_is_target else "calculated"} rental: {("£" + format(_gp_before_buyout, ",.0f") + " before buyout, less £" + format(termination_cost, ",.0f") + " buyout") if termination_cost > 0 else ("funder pays £" + format(_profit_disc_turnover, ",.0f") + " less costs £" + format(pl_data["cos_full"], ",.0f"))}</div>
         </div>''', unsafe_allow_html=True)
     with pb2:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
