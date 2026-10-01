@@ -1029,10 +1029,9 @@ with st.sidebar:
     # Silent floor: effective uplift never drops below 5% regardless of discount level
     service_uplift_pct = max(40 - service_discount_pct, 5)
     if any(int(st.session_state.get(f"prn_qty_{_pn}", 0) or 0) > 0 for _pn in PRINTERS):
-        st.slider("Printer device uplift %", 20, 200, int(C.get("printer_uplift_pct", 70)), 5, key="prn_uplift",
-                  help="Uplift on our cost for the printers (default 70%).")
-        st.slider("Print (per page) uplift %", 20, 200, int(C.get("printer_cpc_uplift_pct", 70)), 5, key="prn_cpc_uplift",
-                  help="Uplift on our cost per print (default 70%).")
+        # Labels kept deliberately neutral (no "uplift" or "%") in case a customer sees the screen
+        st.slider("Printer device", 20, 200, int(C.get("printer_uplift_pct", 100)), 5, key="prn_uplift")
+        st.slider("Print per page", 20, 200, int(C.get("printer_cpc_uplift_pct", 100)), 5, key="prn_cpc_uplift")
 
     st.markdown("")
     st.markdown("**Desired Lease Rental**")
@@ -4147,8 +4146,8 @@ fin_rental_max      = FIN_MAX_PER_HANDSET * fin_handsets * true_rate / 1000.0   
 termination_over_pct   = (max(1.0, round((termination_cost - max_termination) / max_termination * 100.0, 0))
                           if (termination_over and max_termination > 0) else 0.0)
 # ── Printers: separate lease on its own term + estimated print charges ─────
-PRN_UPLIFT     = float(st.session_state.get("prn_uplift", C.get("printer_uplift_pct", 70)))
-PRN_CPC_UPLIFT = float(st.session_state.get("prn_cpc_uplift", C.get("printer_cpc_uplift_pct", 70)))
+PRN_UPLIFT     = float(st.session_state.get("prn_uplift", C.get("printer_uplift_pct", 100)))
+PRN_CPC_UPLIFT = float(st.session_state.get("prn_cpc_uplift", C.get("printer_cpc_uplift_pct", 100)))
 printer_term   = int(st.session_state.get("prn_term", 60) or 60)
 for _r in printer_rows:
     _r["sell"]     = round(_r["cost"] * (1 + PRN_UPLIFT / 100.0), 2)
@@ -6335,7 +6334,7 @@ try:
     _n_routers = sum(router_quantities.values()) if add_router else 0
     _n_bb = (0 if bb_provider == "None / Customer Supplied" else 1) + extra_bb_count
     _svc_mo = float(svc.get("total_sell", 0) or 0)
-    _has_customer, _has_hw, _has_svc = bool(comp_name), (_n_hw + _n_routers) > 0, _svc_mo > 0
+    _has_customer, _has_hw, _has_svc = bool(comp_name), (_n_hw + _n_routers + printer_count) > 0, _svc_mo > 0
 except Exception:
     _n_handsets = _n_hw = _n_routers = _n_bb = 0
     _svc_mo, _has_customer, _has_hw, _has_svc = 0.0, bool(st.session_state.get("q_comp_name")), False, False
