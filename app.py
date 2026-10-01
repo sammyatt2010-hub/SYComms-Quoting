@@ -543,6 +543,8 @@ mobile_rows = []   # default - overridden by sidebar
 current_calls = current_lines = current_bb = current_system = 0.0
 current_support = current_hosted = current_onhold = current_other = current_it = 0.0
 current_mobile = current_total = 0.0
+current_printing = 0.0
+printer_rows, printer_monthly, printer_print_est_mo, printer_count, printer_term = [], 0.0, 0.0, 0, 60
 extra_costs, extra_costs_total = [], 0.0
 commission_pct      = C.get("commission_pct", 25)   # fallback %
 commission_unit_size = C.get("commission_unit_size", 4000)  # £GP per unit
@@ -593,7 +595,7 @@ QUOTE_KEYS = [
 # ── Saved quotes: capture EVERY deal input by name pattern, so new features are
 #    included automatically instead of relying on a hand-kept list.
 _QUOTE_PREFIXES = ("q_", "desk_", "cord_", "hs_", "oth_", "bb_extra_", "rt_qty_", "sw_qty_",
-                   "mob_", "it_", "sec_", "cs_", "cctv_", "xc_")
+                   "mob_", "it_", "sec_", "cs_", "cctv_", "xc_", "prn_")
 _QUOTE_EXTRA = {
     "c_desired_rental", "c_svc_disc", "c_notes_val",                       # consultant: target rental, discount, special conditions
     "router_mode", "switch_mode", "add_wired_ports", "standalone_softphones_key",
@@ -693,6 +695,11 @@ PRODUCT_IMAGES = {
     "ACD Light Agent":               "images/acd_light.jpg",
     "Click to Dial":                 "images/teams_integration.jpg",
     "HTML Wallboard":                "images/html_wallboard.jpg",
+    # Ricoh printers - photos live in the repo's images/ folder
+    "Ricoh IMC 401":                 "images/IMC 401.jpg",
+    "Ricoh IMC 2010":                "images/IMC 2010.jpg",
+    "Ricoh IMC 3010":                "images/IMC 3010.jpg",
+    "Ricoh IMC 6010":                "images/IMC 6010.jpg",
     # ── Grandstream Desktop ───────────────────────────────────────────────────
     "Grandstream GRP2601P":    "images/grp2601p.jpg",
     "Grandstream GRP2602P":    "images/grp2602p.jpg",
@@ -867,6 +874,19 @@ _IT_SERVICES_DEFAULT = {
 }
 IT_SERVICES = st.session_state.active_config.get("it_services", _IT_SERVICES_DEFAULT)
 
+# ─── RICOH PRINTERS ─────────────────────────────────────────────────────────
+# cost = our device cost (£); cpc = our cost per print in PENCE. Leased separately on their own term.
+_PRINTERS_DEFAULT = {
+    "Ricoh IMC 401":  {"cost": 1249.00, "cpc": 0.33},
+    "Ricoh IMC 2010": {"cost": 1997.00, "cpc": 0.26},
+    "Ricoh IMC 3010": {"cost": 2751.00, "cpc": 0.26},
+    "Ricoh IMC 6010": {"cost": 5832.00, "cpc": 0.26},
+}
+PRINTERS = st.session_state.active_config.get("printers", _PRINTERS_DEFAULT)
+PRINTER_TERMS        = [24, 36, 48, 60]
+PRINTER_SETUP_COST   = float(C.get("printer_setup_cost", 150.00))    # set up & delivery, per printer (our cost)
+PRINTER_SETUP_CHARGE = float(C.get("printer_setup_charge", 150.00))  # what goes into the printer lease
+
 IT_UPLIFT_PCT = 15.0  # % markup on cost price
 
 HARDWARE_FUNDS = {"Bronze": 500, "Silver": 1000, "Gold": 1500}
@@ -1008,6 +1028,11 @@ with st.sidebar:
     )
     # Silent floor: effective uplift never drops below 5% regardless of discount level
     service_uplift_pct = max(40 - service_discount_pct, 5)
+    if any(int(st.session_state.get(f"prn_qty_{_pn}", 0) or 0) > 0 for _pn in PRINTERS):
+        st.slider("Printer device uplift %", 20, 200, int(C.get("printer_uplift_pct", 70)), 5, key="prn_uplift",
+                  help="Uplift on our cost for the printers (default 70%).")
+        st.slider("Print (per page) uplift %", 20, 200, int(C.get("printer_cpc_uplift_pct", 70)), 5, key="prn_cpc_uplift",
+                  help="Uplift on our cost per print (default 70%).")
 
     st.markdown("")
     st.markdown("**Desired Lease Rental**")
@@ -1064,7 +1089,9 @@ with st.sidebar:
             current_mobile  = st.number_input("Mobile (£/mo)",            0.0, step=5.0, key="q_curr_mobile")
             current_support = st.number_input("Support / Maintenance (£/mo)", 0.0, step=5.0, key="q_curr_support")
             current_other   = st.number_input("Other / Misc (£/mo)",      0.0, step=5.0, key="q_curr_other")
-        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other + current_it + current_hosted
+            current_printing = st.number_input("Printing / copiers (£/mo)", 0.0, step=5.0, key="q_curr_print",
+                                               help="Current copier lease and print charges")
+        current_total = current_bb + current_system + current_calls + current_mobile + current_support + current_other + current_it + current_hosted + current_printing
 
     _xc_open = any(float(st.session_state.get(f"xc_amt_{_i}", 0) or 0) > 0 for _i in range(6))
     with st.expander("🔒 Additional Costs (Internal)", expanded=_xc_open):
@@ -1561,6 +1588,29 @@ cs_cfg_mod = st.session_state.active_config.get("call_scope_services", [
     {"name": "Call Score", "buy": 20.00, "sell": 29.00},
 ])
 _CS_MINS_COSTS = {"500 mins  — £25/mo": 25.0, "1000 mins — £35/mo": 35.0, "1500 mins — £45/mo": 45.0}
+# ── Printers (Ricoh): own expander in the right-hand column ────────────────
+printer_rows = []
+with col_hw2:
+    _prn_open = any(int(st.session_state.get(f"prn_qty_{_pn}", 0) or 0) > 0 for _pn in PRINTERS)
+    with st.expander("🖨️ Printers (Ricoh)", expanded=_prn_open):
+        st.caption("Leased separately on their own term. Set up & delivery is included per printer. "
+                   "Print charges are per page, billed on usage.")
+        st.selectbox("Printer lease term", PRINTER_TERMS, index=PRINTER_TERMS.index(60), key="prn_term",
+                     format_func=lambda _m: f"{_m} months")
+        for _pn, _pi in PRINTERS.items():
+            _pq_now = int(st.session_state.get(f"prn_qty_{_pn}", 0) or 0)
+            _pc1, _pc2 = st.columns([1, 1.5])
+            with _pc1:
+                st.markdown(product_card_html(_pn, {"cat": "Printer"}, qty=_pq_now, img_height=70), unsafe_allow_html=True)
+            with _pc2:
+                _pq = st.number_input("Quantity", 0, 20, 0, 1, key=f"prn_qty_{_pn}")
+                _pv = 0
+                if _pq > 0:
+                    _pv = st.number_input("Est. prints per month", 0, 500000, 1000, 250, key=f"prn_vol_{_pn}")
+            if _pq > 0:
+                printer_rows.append({"name": _pn, "qty": int(_pq), "cost": float(_pi["cost"]),
+                                     "cpc_cost": float(_pi["cpc"]), "volume": int(_pv)})
+
 cs_svc_rows = []
 for _cs in cs_cfg_mod:
     qty = st.session_state.get(f"cs_{_cs['name']}", 0)
@@ -1937,6 +1987,10 @@ def build_proposal_pdf():
         if _r.get("qty", 0) > 0:
             svc_rows.append((f"Mobile - {mobile_label(_r)} x{_r['qty']}",
                              f"{gbp(_r['sell'] * _r['qty'])}/mo", False))
+    if printer_rows:
+        svc_rows.append((f"Printer lease - {printer_count} printer(s), {printer_term} months", f"{gbp(printer_monthly)}/mo", False))
+        svc_rows.append((f"Printing (est. {sum(_r['volume'] for _r in printer_rows):,} prints/month)",
+                         f"{gbp(printer_print_est_mo)}/mo", False))
     if svc_rows:
         section("03", "Monthly services included", "Excluding VAT")
         for label, val, promo in svc_rows:
@@ -2209,6 +2263,12 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             _cs_lines.append((f"Mobile - {mobile_label(_r)} x{_r['qty']}", _r["sell"] * _r["qty"]))
     if is_spread:
         _cs_lines.append((f"Hardware (equipment lease over {_cs_term_lbl})", hw_monthly_spread))
+    if printer_rows:
+        _cs_lines.append((f"Printers - lease over {printer_term} months ({printer_count} printer(s), incl. set up & delivery)",
+                          printer_monthly))
+        for _r in printer_rows:
+            _cs_lines.append((f"Printing - {_r['name']}: est. {_r['volume']:,} prints/month at {_r['cpc_sell']:.3f}p per print",
+                              _r["print_mo"]))
     for _i, (_l, _v) in enumerate(_cs_lines):
         _cs_row(_l, f"£{_v:,.2f}", shade=(_i % 2 == 0))
     _cs_row("Total monthly charge", f"£{total_mo:,.2f}", bold=True)
@@ -2229,7 +2289,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 6, "Monthly charge (ex VAT)  ", fill=True, ln=True, align="R")
     for _y in range(1, _years + 1):
         _m0, _m1 = (_y - 1) * 12 + 1, min(_y * 12, _cs_months)
-        _val = total_mo - (_bb_step if _y == 1 else 0.0) + (_rec_fee if _y >= 2 else 0.0)
+        _val = (total_mo - (_bb_step if _y == 1 else 0.0) + (_rec_fee if _y >= 2 else 0.0)
+                - (printer_monthly if (printer_rows and _m0 > printer_term) else 0.0))
         pdf.set_font("Helvetica", "", 8.2); pdf.set_x(pdf.l_margin)
         _fill = (_y % 2 == 1); pdf.set_fill_color(245, 247, 255)
         pdf.cell(45, 5.6, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6, f"Months {_m0}-{_m1}", fill=_fill)
@@ -2240,6 +2301,10 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                       f"£{_bb_full_sell:,.2f}/mo applies from month 13.")
     if _rec_fee:
         _notes.append("Call recording storage is included for 12 months, then £20.00/mo applies from month 13.")
+    if printer_rows:
+        _notes.append(f"Printer lease runs for {printer_term} months" +
+                      (f" - it ends after month {printer_term}, so it's not included after that." if printer_term < _cs_months else ".") +
+                      " Print charges are estimates; you pay the fixed per-print price for prints actually made.")
     if st.session_state.get("cs_ai_portal_free", False):
         _notes.append("The AI Portal is free for the first month only; its normal price is included above from month 1 "
                       "and credited in month 1.")
@@ -2441,6 +2506,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         if r["qty"] > 0:
             all_equip_pdf.append((f"IT: {r['service']} x{r['qty']}", r["qty"],
                                    f"£{r['sell']*r['qty']:.2f}/mo"))
+    for _r in printer_rows:
+        all_equip_pdf.append((f"Printer: {_r['name']}", _r["qty"], f"Printer lease ({printer_term} mo)"))
 
 
     for i, (name, qty, charge) in enumerate(all_equip_pdf):
@@ -2728,7 +2795,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(60, 8, "  Monthly rental period of", fill=True, ln=False)
     pdf.set_fill_color(0, 181, 163)
-    pdf.cell(35, 8, f"  £{pl_data['rental']:.2f}", fill=True, ln=False)
+    pdf.cell(35, 8, f"  £{(hw_monthly_spread if is_spread else pl_data['rental']):.2f}", fill=True, ln=False)
     pdf.set_fill_color(31, 20, 80)
     pdf.cell(0, 8, "  plus VAT at the prevailing rate", fill=True, ln=True)
     pdf.set_text_color(0, 0, 0)
@@ -2791,6 +2858,68 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(0, 5, f"Name: {_la_name}", ln=True)
     pdf.cell(0, 5, f"Position / Title: {_la_pos}", ln=True)
     pdf.cell(0, 5, f"Date: {date.today().strftime('%d/%m/%Y')}", ln=True)
+
+    # ── PRINTER LEASE AGREEMENT (only when printers are on the deal) ──────────
+    if printer_rows:
+        pdf.add_page()
+        _add_header(pdf, "Printer Lease Agreement")
+        pdf.set_font("Helvetica", "B", 11); pdf.cell(0, 7, "Printers", ln=True); pdf.ln(1)
+        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(120, 7, "  Model", fill=True); pdf.cell(0, 7, "Quantity  ", fill=True, ln=True, align="R")
+        pdf.set_text_color(0, 0, 0)
+        for _i, _r in enumerate(printer_rows):
+            pdf.set_fill_color(*((248, 249, 255) if _i % 2 == 0 else (255, 255, 255)))
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(120, 6, s(f"  {_r['name']}"), fill=True); pdf.cell(0, 6, f"{_r['qty']}  ", fill=True, ln=True, align="R")
+        pdf.ln(3)
+        _qi_row("Set up & delivery", "Included")
+        _qi_row("Lease term", f"{printer_term} months")
+        pdf.ln(5)
+        pdf.set_font("Helvetica", "B", 11); pdf.cell(0, 7, "Printer Rental Terms", ln=True); pdf.ln(1)
+        pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(60, 8, "  Monthly rental of", fill=True, ln=False)
+        pdf.set_fill_color(0, 181, 163); pdf.cell(35, 8, f"  £{printer_monthly:.2f}", fill=True, ln=False)
+        pdf.set_fill_color(31, 20, 80); pdf.cell(0, 8, f"  plus VAT, for {printer_term} months", fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0); pdf.ln(5)
+        pdf.set_font("Helvetica", "B", 11); pdf.cell(0, 7, "Print Charges", ln=True); pdf.ln(1)
+        pdf.set_fill_color(230, 233, 245); pdf.set_font("Helvetica", "B", 8.5)
+        pdf.cell(70, 6.5, "  Model", fill=True); pdf.cell(35, 6.5, "Price per print", fill=True, align="R")
+        pdf.cell(40, 6.5, "Est. prints / month", fill=True, align="R"); pdf.cell(0, 6.5, "Est. monthly  ", fill=True, ln=True, align="R")
+        pdf.set_font("Helvetica", "", 8.5)
+        for _r in printer_rows:
+            pdf.cell(70, 6, s(f"  {_r['name']}")); pdf.cell(35, 6, f"{_r['cpc_sell']:.3f}p", align="R")
+            pdf.cell(40, 6, f"{_r['volume']:,}", align="R"); pdf.cell(0, 6, f"£{_r['print_mo']:.2f}  ", ln=True, align="R")
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "", 8); pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 4.5, s(
+            f"Print charges are billed monthly in arrears on actual usage at the per-print prices above, which are fixed "
+            f"for the {printer_term}-month term. Estimated monthly print charges of £{printer_print_est_mo:.2f} + VAT are "
+            f"for guidance only. The printer rental is billed separately from your telephony services."), align="J")
+        pdf.ln(5)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 4.5, s(
+            f"I confirm the printers, rental and print charges above, and I understand I will be billed in line with "
+            f"{_CO_LEGAL}'s current Terms and Conditions."), align="J")
+        pdf.ln(6)
+        pdf.set_font("Helvetica", "B", 9); pdf.cell(0, 5, f"For {s(_comp or 'Company Name')}:", ln=True); pdf.ln(2)
+        pdf.set_font("Helvetica", "", 9)
+        if sig_bytes:
+            try:
+                import tempfile as _tf3, os as _os3
+                with _tf3.NamedTemporaryFile(suffix=".png", delete=False) as _stf3:
+                    _stf3.write(sig_bytes); _stf3_path = _stf3.name
+                try:
+                    pdf.image(_stf3_path, x=pdf.l_margin, y=pdf.get_y(), h=14)
+                finally:
+                    _os3.unlink(_stf3_path)
+                pdf.ln(16)
+            except Exception:
+                pdf.cell(0, 14, "Signed: ________________", ln=True)
+        else:
+            pdf.cell(0, 14, "Signed: ________________", ln=True)
+        pdf.cell(0, 5, f"Name: {_la_name}", ln=True)
+        pdf.cell(0, 5, f"Position / Title: {_la_pos}", ln=True)
+        pdf.cell(0, 5, f"Date: {date.today().strftime('%d/%m/%Y')}", ln=True)
     pdf.add_page()
     _add_header(pdf, "Direct Debit Mandate & Customer Checklist")
 
@@ -3829,6 +3958,7 @@ def build_comparison_rows():
         ("Software & Add-ons",        0.0,             sw_sell_total + svc.get("wallboard_mo", 0.0)),
         ("Call Scope",                0.0,             svc.get("cs_sell", 0.0)),
         ("System Security",           0.0,             svc.get("sec_sell", 0.0)),
+        ("Printing / copiers",        current_printing, printer_monthly + printer_print_est_mo),
         ("Other",                     current_other,   0.0),
     ]
     rows = [(l, round(cv, 2), round(nv, 2)) for l, cv, nv in _cmp if cv > 0.004 or nv > 0.004]
@@ -4016,7 +4146,28 @@ fin_rental_ok       = FIN_OK_PER_HANDSET  * fin_handsets * true_rate / 1000.0   
 fin_rental_max      = FIN_MAX_PER_HANDSET * fin_handsets * true_rate / 1000.0   # rental at the upper limit
 termination_over_pct   = (max(1.0, round((termination_cost - max_termination) / max_termination * 100.0, 0))
                           if (termination_over and max_termination > 0) else 0.0)
-commission_units       = _adjusted_gp / 4000
+# ── Printers: separate lease on its own term + estimated print charges ─────
+PRN_UPLIFT     = float(st.session_state.get("prn_uplift", C.get("printer_uplift_pct", 70)))
+PRN_CPC_UPLIFT = float(st.session_state.get("prn_cpc_uplift", C.get("printer_cpc_uplift_pct", 70)))
+printer_term   = int(st.session_state.get("prn_term", 60) or 60)
+for _r in printer_rows:
+    _r["sell"]     = round(_r["cost"] * (1 + PRN_UPLIFT / 100.0), 2)
+    _r["cpc_sell"] = round(_r["cpc_cost"] * (1 + PRN_CPC_UPLIFT / 100.0), 3)      # pence per print
+    _r["print_mo"] = round(_r["volume"] * _r["cpc_sell"] / 100.0, 2)               # £/month estimate
+printer_count        = sum(_r["qty"] for _r in printer_rows)
+printer_setup        = round(PRINTER_SETUP_CHARGE * printer_count, 2)
+printer_capital      = round(sum(_r["sell"] * _r["qty"] for _r in printer_rows) + printer_setup, 2)
+_prn_sr              = float(LEASE_RATES.get(printer_term) or LEASE_RATES.get(60) or 26.26)
+_prn_tr              = float(TRUE_LEASE_RATES.get(printer_term) or TRUE_LEASE_RATES.get(60) or 21.01)
+printer_monthly      = round(printer_capital * _prn_sr / 1000.0, 2)
+printer_print_est_mo = round(sum(_r["print_mo"] for _r in printer_rows), 2)
+printer_funder       = round(printer_monthly / _prn_tr * 1000.0, 2) if _prn_tr else 0.0
+printer_cost_total   = round(sum(_r["cost"] * _r["qty"] for _r in printer_rows) + PRINTER_SETUP_COST * printer_count, 2)
+printer_lease_profit = round(printer_funder - printer_cost_total, 2)
+printer_print_margin_mo = round(sum(_r["volume"] * (_r["cpc_sell"] - _r["cpc_cost"]) / 100.0 for _r in printer_rows), 2)
+
+# Units: phone lease profit + printer lease profit, the same way (print margin, like service margin, isn't included)
+commission_units       = (_adjusted_gp + printer_lease_profit) / 4000
 commission             = round(commission_units * commission_per_unit, 2)
 st.session_state["_prev_commission_units"] = round(commission_units, 2)
 st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
@@ -4036,10 +4187,12 @@ if is_spread:
     hw_monthly_spread = _desired_rental
     total_mo          = svc["total_sell"] + hw_monthly_spread
 
+total_mo = round(total_mo + printer_monthly + printer_print_est_mo, 2)
+
 base_total_mo = total_mo
 rate_uplift   = rental_adjustment  # for display purposes
-adjusted_pat  = _adjusted_gp
-pat           = _adjusted_gp   # warnings and profit colours use the real deal profit (target rental + buyout rule)
+adjusted_pat  = _adjusted_gp + printer_lease_profit
+pat           = _adjusted_gp + printer_lease_profit   # warnings use the real deal profit, incl. printer leases
 
 # Aliases for PDF / legacy references
 kit_cost    = hw_buy
@@ -4099,6 +4252,8 @@ with tab1:
                     all_hw_items.append((_rn, _rq, _hw_billing))
             elif router_type not in ("None / Customer Supplied", ""):
                 all_hw_items.append((router_type, 1, _hw_billing))
+        for _r in printer_rows:
+            all_hw_items.append((_r["name"], _r["qty"], f"Printer lease ({printer_term} mo)"))
         if all_hw_items:
             hw_df = pd.DataFrame(all_hw_items, columns=["Description", "Qty", "Billing"])
             st.dataframe(hw_df, use_container_width=True, hide_index=True)
@@ -4123,6 +4278,10 @@ with tab1:
             net_items.append((f"{bb_provider} - {_xp} (additional)", _xq, f"£{_xs:.2f}/mo"))
         # Mobile rows
 
+        if printer_rows:
+            net_items.append((f"Printer lease ({printer_term} months, incl. set up)", printer_count, f"£{printer_monthly:.2f}/mo"))
+            for _r in printer_rows:
+                net_items.append((f"Printing - {_r['name']} ({_r['volume']:,}/mo at {_r['cpc_sell']:.3f}p)", 1, f"£{_r['print_mo']:.2f}/mo est."))
         net_df = pd.DataFrame(net_items, columns=["Service", "Qty", "Charge"])
         st.dataframe(net_df, use_container_width=True, hide_index=True)
 
@@ -4309,6 +4468,8 @@ with tab2:
         for r in mobile_rows:
             if r["qty"] > 0:
                 all_equip.append((f"Mobile SIM: {r['network']} - {r['package']}", r["qty"]))
+        for _r in printer_rows:
+            all_equip.append((f"Printer: {_r['name']}", _r["qty"]))
         for name, qty in all_equip:
             st.markdown(f"<div style='display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.85rem'><span style='color:var(--muted)'>{name}</span><span style='font-weight:600'>×{qty}</span></div>", unsafe_allow_html=True)
 
@@ -4423,6 +4584,8 @@ with tab4:
                     all_selected.append((_rn, _rq, {"cat": "Router"}))
             elif router_type not in ("None / Customer Supplied", ""):
                 all_selected.append((router_type, 1, {"cat": "Router"}))
+        for _r in printer_rows:
+            all_selected.append((_r["name"], _r["qty"], {"cat": "Printer"}))
         # Add software add-ons as cards
         for addon_name, addon_qty, _, _ in SW_ADDONS:
             if addon_qty > 0:
@@ -4582,6 +4745,11 @@ with tab4:
             if r["qty"] > 0:
                 svc_lines.append((f"Mobile - {mobile_label(r)} x{r['qty']}",
                                   f"£{r['sell'] * r['qty']:.2f}/mo"))
+        if printer_rows:
+            svc_lines.append((f"Printer lease - {printer_count} printer(s) over {printer_term} months", f"£{printer_monthly:.2f}/mo"))
+            for _r in printer_rows:
+                svc_lines.append((f"Printing - {_r['name']}: {_r['volume']:,} prints at {_r['cpc_sell']:.3f}p (est.)",
+                                  f"£{_r['print_mo']:.2f}/mo"))
 
         for label, val in svc_lines:
             st.markdown(f"""
@@ -5087,7 +5255,7 @@ with tab5:
         _tc_lease_mo = float(current_system or 0)
         _tc_svc_parts = [("Broadband", current_bb), ("User licences", current_hosted), ("Mobiles", current_mobile),
                          ("IT services / M365", current_it), ("Support & maintenance", current_support),
-                         ("Other", current_other)]
+                         ("Printing / copiers", current_printing), ("Other", current_other)]
         _tc_svc_mo = float(sum(v or 0 for _, v in _tc_svc_parts))
 
         tc1, tc2 = st.columns(2)
@@ -6074,7 +6242,7 @@ if st.session_state.admin_unlocked:
     _svc_sell_pm    = svc["total_sell"]
     _svc_margin_pm  = _svc_sell_pm - _svc_cost_pm
     _svc_profit_term = round(_svc_margin_pm * lease_term, 2)
-    _total_gp        = round(_adjusted_gp + _svc_profit_term, 2)
+    _total_gp        = round(_adjusted_gp + _svc_profit_term + printer_lease_profit, 2)
     _lp_is_target    = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
     # Lease value + maximum termination
     lv1, lv2 = st.columns(2)
@@ -6091,6 +6259,20 @@ if st.session_state.admin_unlocked:
           <div class="metric-value" style="color:{"var(--warn)" if _over else "var(--good)"}!important">{"£" + format(max_termination, ",.0f") if is_spread else "n/a"}</div>
           <div class="metric-sub">{("Buyout £" + format(termination_cost, ",.0f") + (" - " + format(termination_over_pct, ".0f") + "% (£" + format(termination_cost - max_termination, ",.0f") + ") over the maximum" if _over else " - within the maximum")) if (is_spread and termination_cost > 0) else ("No buyout. At the maximum, lease profit would be £" + format(_gp_before_buyout - max_termination, ",.0f") if is_spread else "No buyout on this deal")}</div>{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Safe buyout at this rental: £" + format(safe_buyout, ",.0f") + "</div>") if safe_buyout_limited else ""}{("<div class='metric-sub' style='color:var(--warn)!important;margin-top:.3rem'>Target rental £" + format(rental_short_of_buyout, ",.2f") + "/mo short of covering the buyout</div>") if rental_short_of_buyout > 0 else ""}
         </div>''', unsafe_allow_html=True)
+    if printer_rows:
+        pr1, pr2 = st.columns(2)
+        with pr1:
+            st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
+              <div class="metric-label">Printer Lease Profit</div>
+              <div class="metric-value">£{printer_lease_profit:,.0f}</div>
+              <div class="metric-sub">Funder pays £{printer_funder:,.0f} for £{printer_monthly:.2f}/mo over {printer_term} months, less costs £{printer_cost_total:,.0f} · {printer_lease_profit / 4000:.2f} units</div>
+            </div>''', unsafe_allow_html=True)
+        with pr2:
+            st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
+              <div class="metric-label">Print Margin (estimated)</div>
+              <div class="metric-value">£{printer_print_margin_mo:,.2f}/mo</div>
+              <div class="metric-sub">Device uplift {PRN_UPLIFT:.0f}% · print uplift {PRN_CPC_UPLIFT:.0f}%</div>
+            </div>''', unsafe_allow_html=True)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--border-strong)">
@@ -6108,7 +6290,7 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--good);background:rgba(52,211,153,.08)">
           <div class="metric-label" style="color:var(--good)">Total Gross Profit</div>
           <div class="metric-value" style="color:var(--good)">£{_total_gp:.0f}</div>
-          <div class="metric-sub">Lease £{_adjusted_gp:.0f} + Services £{_svc_profit_term:.0f}</div>
+          <div class="metric-sub">Lease £{_adjusted_gp:.0f} + Services £{_svc_profit_term:.0f}{(" + Printers £" + format(printer_lease_profit, ".0f")) if printer_rows else ""}</div>
         </div>''', unsafe_allow_html=True)
     if termination_cost > 0:
         st.markdown(
@@ -6194,6 +6376,8 @@ with _sum_card:
             _rows.append(("Hardware lease", f"£{hw_monthly_spread:,.2f}/mo"))
         else:
             _rows.append(("Hardware (one-off)", f"£{upfront:,.2f}"))
+        if printer_rows:
+            _rows.append(("Printers (lease + est. prints)", f"£{printer_monthly + printer_print_est_mo:,.2f}/mo"))
         _rows += [("Services", f"£{_svc_mo:,.2f}/mo"),
                   ("Handsets", str(_n_handsets)),
                   ("Broadband lines", str(_n_bb)),
