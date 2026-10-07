@@ -516,7 +516,7 @@ hw_uplift_upfront_override = C.get("hw_uplift_upfront_pct", 20)  # upfront purch
 # Mirrors the P&L cos_ex formula; keeps sidebar in sync with termination cost etc.
 def _early_rental_estimate():
     """Quick rental estimate using session-state widget values (no UI needed)."""
-    _term     = float(st.session_state.get("q_termination", 0)) + sum(float(st.session_state.get(f"xc_amt_{_k}", 0) or 0) for _k in range(6))
+    _term     = (float(st.session_state.get("q_term_lease", 0) or 0) + float(st.session_state.get("q_term_services", 0) or 0)) + sum(float(st.session_state.get(f"xc_amt_{_k}", 0) or 0) for _k in range(6))
     _lease    = int(st.session_state.get("q_lease_term", 36))
     _lr_map   = {24: 46.94, 36: 39.45, 48: 31.00, 60: 26.26, 72: 21.90, 84: 20.58}
     _sr       = _lr_map.get(_lease, 39.45)
@@ -534,7 +534,7 @@ _early_est = _early_rental_estimate()
 if _early_est > 0:
     st.session_state["_prev_base_rental"] = _early_est
 # Store current termination cost so next rerun can compute delta
-st.session_state["_prev_termination_cost"] = float(st.session_state.get("q_termination", 0)) + sum(float(st.session_state.get(f"xc_amt_{_k}", 0) or 0) for _k in range(6))
+st.session_state["_prev_termination_cost"] = (float(st.session_state.get("q_term_lease", 0) or 0) + float(st.session_state.get("q_term_services", 0) or 0)) + sum(float(st.session_state.get(f"xc_amt_{_k}", 0) or 0) for _k in range(6))
 _no_switch = False  # default - overridden by sidebar switch radio button
 switch_quantities = {}  # for manual multi-switch mode
 cctv_turret_qty = cctv_dome_qty = cctv_nvr_qty = 0  # CCTV defaults
@@ -587,7 +587,7 @@ QUOTE_KEYS = [
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp","q_ll_cost","q_ll_sell","q_ll_install",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
-    "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_termination","xc_desc_0","xc_amt_0","xc_desc_1","xc_amt_1","xc_desc_2","xc_amt_2","xc_desc_3","xc_amt_3","xc_desc_4","xc_amt_4","xc_desc_5","xc_amt_5","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
+    "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_term_lease","q_term_services","xc_desc_0","xc_amt_0","xc_desc_1","xc_amt_1","xc_desc_2","xc_amt_2","xc_desc_3","xc_amt_3","xc_desc_4","xc_amt_4","xc_desc_5","xc_amt_5","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
     "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
     "q_rep_name","q_rep_position",
     "c_svc_disc",
@@ -901,6 +901,8 @@ _hero_ph = st.container(key="hero")  # keeps the old header on screen during a r
 # ── Apply any pending quote load (must happen before widgets render) ────────────
 if "_pending_quote" in st.session_state:
     _pq = st.session_state.pop("_pending_quote")
+    if "q_termination" in _pq and "q_term_lease" not in _pq:     # quote saved before the two-box change
+        _pq["q_term_lease"] = _pq.pop("q_termination")
     if "c_notes" in _pq and "c_notes_val" not in _pq:      # quote files saved before this change
         _pq["c_notes_val"] = _pq.pop("c_notes")
     st.session_state.pop("c_notes_w", None)                 # so the notes box refills from the loaded value
@@ -920,7 +922,13 @@ if "_pending_quote" in st.session_state:
 
 # Termination calculator "use as buyout" button: apply before the buyout box is drawn
 if "_pending_termination" in st.session_state:
-    st.session_state["q_termination"] = round(float(st.session_state.pop("_pending_termination")), 2)
+    _pt = st.session_state.pop("_pending_termination")
+    if isinstance(_pt, (tuple, list)):
+        st.session_state["q_term_lease"]    = round(float(_pt[0]), 2)
+        st.session_state["q_term_services"] = round(float(_pt[1]), 2)
+    else:                                   # plain number: put it all in the lease box
+        st.session_state["q_term_lease"]    = round(float(_pt), 2)
+        st.session_state["q_term_services"] = 0.0
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
@@ -1066,12 +1074,22 @@ with st.sidebar:
     _units_ph = st.container(key="units_caption")
 
     st.markdown("### 🔒 Deal Adjustments (Internal Only)")
-    termination_cost = st.number_input(
-        "Buyout / Termination Cost (£)",
+    termination_lease = st.number_input(
+        "Lease terminations (£)",
         min_value=0.0, step=50.0,
-        key="q_termination",
-        help="Cost to exit the customer's existing contract. Added to the lease spread - not shown to customer."
+        key="q_term_lease",
+        help="Cost to exit the customer's existing phone system lease. Added to the lease spread - not shown to customer in the app."
     )
+    termination_services = st.number_input(
+        "Services terminations (£)",
+        min_value=0.0, step=50.0,
+        key="q_term_services",
+        help="Cost to exit the customer's existing service contracts. Added to the lease spread - not shown to customer in the app."
+    )
+    # The total drives every existing calculation exactly as the single buyout box did
+    termination_cost = round(float(termination_lease) + float(termination_services), 2)
+    if termination_lease > 0 and termination_services > 0:
+        st.caption(f"Total termination: £{termination_cost:,.2f}")
 
     # SW Add-ons moved to Licences & Add-ons expander in right column
 
@@ -2586,6 +2604,22 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                 f"from existing agreements. This amount will be paid once {_CO} have taken over the lines and the "
                 "system has been formally accepted into service."
             )
+        pdf.ln(3)
+
+    # Termination charges breakdown (only when there are terminations)
+    if is_spread and (termination_lease > 0 or termination_services > 0):
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, "Termination Charges Breakdown", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_fill_color(248, 249, 255)
+        for _tl, _tv in (("Lease terminations", termination_lease), ("Service charge terminations", termination_services)):
+            if _tv > 0:
+                pdf.cell(130, 6, s("  " + _tl), fill=True, ln=False)
+                pdf.cell(0, 6, f"£{_tv:,.2f}  ", fill=True, ln=True, align="R")
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(130, 6.5, "  Total termination charges", ln=False)
+        pdf.cell(0, 6.5, f"£{termination_cost:,.2f}  ", ln=True, align="R")
+        pdf.set_font("Helvetica", "", 9)
         pdf.ln(3)
 
     # Documents provided before signing (Ofcom)
@@ -5301,9 +5335,9 @@ with tab5:
             _cmp_max = (f" - the maximum for this deal is £{max_termination:,.0f}"
                         + (" (this total is over it)" if _tc_total - max_termination >= 1 else "")) if is_spread else ""
             st.caption(f"Estimate only - confirm with the customer's settlement letters.{_cmp_max}")
-            if st.button(f"Use £{_tc_total:,.2f} as the buyout", type="primary", key="tc_use_btn",
+            if st.button(f"Use these figures (£{_tc_lease_settle:,.0f} lease + £{_tc_svc_settle:,.0f} services)", type="primary", key="tc_use_btn",
                          disabled=_tc_total <= 0):
-                st.session_state["_pending_termination"] = _tc_total
+                st.session_state["_pending_termination"] = (_tc_lease_settle, _tc_svc_settle)
                 st.rerun()
 
     # ── Feasibility Calculator ──────────────────────────────────────────
@@ -5983,6 +6017,45 @@ with tab7:
         # ── TAB 3: Broadband & Lease Rates ────────────────────────────────────
 
         with panel_tabs[3]:
+            # ── Lease rates: drive rental, lease value, max termination, profit, units, finance status ──
+            st.markdown("**Lease Rates** - per £1,000 per month. Applying re-prices the current deal straight away.")
+            import time as _lr_time
+            if _lr_time.time() - float(st.session_state.get("_lr_applied_at", 0)) < 8:
+                st.success("Lease rates updated - the deal has been re-priced with the new rates.")
+            _lr_rows = sorted(
+                [{"months": int(_i["months"]), "label": _i.get("label", f"{_i['months']} months"),
+                  "rate": float(_i["rate"]), "true_rate": float(_i.get("true_rate", round(_i["rate"] * 0.8, 2)))}
+                 for _i in cfg["lease_rates"]], key=lambda _r: _r["months"])
+            edited_lr = st.data_editor(
+                pd.DataFrame(_lr_rows), num_rows="fixed", use_container_width=True, hide_index=True,
+                key="de_lease_rates", disabled=["months"],
+                column_config={
+                    "months":    st.column_config.NumberColumn("Term (months)", format="%d"),
+                    "label":     st.column_config.TextColumn("Label"),
+                    "rate":      st.column_config.NumberColumn("Sales rate", format="%.2f", min_value=0.01,
+                                     help="Customer rental per £1,000 per month"),
+                    "true_rate": st.column_config.NumberColumn("Funder rate", format="%.2f", min_value=0.01,
+                                     help="What the funder pays: lease value = rental ÷ funder rate × 1,000"),
+                })
+            _lr_bad = [int(_r["months"]) for _r in edited_lr.to_dict("records")
+                       if float(_r["true_rate"] or 0) >= float(_r["rate"] or 0)]
+            if _lr_bad:
+                st.warning("Funder rate is at or above the sales rate for "
+                           + ", ".join(f"{_m} months" for _m in _lr_bad) + " - those terms make no lease margin.")
+            if not any("true_rate" in _i for _i in cfg["lease_rates"]):
+                st.caption("Funder rates are currently estimated at 80% of the sales rate - enter your real funder rates and apply.")
+            st.caption(f"This deal ({LEASE_TERM_LABELS.get(lease_term, '')}): rental £{_desired_rental:,.2f}/mo · "
+                       f"lease value £{lease_value_ex_buyout:,.0f} · {commission_units:.2f} units")
+            if st.button("✅ Apply Lease Rates", type="primary", key="apply_lease_rates", disabled=bool(_lr_bad)):
+                st.session_state.active_config["lease_rates"] = [
+                    {"months": int(_r["months"]), "label": str(_r["label"]),
+                     "rate": round(float(_r["rate"]), 2), "true_rate": round(float(_r["true_rate"]), 2)}
+                    for _r in edited_lr.to_dict("records")]
+                import time as _lr_time2
+                st.session_state["_lr_applied_at"] = _lr_time2.time()
+                st.rerun()
+            st.caption("To keep new rates permanently, use 💾 Save Configuration below and commit config.json to GitHub.")
+            st.markdown("---")
             st.markdown("**Broadband Packages** - edit wholesale costs and install charges")
             bb_df = pd.DataFrame(cfg["broadband"])
             edited_bb = st.data_editor(bb_df, num_rows="dynamic", use_container_width=True, key="de_bb",
