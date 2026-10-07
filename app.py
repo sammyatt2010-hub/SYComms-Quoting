@@ -2626,7 +2626,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_font("Helvetica", "I", 7.5); pdf.set_text_color(90, 90, 110); pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 3.8, s(
             'These figures are "up to" amounts and no more than these sums will be payable. Payment is made on '
-            "receipt of invoices from the losing providers, provided within 6 months of the installation."))
+            "receipt of invoices from the losing providers, provided within 3 months of the installation."))
         pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 9)
         pdf.ln(3)
 
