@@ -2235,17 +2235,19 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.cell(0, 6.5, s("  " + title), fill=True, ln=True)
         pdf.set_text_color(0, 0, 0); pdf.ln(1.5)
 
+    _cs_k = 1.0     # density: tightened below for deals with many lines so the summary stays on one page
+
     def _cs_row(label, value, bold=False, shade=False):
         pdf.set_x(pdf.l_margin)
         if shade:
             pdf.set_fill_color(245, 247, 255)
-        pdf.set_font("Helvetica", "B" if bold else "", 8.5)
-        pdf.cell(130, 6, s("  " + label), fill=shade, ln=False)
-        pdf.cell(0, 6, s(value), fill=shade, ln=True, align="R")
+        pdf.set_font("Helvetica", "B" if bold else "", 8.5 if _cs_k > 0.85 else 8)
+        pdf.cell(130, 6 * _cs_k, s("  " + label), fill=shade, ln=False)
+        pdf.cell(0, 6 * _cs_k, s(value), fill=shade, ln=True, align="R")
 
     def _cs_text(text, size=8.2, style=""):
         pdf.set_font("Helvetica", style, size); pdf.set_x(pdf.l_margin)
-        pdf.multi_cell(pdf.epw, 4.2, s(text))
+        pdf.multi_cell(pdf.epw, 4.2 * max(_cs_k, 0.85), s(text))
 
     _cs_months = int(lease_term)
     _cs_term_lbl = LEASE_TERM_LABELS.get(lease_term, f"{_cs_months} months")
@@ -2286,6 +2288,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         for _r in printer_rows:
             _cs_lines.append((f"Printing - {_r['name']}: est. {_r['volume']:,} prints/month at {_r['cpc_sell']:.3f}p per print",
                               _r["print_mo"]))
+    _cs_k = max(0.6, 1.0 - 0.05 * max(0, len(_cs_lines) + max(1, -(-int(lease_term) // 12)) - 12))
     for _i, (_l, _v) in enumerate(_cs_lines):
         _cs_row(_l, f"£{_v:,.2f}", shade=(_i % 2 == 0))
     _cs_row("Total monthly charge", f"£{total_mo:,.2f}", bold=True)
@@ -2310,8 +2313,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                 - (printer_monthly if (printer_rows and _m0 > printer_term) else 0.0))
         pdf.set_font("Helvetica", "", 8.2); pdf.set_x(pdf.l_margin)
         _fill = (_y % 2 == 1); pdf.set_fill_color(245, 247, 255)
-        pdf.cell(45, 5.6, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6, f"Months {_m0}-{_m1}", fill=_fill)
-        pdf.cell(0, 5.6, f"£{_val:,.2f}  ", fill=_fill, ln=True, align="R")
+        pdf.cell(45, 5.6 * _cs_k, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6 * _cs_k, f"Months {_m0}-{_m1}", fill=_fill)
+        pdf.cell(0, 5.6 * _cs_k, f"£{_val:,.2f}  ", fill=_fill, ln=True, align="R")
     _notes = []
     if _bb_step:
         _notes.append(f"Year 1 includes free broadband (saving £{_bb_step:,.2f}/mo); the normal broadband price of "
@@ -2622,14 +2625,27 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_font("Helvetica", "", 9)
         pdf.ln(3)
 
+    # Pointer to the declaration page (keeps this page short and the order details together)
+    pdf.set_font("Helvetica", "I", 8.5); pdf.set_text_color(90, 90, 110); pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, 4.5, s("Declaration, small business information and signatures are on the next page."))
+    pdf.set_text_color(0, 0, 0)
+
+    # ── DECLARATION & SIGNATURE PAGE (its own page) ──────────────────────────────
+    pdf.add_page()
+    _add_header(pdf, "Declaration & Signatures")
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "", 8.5); pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, 4.5, s(f"Order for: {_comp or '-'}   |   Contract term: {LEASE_TERM_LABELS.get(lease_term, '')}   |   "
+                                   f"Total monthly: £{total_mo:,.2f} + VAT"))
+    pdf.ln(3)
     # Documents provided before signing (Ofcom)
-    pdf.ln(1)
-    pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 8.5)
-    pdf.cell(0, 6, "  Documents provided before signing", fill=True, ln=True)
-    pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8); pdf.ln(1)
+    pdf.set_fill_color(31, 20, 80); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(0, 7, "  Documents provided before signing", fill=True, ln=True)
+    pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 9); pdf.ln(2)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(pdf.epw, 4, s("I confirm that, before signing this Order Form, I was given a copy of the following "
-                                 "documents and had the opportunity to read them:"))
+    pdf.multi_cell(pdf.epw, 4.5, s("I confirm that, before signing this Order Form, I was given a copy of the following "
+                                   "documents and had the opportunity to read them:"))
+    pdf.ln(1)
     _docs = ["Contract Summary", f"Terms & Conditions (summary in this pack; full terms at {_CO_WEB}/terms-conditions)",
              "Network Services & Broadband Agreement"] + (["Equipment Lease Agreement"] if is_spread else []) + ["This Order Form"]
     for _d in _docs:
@@ -2638,8 +2654,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         _bx = pdf.l_margin + 2; pdf.set_line_width(0.45)                      # pre-ticked
         pdf.line(_bx + 0.6, _yb + 1.8, _bx + 1.4, _yb + 2.8); pdf.line(_bx + 1.4, _yb + 2.8, _bx + 2.9, _yb + 0.6)
         pdf.set_line_width(0.2)
-        pdf.set_x(pdf.l_margin + 8); pdf.cell(0, 5, s(_d), ln=True)
-    pdf.set_draw_color(0, 0, 0); pdf.ln(1)
+        pdf.set_x(pdf.l_margin + 8); pdf.set_font("Helvetica", "", 9); pdf.cell(0, 6, s(_d), ln=True)
+    pdf.set_draw_color(0, 0, 0); pdf.ln(4)
 
     # Small business 24-month right - separate, express waiver (Ofcom)
     _small_limit = int(C.get("small_business_max_employees", 9))    # fewer than 10 employees
@@ -2661,7 +2677,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.rect(pdf.l_margin + 1.5, _wy - 1, pdf.epw - 3, pdf.get_y() - _wy + 2)
         pdf.set_draw_color(0, 0, 0); pdf.set_line_width(0.2); pdf.ln(3)
 
-    # Signatures
+    # Signatures (same page as the declaration and waiver being confirmed)
+    pdf.ln(4)
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 7, "Signatures", ln=True)
     pdf.set_font("Helvetica", "", 9)
