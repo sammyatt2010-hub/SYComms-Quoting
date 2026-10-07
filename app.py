@@ -2618,11 +2618,16 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         for _tl, _tv in (("Lease terminations", termination_lease), ("Service charge terminations", termination_services)):
             if _tv > 0:
                 pdf.cell(130, 6, s("  " + _tl), fill=True, ln=False)
-                pdf.cell(0, 6, f"£{_tv:,.2f}  ", fill=True, ln=True, align="R")
+                pdf.cell(0, 6, f"up to £{_tv:,.2f}  ", fill=True, ln=True, align="R")
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(130, 6.5, "  Total termination charges", ln=False)
-        pdf.cell(0, 6.5, f"£{termination_cost:,.2f}  ", ln=True, align="R")
-        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 6.5, f"up to £{termination_cost:,.2f}  ", ln=True, align="R")
+        pdf.ln(0.5)
+        pdf.set_font("Helvetica", "I", 7.5); pdf.set_text_color(90, 90, 110); pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 3.8, s(
+            'These figures are "up to" amounts and no more than these sums will be payable. Payment is made on '
+            "receipt of invoices from the losing providers, provided within 6 months of the installation."))
+        pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 9)
         pdf.ln(3)
 
     # Pointer to the declaration page (keeps this page short and the order details together)
