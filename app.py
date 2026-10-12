@@ -4158,10 +4158,14 @@ _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 e
 _buyout_rental_share   = (pl_data["sales_rate"] / 1000.0) * termination_cost
 _calc_rental_ex_buyout = (pl_data["sales_rate"] / 1000.0) * max(0.0, pl_data["sub_total"] - termination_cost)
 _target_active         = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
-_lv_rental             = _desired_rental if _target_active else _calc_rental_ex_buyout
-_buyout_funding        = max(0.0, _desired_rental - _lv_rental)       # rental uplift that only funds the buyout
-_profit_disc_turnover  = ((_desired_rental - _buyout_funding) / true_rate) * 1000 if true_rate > 0 else 0
-_adjusted_gp           = _profit_disc_turnover - pl_data["cos_full"]      # cos_full already includes the buyout
+# Value for the max = equipment rental, plus any rental ABOVE what is needed to cover the buyout.
+# Continuous: at the pricebook rental it equals the equipment-only rental; a target below the
+# buyout-covering rental gives the same; every pound above that raises the max.
+_lv_rental             = max(_calc_rental_ex_buyout, _desired_rental - _buyout_rental_share)
+_buyout_funding        = max(0.0, _desired_rental - _lv_rental)       # rental that funds the buyout (info only)
+# Profit counts ALL the funder money; cos_full already contains the buyout, so it comes off once.
+_profit_disc_turnover  = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
+_adjusted_gp           = _profit_disc_turnover - pl_data["cos_full"]
 _gp_before_buyout      = _adjusted_gp + termination_cost
 # Lease value = what the funder pays for the lease at the rental in the deal (incl. any target rental);
 # the most we'd put towards settling a customer's existing agreement is a % of it (default 70%).
@@ -5383,7 +5387,7 @@ with tab5:
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Lease Value (funder pays)</div>
               <div style='font-size:1.3rem;font-weight:700;color:var(--text)'>£{_lease_total:.2f}</div>
-              <div style='font-size:0.8rem;color:var(--muted)'>(£{_lv_rental:.2f}/mo {"target" if _target_active else "calculated"} rental ÷ {true_rate:.2f} × 1,000, before any buyout)</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>(£{_lv_rental:.2f}/mo value rental ÷ {true_rate:.2f} × 1,000, before any buyout)</div>
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement ({MAX_TERMINATION_PCT:.0f}%)</div>
               <div style='font-size:1.6rem;font-weight:800;color:var(--good)'>£{_max_settlement:.2f}</div>
@@ -6344,7 +6348,7 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
           <div class="metric-label">Lease Value</div>
           <div class="metric-value">{"£" + format(lease_value, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("What the funder pays for £" + format(_lv_rental, ",.2f") + "/mo " + ("target" if _target_active else "calculated") + " rental (÷ " + format(true_rate, ".2f") + " rate × 1,000), before any buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo incl. buyout, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + "</div>") if (is_spread and abs(_desired_rental - _lv_rental) > 0.01) else ""}
+          <div class="metric-sub">{("What the funder pays for £" + format(_lv_rental, ",.2f") + "/mo value rental (÷ " + format(true_rate, ".2f") + " rate × 1,000), before any buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo incl. buyout, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + "</div>") if (is_spread and abs(_desired_rental - _lv_rental) > 0.01) else ""}
         </div>''', unsafe_allow_html=True)
     with lv2:
         _over = termination_over
