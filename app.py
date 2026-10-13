@@ -451,7 +451,7 @@ def _default_config():
             "hw_uplift_pct":     200,      # SY Comms use 3x (200% uplift) on hardware
             "commission_unit_size": 4000,
             "commission_per_unit":  1000,
-            "install_engineer":  450.00,   # On-site installation
+            "install_engineer":  450.00,   # On-site installation - per day
             "install_remote":     50.00,   # Remote installation
         }
     }
@@ -501,6 +501,8 @@ if "c_desired_rental" not in st.session_state:
     st.session_state.c_desired_rental = 0.0
 if "c_svc_disc" not in st.session_state:
     st.session_state.c_svc_disc = 0
+if "c_bb_disc" not in st.session_state:
+    st.session_state.c_bb_disc = 0
 if "c_svc_disc_w" not in st.session_state:
     st.session_state.c_svc_disc_w = 0
 if "uploaded_images" not in st.session_state:
@@ -583,7 +585,7 @@ if st.session_state.get("selected_brand", "SY Comms") == "SY Comms":
 QUOTE_KEYS = [
     "q_comp_name","q_comp_reg","q_biz_type","q_contact","q_phone",
     "q_dir_email","q_bill_email","q_address","q_employees",
-    "q_deal_type","q_lease_term","q_install_type","q_num_sites",
+    "q_deal_type","q_lease_term","q_install_type","q_install_days","q_num_sites",
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp","q_ll_cost","q_ll_sell","q_ll_install",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
@@ -597,7 +599,7 @@ QUOTE_KEYS = [
 _QUOTE_PREFIXES = ("q_", "desk_", "cord_", "hs_", "oth_", "bb_extra_", "rt_qty_", "sw_qty_",
                    "mob_", "it_", "sec_", "cs_", "cctv_", "xc_", "prn_")
 _QUOTE_EXTRA = {
-    "c_desired_rental", "c_svc_disc", "c_notes_val",                       # consultant: target rental, discount, special conditions
+    "c_desired_rental", "c_svc_disc", "c_bb_disc", "c_notes_val",                       # consultant: target rental, discount, special conditions
     "router_mode", "switch_mode", "add_wired_ports", "standalone_softphones_key",
     "cs_ai_portal_free",
     "adm_bb_override", "adm_override_upfront", "adm_override_install",  # manager per-deal overrides
@@ -815,6 +817,20 @@ def product_card_html(name, info, qty=0, show_qty=False, img_height=80):
 # ─── FULL PRODUCT CATALOGUE (from Excel NEW MECHANICS sheets) ────────────────
 
 # ─── PRODUCT CATALOGUES - loaded from config (editable via Admin Panel) ────────
+# Hard-coded broadband wholesale cost + customer sell rates (these win over anything saved in config.json)
+BB_FIXED_RATES = {
+    "FTTP 40/10 Unlimited":    (22.45, 35.00),
+    "FTTP 80/20 Unlimited":    (29.00, 35.00),
+    "FTTP 115/20 Unlimited":   (25.20, 35.00),
+    "FTTP 160/30 Unlimited":   (26.48, 36.00),
+    "FTTP 220/30 Unlimited":   (26.72, 37.00),
+    "FTTP 330/50 Unlimited":   (34.66, 39.00),
+    "FTTP 550/75 Unlimited":   (34.66, 45.00),
+    "FTTP 1000/115 Unlimited": (38.61, 55.00),
+    "SOGEA 40/10 Unlimited":   (27.49, 30.00),
+    "SOGEA 80/20 Unlimited":   (28.12, 32.00),
+}
+
 def _build_catalogues(cfg):
     hd = {i["name"]: {k:v for k,v in i.items() if k!="name"} for i in cfg["handsets_desktop"]}
     hc = {i["name"]: {k:v for k,v in i.items() if k!="name"} for i in cfg["handsets_cordless"]}
@@ -827,8 +843,11 @@ def _build_catalogues(cfg):
     ll  = {i["months"]: i["label"]                             for i in cfg["lease_rates"]}
     bb = {}
     for row in cfg["broadband"]:
+        _c, _s = row["cost"], row.get("sell", 0)
+        if row["provider"] == "SY" and row["package"] in BB_FIXED_RATES:
+            _c, _s = BB_FIXED_RATES[row["package"]]
         bb.setdefault(row["provider"], {})[row["package"]] = {
-            "cost": row["cost"], "sell": row.get("sell", 0), "install": row["install"]
+            "cost": _c, "sell": _s, "install": row["install"]
         }
     # "None / Customer Supplied" - zero cost/sell, appears first in selector
     bb["None / Customer Supplied"] = {
@@ -964,6 +983,11 @@ with st.sidebar:
     lease_term = st.selectbox("Service Agreement Term", list(LEASE_TERM_LABELS.keys()),
                               format_func=lambda x: LEASE_TERM_LABELS[x], index=5, key="q_lease_term")
     install_type = st.selectbox("Installation Type", ["Engineer Install", "Remote Install", "Self Install"], key="q_install_type")
+    if install_type == "Engineer Install":
+        install_days = st.selectbox("Installation days", list(range(1, 11)), key="q_install_days",
+                                    help="Each day of engineer installation is charged at the day rate (set in Admin).")
+    else:
+        install_days = 1
     payment_model = st.selectbox(
         "Hardware Payment Model",
         ["Lease (spread over contract term)", "Upfront Purchase (one-off payment)"],
@@ -1028,7 +1052,7 @@ with st.sidebar:
     def _sync_sidebar_to_cons():
         st.session_state["c_svc_disc"] = st.session_state["q_svc_discount"]
     service_discount_pct = st.slider(
-        "Service Discount %", 0, 40,
+        "Service Discount %", 0, 50,
         value=int(st.session_state.get("c_svc_disc", 0)),
         step=5,
         help="Syncs with Consultant tab. Floor protection keeps minimum 5% uplift on all items.",
@@ -1698,9 +1722,12 @@ if cs_any_selected and "Call Scope Platform Setup" not in other_quantities:
 # --- AUTO-CALCULATE VOICE CHANNELS -----------------------------------
 # One licence required per physical handset (mirrors Excel SYSTEM BUILDER I16)
 # Standalone softphones add extra seats on top
+# DECT base stations and repeaters are not users, so they never add a licence
+_NON_USER_DECT = ("base station", "repeater")
+def _is_user_handset(_n): return not any(k in str(_n).lower() for k in _NON_USER_DECT)
 auto_handset_licences = (
     sum(desktop_quantities.values()) +
-    sum(cordless_quantities.values())
+    sum(q for n, q in cordless_quantities.items() if _is_user_handset(n))
 )
 user_licences        = auto_handset_licences
 softphone_licences   = standalone_softphones
@@ -3910,7 +3937,7 @@ def compute_install_cost():
     if override_install_cost > 0:
         return override_install_cost         # manager override
     if install_type == "Engineer Install":
-        return 500.0
+        return round(float(C.get("install_engineer", 450.0)) * max(1, int(install_days)), 2)
     return 0.0
 
 def compute_upfront():
@@ -3934,7 +3961,9 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
         bb1_sell  = override_bb_sell         # manager override
         bb1_floor = bb_cost
     else:
-        bb1_sell  = 0.0 if bb_cost == 0.0 else bb_cost * (1.0 + uplift)
+        _fixed_s  = BROADBAND[bb_provider][bb_package].get("sell", 0) or 0
+        # Fixed sell rate from the broadband price table; cost + uplift only if no sell rate is set
+        bb1_sell  = 0.0 if bb_cost == 0.0 else (_fixed_s if _fixed_s > 0 else bb_cost * (1.0 + uplift))
         bb1_floor = bb_cost                  # wholesale - never sell below this
     if bb_care == "Business (+£8/mo)":
         bb1_sell  += 8.0
@@ -3942,7 +3971,8 @@ def compute_service_charges(sw_sell=0.0, sw_cost=0.0):
     bb2_sell = bb2_floor = 0.0
     for _xp, _xq in extra_bb_lines.items():
         _xcost     = BROADBAND[bb_provider][_xp]["cost"]
-        bb2_sell  += _xcost * (1.0 + uplift) * _xq
+        _xs        = BROADBAND[bb_provider][_xp].get("sell", 0) or 0
+        bb2_sell  += (_xs if _xs > 0 else _xcost * (1.0 + uplift)) * _xq
         bb2_floor += _xcost * _xq
     bb_sell = bb1_sell + bb2_sell
 
@@ -3979,11 +4009,13 @@ def extra_bb_display():
     """[(package, qty, monthly_total)] for each additional line, after discount.
     Uses the same ratio as the aggregate bb2 price so rows always sum to svc['bb2_sell']."""
     _rows = []
-    _list_total = sum(BROADBAND[bb_provider][p]["cost"] * (1.0 + service_uplift_pct / 100.0) * q
-                      for p, q in extra_bb_lines.items())
+    def _x_list(p):
+        _s = BROADBAND[bb_provider][p].get("sell", 0) or 0
+        return _s if _s > 0 else BROADBAND[bb_provider][p]["cost"] * (1.0 + service_uplift_pct / 100.0)
+    _list_total = sum(_x_list(p) * q for p, q in extra_bb_lines.items())
     _ratio = (svc["bb2_sell"] / _list_total) if _list_total > 0 else 0.0
     for p, q in extra_bb_lines.items():
-        _line_list = BROADBAND[bb_provider][p]["cost"] * (1.0 + service_uplift_pct / 100.0) * q
+        _line_list = _x_list(p) * q
         _rows.append((p, q, round(_line_list * _ratio, 2)))
     return _rows
 
@@ -4092,22 +4124,24 @@ svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell + _it_svc_s
 # ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
 # Applies to hosted user licences, software add-ons and broadband (broadband is capped
 # at wholesale cost). Mobiles are not discountable. Commission is reduced by the same %.
-svc_disc_pct  = max(0.0, min(40.0, float(st.session_state.get("c_svc_disc", 0))))
+svc_disc_pct  = max(0.0, min(50.0, float(st.session_state.get("c_svc_disc", 0))))
 _svc_mult     = 1.0 - svc_disc_pct / 100.0
+bb_disc_pct   = max(0.0, min(10.0, float(st.session_state.get("c_bb_disc", 0))))   # separate broadband discount, up to 10%
+_bb_mult      = 1.0 - bb_disc_pct / 100.0
 lic_list_total = float(svc["lic_monthly"])          # undiscounted, for consultant display
 bb1_list       = float(svc["bb1_sell"])
 bb2_list       = float(svc["bb2_sell"])
 sw_list_total  = float(sw_sell_total)               # undiscounted, for consultant display
-if svc_disc_pct > 0:
+if svc_disc_pct > 0 or bb_disc_pct > 0:
     SW_ADDONS = [(n, q, c, round(sell * _svc_mult, 2)) for n, q, c, sell in SW_ADDONS]
     sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
     svc["sw_sell"]     = sw_sell_total
     svc["lic_monthly"] = round(lic_list_total * _svc_mult, 2)
     # Broadband: discounted, but NEVER below wholesale cost (per line)
     if bb1_list > 0:
-        svc["bb1_sell"] = round(max(bb1_list * _svc_mult, svc["bb1_floor"]), 2)
+        svc["bb1_sell"] = round(max(bb1_list * _bb_mult, svc["bb1_floor"]), 2)
     if bb2_list > 0:
-        svc["bb2_sell"] = round(max(bb2_list * _svc_mult, svc["bb2_floor"]), 2)
+        svc["bb2_sell"] = round(max(bb2_list * _bb_mult, svc["bb2_floor"]), 2)
     svc["bb_sell"]     = svc["bb1_sell"] + svc["bb2_sell"]
     svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
                           svc.get("mobile_sell", 0.0) + sw_sell_total +
@@ -4158,10 +4192,14 @@ _desired_disc_turnover = (_desired_rental / true_rate) * 1000 if true_rate > 0 e
 _buyout_rental_share   = (pl_data["sales_rate"] / 1000.0) * termination_cost
 _calc_rental_ex_buyout = (pl_data["sales_rate"] / 1000.0) * max(0.0, pl_data["sub_total"] - termination_cost)
 _target_active         = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
-_lv_rental             = _desired_rental if _target_active else _calc_rental_ex_buyout
-_buyout_funding        = max(0.0, _desired_rental - _lv_rental)       # rental uplift that only funds the buyout
-_profit_disc_turnover  = ((_desired_rental - _buyout_funding) / true_rate) * 1000 if true_rate > 0 else 0
-_adjusted_gp           = _profit_disc_turnover - pl_data["cos_full"]      # cos_full already includes the buyout
+# Value for the max = equipment rental, plus any rental ABOVE what is needed to cover the buyout.
+# Continuous: at the pricebook rental it equals the equipment-only rental; a target below the
+# buyout-covering rental gives the same; every pound above that raises the max.
+_lv_rental             = max(_calc_rental_ex_buyout, _desired_rental - _buyout_rental_share)
+_buyout_funding        = max(0.0, _desired_rental - _lv_rental)       # rental that funds the buyout (info only)
+# Profit counts ALL the funder money; cos_full already contains the buyout, so it comes off once.
+_profit_disc_turnover  = (_desired_rental / true_rate) * 1000 if true_rate > 0 else 0
+_adjusted_gp           = _profit_disc_turnover - pl_data["cos_full"]
 _gp_before_buyout      = _adjusted_gp + termination_cost
 # Lease value = what the funder pays for the lease at the rental in the deal (incl. any target rental);
 # the most we'd put towards settling a customer's existing agreement is a % of it (default 70%).
@@ -4191,7 +4229,7 @@ lease_profit_negative = is_spread and _adjusted_gp < -0.5
 # likely to be rejected. Stops a deal being "pumped" with a huge target rental. (Admin-adjustable.)
 FIN_OK_PER_HANDSET  = float(C.get("finance_ok_per_handset", 1500))
 FIN_MAX_PER_HANDSET = float(C.get("finance_max_per_handset", 2000))
-fin_handsets        = int(sum(desktop_quantities.values()) + sum(cordless_quantities.values()))
+fin_handsets        = int(sum(desktop_quantities.values()) + sum(q for n, q in cordless_quantities.items() if _is_user_handset(n)))
 fin_funded          = (_desired_rental / true_rate * 1000.0) if (is_spread and true_rate > 0) else 0.0
 fin_per_handset     = (fin_funded / fin_handsets) if fin_handsets > 0 else 0.0
 fin_band            = ("none" if (not is_spread or fin_handsets == 0) else
@@ -4229,9 +4267,10 @@ st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
 st.session_state["_prev_cos_full"]         = pl_data["cos_full"]
 # Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
 commission_full        = commission
-if svc_disc_pct > 0 and commission > 0:
-    commission_units   = commission_units * _svc_mult
-    commission         = round(commission * _svc_mult, 2)
+_comm_mult = max(0.0, 1.0 - (svc_disc_pct + bb_disc_pct) / 100.0)     # 1% of discount = 1% of commission
+if (svc_disc_pct > 0 or bb_disc_pct > 0) and commission > 0:
+    commission_units   = commission_units * _comm_mult
+    commission         = round(commission * _comm_mult, 2)
 commission_lost        = round(commission_full - commission, 2)
 
 # Rental adjustment (vs calculated) - can be positive (premium) or negative (discount)
@@ -5114,7 +5153,7 @@ with tab5:
         _appt_rates = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
         st.info(f"📋 Appointment type: **{_appt}** — commission rate £{_appt_rates.get(_appt, 1000):,}/unit")
         st.markdown("### 🏷️ Services Discount")
-        st.caption("Discount monthly licences, software & broadband by up to 40%. "
+        st.caption("Discount licences, software and other monthly services by up to 50%, and broadband separately by up to 10%. "
                    "Every 1% of discount removes 1% of your commission.")
 
         def _sync_svc_disc():
@@ -5125,10 +5164,16 @@ with tab5:
         with _sd_col1:
             # Keep widget key in sync with c_svc_disc (allows sidebar to push value here)
             st.session_state["c_svc_disc_w"] = int(st.session_state.get("c_svc_disc", 0))
-            st.slider("Services discount (%)", min_value=0, max_value=40, step=5,
+            st.slider("Services discount (%)", min_value=0, max_value=50, step=5,
                       key="c_svc_disc_w", on_change=_sync_svc_disc,
-                      help="Applies to hosted user licences, software add-ons and broadband. "
-                           "Broadband can never go below wholesale cost. Mobiles are not discountable.")
+                      help="Applies to hosted user licences and software add-ons (not broadband - that has its own slider). "
+                           "Mobiles are not discountable.")
+            def _sync_bb_disc():
+                st.session_state["c_bb_disc"] = st.session_state["c_bb_disc_w"]
+            st.session_state["c_bb_disc_w"] = int(st.session_state.get("c_bb_disc", 0))
+            st.slider("Broadband discount (%)", min_value=0, max_value=10, step=1,
+                      key="c_bb_disc_w", on_change=_sync_bb_disc,
+                      help="Separate discount on broadband sell prices, up to 10%. Broadband can never go below wholesale cost.")
 
             def _svc_row(label, list_price, new_price, note=""):
                 _chg = new_price < list_price - 0.005
@@ -5151,10 +5196,10 @@ with tab5:
                     _rows += _svc_row(f"{_an} x{_aq}", _alist * _aq, _asell * _aq)
             if bb1_list > 0:
                 _rows += _svc_row(f"Broadband - {bb_package}", bb1_list, svc["bb1_sell"],
-                                  "(at wholesale floor)" if svc_disc_pct > 0 and svc["bb1_sell"] <= svc["bb1_floor"] + 0.005 else "")
+                                  "(at wholesale floor)" if bb_disc_pct > 0 and svc["bb1_sell"] <= svc["bb1_floor"] + 0.005 else "")
             if bb2_list > 0:
                 _rows += _svc_row(f"Broadband additional lines ({extra_bb_count})", bb2_list, svc["bb2_sell"],
-                                  "(at wholesale floor)" if svc_disc_pct > 0 and svc["bb2_sell"] <= svc["bb2_floor"] + 0.005 else "")
+                                  "(at wholesale floor)" if bb_disc_pct > 0 and svc["bb2_sell"] <= svc["bb2_floor"] + 0.005 else "")
             if svc.get("mobile_sell", 0) > 0:
                 _rows += _svc_row("Mobiles", svc["mobile_sell"], svc["mobile_sell"], "(fixed)")
             if not _rows:
@@ -5172,7 +5217,7 @@ with tab5:
                  border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
               <div style="font-size:0.72rem;color:{_cm_col};font-weight:700;text-transform:uppercase">Commission Impact</div>
               <div style="font-size:0.85rem;color:var(--muted);margin-top:0.3rem">Before discount: <strong>£{commission_full:.2f}</strong></div>
-              <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
+              <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct + bb_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
               <div style="font-size:1.5rem;font-weight:800;color:var(--text);margin-top:0.3rem">£{commission:.2f}</div>
               <div style="font-size:0.75rem;color:var(--muted)">Services saving to customer: £{_svc_saving:.2f}/mo</div>
             </div>
@@ -5383,7 +5428,7 @@ with tab5:
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Lease Value (funder pays)</div>
               <div style='font-size:1.3rem;font-weight:700;color:var(--text)'>£{_lease_total:.2f}</div>
-              <div style='font-size:0.8rem;color:var(--muted)'>(£{_lv_rental:.2f}/mo {"target" if _target_active else "calculated"} rental ÷ {true_rate:.2f} × 1,000, before any buyout)</div>
+              <div style='font-size:0.8rem;color:var(--muted)'>(£{_lv_rental:.2f}/mo value rental ÷ {true_rate:.2f} × 1,000, before any buyout)</div>
               <hr style='margin:0.8rem 0'>
               <div style='font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--muted)'>Max Settlement ({MAX_TERMINATION_PCT:.0f}%)</div>
               <div style='font-size:1.6rem;font-weight:800;color:var(--good)'>£{_max_settlement:.2f}</div>
@@ -5879,7 +5924,7 @@ with tab7:
             st.caption("Edit wholesale (buy) and customer (sell) prices for all monthly service items. Changes apply immediately to new deals.")
 
             # Show current deal discount impact
-            _adm_disc = max(0.0, min(40.0, float(st.session_state.get("c_svc_disc", 0))))
+            _adm_disc = max(0.0, min(50.0, float(st.session_state.get("c_svc_disc", 0))))
             if _adm_disc > 0:
                 st.info(f"ℹ️ Consultant has applied a **{_adm_disc:.0f}% service discount** on this deal. "
                         f"Effective sell prices and margins shown below reflect this.")
@@ -6103,6 +6148,8 @@ with tab7:
                 new_vc_sell    = st.number_input("Voice Channel Sell £/seat/mo (to customer)", value=float(c.get("vc_sell_per_seat", 12.00)), step=0.50,
                                                   help="Professional Bundle sell rate per hosted user per month")
                 new_wallboard  = st.number_input("Wallboard Sell £/user/mo",           value=float(c.get("wallboard_sell", 99.00)),    step=0.50)
+                new_install_day = st.number_input("Engineer Installation £ per day", value=float(c.get("install_engineer", 450.00)), step=25.0,
+                                                  min_value=0.0, help="Charged once per installation day chosen by the consultant.")
                 new_uplift     = st.number_input("Default Service Uplift %",           value=float(c.get("default_service_uplift_pct", 40)), min_value=0.0, max_value=100.0, step=1.0)
             with cc2:
                 new_hw_uplift_up = st.number_input("Upfront Purchase Uplift %",
@@ -6121,6 +6168,7 @@ with tab7:
                     "vc_cost_per_seat":  new_vc_cost,
                     "vc_sell_per_seat":  new_vc_sell,
                     "wallboard_sell":   new_wallboard,
+                    "install_engineer": new_install_day,
                     "default_service_uplift_pct": new_uplift,
                     "hw_uplift_upfront_pct": new_hw_uplift_up,
                     "hw_uplift_pct": new_hw_uplift,
@@ -6344,7 +6392,7 @@ if st.session_state.admin_unlocked:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--accent)">
           <div class="metric-label">Lease Value</div>
           <div class="metric-value">{"£" + format(lease_value, ",.0f") if is_spread else "n/a"}</div>
-          <div class="metric-sub">{("What the funder pays for £" + format(_lv_rental, ",.2f") + "/mo " + ("target" if _target_active else "calculated") + " rental (÷ " + format(true_rate, ".2f") + " rate × 1,000), before any buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo incl. buyout, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + "</div>") if (is_spread and abs(_desired_rental - _lv_rental) > 0.01) else ""}
+          <div class="metric-sub">{("What the funder pays for £" + format(_lv_rental, ",.2f") + "/mo value rental (÷ " + format(true_rate, ".2f") + " rate × 1,000), before any buyout") if is_spread else "Upfront purchase - no lease"}</div>{('<div class="metric-sub" style="margin-top:.35rem;color:var(--accent-2)!important">This deal: £' + format(_desired_rental, ",.2f") + "/mo incl. buyout, funder pays £" + format(_desired_rental / true_rate * 1000.0 if true_rate > 0 else 0, ",.0f") + "</div>") if (is_spread and abs(_desired_rental - _lv_rental) > 0.01) else ""}
         </div>''', unsafe_allow_html=True)
     with lv2:
         _over = termination_over
@@ -6402,7 +6450,7 @@ if st.session_state.admin_unlocked:
 # Sidebar rental + units: exactly the numbers used in the Consultant view
 with _units_ph:
     _is_override = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
-    _disc_note = f"  ·  after {svc_disc_pct:.0f}% services discount" if svc_disc_pct > 0 else ""
+    _disc_note = f"  ·  after {svc_disc_pct + bb_disc_pct:.0f}% discount" if (svc_disc_pct + bb_disc_pct) > 0 else ""
     st.caption(f"{'Override' if _is_override else 'Calculated'}: £{_desired_rental:,.2f}/mo  ·  "
                f"{commission_units:.2f} units{_disc_note}")
     if is_spread and lease_value > 0:
@@ -6423,7 +6471,7 @@ with _units_ph:
                        "unlikely": ":red[Finance - Unlikely to pass]"}[fin_band]
         st.caption(_fin_status)
 try:
-    _n_handsets = sum(desktop_quantities.values()) + sum(cordless_quantities.values())
+    _n_handsets = sum(desktop_quantities.values()) + sum(q for n, q in cordless_quantities.items() if _is_user_handset(n))
     _n_hw = (_n_handsets + sum(headset_quantities.values())
              + sum(q for q in other_quantities.values() if q))
     _n_routers = sum(router_quantities.values()) if add_router else 0
