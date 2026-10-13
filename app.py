@@ -400,6 +400,7 @@ def _default_config():
             {"name": "Call Answer (500 mins)",            "buy": 100.00, "sell": 149.00},
             {"name": "Website Widget",                    "buy": 30.00,  "sell": 50.00},
             {"name": "Call Scope Platform Setup",         "buy": 300.00, "sell": 500.00},
+            {"name": "Call Scope AI Receptionist Setup (one-off)", "buy": 69.00, "sell": 100.00},
             {"name": "TP Link NX200 (4G/5G Standalone)",  "buy": 210.00, "sell": 630.00},
             {"name": "HIK Vision Turret 8MP",          "buy": 125.00, "sell": 427.50},
             {"name": "HIK Vision Dome 8MP",            "buy": 125.00, "sell": 400.00},
@@ -446,7 +447,9 @@ def _default_config():
             "vc_cost_per_seat":    2.95,   # Professional Bundle buy cost per user/mo
             "vc_sell_per_seat":   12.00,   # Professional Bundle fixed sell price per user/mo
             "wallboard_sell":     99.00,   # Live HTML Wallboard sell price
-            "wallboard_cost":      5.00,   # Live HTML Wallboard buy cost
+            "wallboard_cost":      5.00,
+            "cs_min_buy":          0.10,   # Call Scope minutes: our cost per minute
+            "cs_min_sell":         0.25,   # Call Scope minutes: customer price per minute   # Live HTML Wallboard buy cost
             "default_service_uplift_pct": 40,
             "hw_uplift_pct":     200,      # SY Comms use 3x (200% uplift) on hardware
             "commission_unit_size": 4000,
@@ -493,6 +496,24 @@ def _cfg_to_json(cfg):
 # Persist config and images in session state
 if "active_config" not in st.session_state:
     st.session_state.active_config = _load_config()
+def _migrate_call_scope_prices(cfg):
+    """One-off update (flagged in the config) of the Call Scope prices agreed on 13 Oct 2026."""
+    if cfg.get("_cs_price_v", 0) >= 1:
+        return
+    new = {"AI Integration - Portal": (5.0, 32.0), "AI Integration - CRM": (5.0, 35.0),
+           "Manager Dashboard": (5.0, 59.0), "Call Score": (20.0, 45.0), "AI Receptionist": (69.0, 89.0)}
+    svc = cfg.setdefault("call_scope_services", [])
+    for n, (b, s) in new.items():
+        row = next((r for r in svc if r.get("name") == n), None)
+        if row: row["buy"], row["sell"] = b, s
+        else:   svc.append({"name": n, "buy": b, "sell": s})
+    oh = cfg.setdefault("other_hardware", [])
+    if not any(i.get("name") == "Call Scope AI Receptionist Setup (one-off)" for i in oh):
+        oh.append({"name": "Call Scope AI Receptionist Setup (one-off)", "buy": 69.0, "sell": 100.0})
+    cfg.setdefault("constants", {}).setdefault("cs_min_buy", 0.10)
+    cfg["constants"].setdefault("cs_min_sell", 0.25)
+    cfg["_cs_price_v"] = 1
+_migrate_call_scope_prices(st.session_state.active_config)
 if "admin_unlocked" not in st.session_state:
     st.session_state.admin_unlocked = False
 if "consultant_unlocked" not in st.session_state:
@@ -1068,8 +1089,8 @@ with st.sidebar:
     st.slider("Broadband discount %", 0, 10, step=1, key="q_bb_discount", on_change=_sync_sidebar_bb,
               help="Broadband sell prices, up to 10%. Never goes below wholesale cost. Syncs with Consultant tab.")
     st.session_state["q_cs_discount"] = int(st.session_state.get("c_cs_disc", 0))
-    st.slider("Call Scope discount %", 0, 50, step=5, key="q_cs_discount", on_change=_sync_sidebar_cs,
-              help="Call Scope services, up to 50%. Syncs with Consultant tab.")
+    st.slider("Call Scope discount %", 0, 80, step=5, key="q_cs_discount", on_change=_sync_sidebar_cs,
+              help="Call Scope services, up to 80%. Syncs with Consultant tab.")
     # Silent floor: effective uplift never drops below 5% regardless of discount level
     service_uplift_pct = max(40 - service_discount_pct, 5)
     if any(int(st.session_state.get(f"prn_qty_{_pn}", 0) or 0) > 0 for _pn in PRINTERS):
@@ -1354,6 +1375,7 @@ with col_hw2:
                 "Bluetooth Headset",
                 # Call Scope items are chosen in the Call Scope section; Platform Setup is added automatically
                 "Call Answer (500 mins)", "Website Widget", "Call Scope Platform Setup",
+                "Call Scope AI Receptionist Setup (one-off)",
             ):
                 continue
             qty = st.number_input(name, min_value=0, value=0, step=1, key=f"oth_{name}")
@@ -1585,14 +1607,22 @@ with col_hw2:
                             min_value=0, value=0, step=1, key=f"sec_{_sc['name']}")
 
 
+    # Call Scope minutes bundles are priced per minute (admin: Service Pricing) - buy 10p / sell 25p by default
+    _CS_MIN_BUY  = float(C.get("cs_min_buy", 0.10))
+    _CS_MIN_SELL = float(C.get("cs_min_sell", 0.25))
+    _CS_MIN_SIZES = (500, 1000, 1500)
+    _CS_MINS_COSTS = {f"{m} mins — £{m * _CS_MIN_SELL:,.0f}/mo": round(m * _CS_MIN_SELL, 2) for m in _CS_MIN_SIZES}
+    _CS_MINS_BUY   = {f"{m} mins — £{m * _CS_MIN_SELL:,.0f}/mo": round(m * _CS_MIN_BUY, 2) for m in _CS_MIN_SIZES}
+    _CS_MIN_OPTS = ["None"] + list(_CS_MINS_COSTS)
     with st.expander("🔮 Call Scope", expanded=False):
         st.caption("Call Scope platform modules — monthly service charges unless noted")
         if "call_scope_services" not in st.session_state.active_config:
             st.session_state.active_config["call_scope_services"] = [
-                {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
-                {"name": "AI Integration - CRM",    "buy": 25.00, "sell": 35.00},
-                {"name": "Manager Dashboard",        "buy": 40.00, "sell": 59.00},
-                {"name": "Call Score",               "buy": 20.00, "sell": 29.00},
+                {"name": "AI Integration - Portal", "buy": 5.00,  "sell": 32.00},
+                {"name": "AI Integration - CRM",    "buy": 5.00,  "sell": 35.00},
+                {"name": "Manager Dashboard",        "buy": 5.00,  "sell": 59.00},
+                {"name": "Call Score",               "buy": 20.00, "sell": 45.00},
+                {"name": "AI Receptionist",          "buy": 69.00, "sell": 89.00},
             ]
         _cs_exp_cfg = st.session_state.active_config.get("call_scope_services", [])
         _cse_col1, _cse_col2 = st.columns(2)
@@ -1603,11 +1633,11 @@ with col_hw2:
                     min_value=0, value=0, step=1, key=f"cs_{_cs['name']}"
                 )
                 if "AI Integration" in _cs["name"] and st.session_state.get(f"cs_{_cs['name']}", 0) > 0:
-                    st.selectbox(
-                        f"Minutes for {_cs['name']}",
-                        ["None", "500 mins  — £25/mo", "1000 mins — £35/mo", "1500 mins — £45/mo"],
-                        key=f"cs_mins_{_cs['name']}"
-                    )
+                    _mk = f"cs_mins_{_cs['name']}"
+                    if st.session_state.get(_mk, "None") not in _CS_MIN_OPTS:       # old saved label -> match on the minutes
+                        _old = str(st.session_state.get(_mk, "None")).split(" ")[0]
+                        st.session_state[_mk] = next((o for o in _CS_MIN_OPTS if o.split(" ")[0] == _old), "None")
+                    st.selectbox(f"Minutes for {_cs['name']}", _CS_MIN_OPTS, key=_mk)
             _mypa_opts_cfg = st.session_state.active_config.get("mypa_bundles", [
                 {"name": "My PA 500 mins",  "sell": 149.0},
                 {"name": "My PA 1000 mins", "sell": 199.0},
@@ -1633,12 +1663,12 @@ with col_hw2:
 # ─── POST-EXPANDER REBUILDS (session state → module-level lists) ─────────────
 # Call Scope services
 cs_cfg_mod = st.session_state.active_config.get("call_scope_services", [
-    {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
-    {"name": "AI Integration - CRM", "buy": 25.00, "sell": 35.00},
-    {"name": "Manager Dashboard", "buy": 40.00, "sell": 59.00},
-    {"name": "Call Score", "buy": 20.00, "sell": 29.00},
+    {"name": "AI Integration - Portal", "buy": 5.00, "sell": 32.00},
+    {"name": "AI Integration - CRM", "buy": 5.00, "sell": 35.00},
+    {"name": "Manager Dashboard", "buy": 5.00, "sell": 59.00},
+    {"name": "Call Score", "buy": 20.00, "sell": 45.00},
+    {"name": "AI Receptionist", "buy": 69.00, "sell": 89.00},
 ])
-_CS_MINS_COSTS = {"500 mins  — £25/mo": 25.0, "1000 mins — £35/mo": 35.0, "1500 mins — £45/mo": 45.0}
 # ── Printers (Ricoh): own expander in the right-hand column ────────────────
 printer_rows = []
 with col_hw2:
@@ -1673,7 +1703,12 @@ for _cs in cs_cfg_mod:
             _mins_cost = _CS_MINS_COSTS.get(_mins_sel, 0.0)
             if _mins_cost > 0:
                 cs_svc_rows.append({"name": f"{_cs['name']} — {_mins_sel.split('—')[0].strip()}",
-                                    "qty": 1, "buy": _mins_cost * 0.7, "sell": _mins_cost})
+                                    "qty": 1, "buy": _CS_MINS_BUY.get(_mins_sel, _mins_cost * 0.4), "sell": _mins_cost})
+_rec_qty = int(st.session_state.get("cs_AI Receptionist", 0) or 0)
+if _rec_qty > 0:      # each AI Receptionist adds its one-off setup to the lease
+    other_quantities["Call Scope AI Receptionist Setup (one-off)"] = _rec_qty
+    if "Call Scope AI Receptionist Setup (one-off)" not in OTHER_HARDWARE:
+        OTHER_HARDWARE["Call Scope AI Receptionist Setup (one-off)"] = {"buy": 69.00, "sell": 100.00}
 _cs_mypa_sel  = st.session_state.get("cs_mypa", "None")
 _cs_web_sel   = st.session_state.get("cs_website", "None")
 cs_call_answer = _cs_mypa_sel != "None"
@@ -4139,7 +4174,7 @@ svc_disc_pct  = max(0.0, min(50.0, float(st.session_state.get("c_svc_disc", 0)))
 _svc_mult     = 1.0 - svc_disc_pct / 100.0
 bb_disc_pct   = max(0.0, min(10.0, float(st.session_state.get("c_bb_disc", 0))))   # separate broadband discount, up to 10%
 _bb_mult      = 1.0 - bb_disc_pct / 100.0
-cs_disc_pct   = max(0.0, min(50.0, float(st.session_state.get("c_cs_disc", 0))))   # Call Scope services, up to 50%
+cs_disc_pct   = max(0.0, min(80.0, float(st.session_state.get("c_cs_disc", 0))))   # Call Scope services, up to 50%
 _cs_mult      = 1.0 - cs_disc_pct / 100.0
 _cs_list_total = float(_cs_svc_sell)
 lic_list_total = float(svc["lic_monthly"])          # undiscounted, for consultant display
@@ -4676,7 +4711,7 @@ with tab4:
         st.markdown('<div class="cv-section">📦 Your New System</div>', unsafe_allow_html=True)
 
         # Items hidden from customer view (backend/setup costs)
-        _CV_HIDE = {"Call Scope AI Setup (one-off)"}
+        _CV_HIDE = {"Call Scope AI Setup (one-off)", "Call Scope AI Receptionist Setup (one-off)"}
         all_selected = (
             [(n, q, HANDSETS_DESKTOP[n])   for n, q in desktop_quantities.items() if q > 0]  +
             [(n, q, HANDSETS_CORDLESS[n])  for n, q in cordless_quantities.items() if q > 0] +
@@ -5176,7 +5211,7 @@ with tab5:
         _appt_rates = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
         st.info(f"📋 Appointment type: **{_appt}** — commission rate £{_appt_rates.get(_appt, 1000):,}/unit")
         st.markdown("### 🏷️ Services Discount")
-        st.caption("Discount user licences by up to 50%, Call Scope by up to 50% and broadband by up to 10% - each has its own slider. "
+        st.caption("Discount user licences by up to 50%, Call Scope by up to 80% and broadband by up to 10% - each has its own slider. "
                    "Commission is reduced by the share of the monthly services you give away, so bigger categories cost more.")
 
         def _sync_svc_disc():
@@ -5202,9 +5237,9 @@ with tab5:
                       key="c_bb_disc_w", on_change=_sync_bb_disc,
                       help="Separate discount on broadband sell prices, up to 10%. Broadband can never go below wholesale cost.")
             st.session_state["c_cs_disc_w"] = int(st.session_state.get("c_cs_disc", 0))
-            st.slider("Call Scope discount (%)", min_value=0, max_value=50, step=5,
+            st.slider("Call Scope discount (%)", min_value=0, max_value=80, step=5,
                       key="c_cs_disc_w", on_change=_sync_cs_disc,
-                      help="Discount on Call Scope services, up to 50%.")
+                      help="Discount on Call Scope services, up to 80%.")
 
             def _svc_row(label, list_price, new_price, note=""):
                 _chg = new_price < list_price - 0.005
@@ -5838,7 +5873,7 @@ with tab7:
                     st.success("Call Scope service pricing updated"); st.rerun()
             st.markdown("**Call Scope Lease Items (incl. Platform Setup Fee)**")
             _cs_lease_items = [i for i in cfg.get("other_hardware", [])
-                               if i.get("name","") in ("Call Answer (500 mins)", "Website Widget", "Call Scope Platform Setup")]
+                               if i.get("name","") in ("Call Answer (500 mins)", "Website Widget", "Call Scope Platform Setup", "Call Scope AI Receptionist Setup (one-off)")]
             cs_lease_df = pd.DataFrame(_cs_lease_items)
             if not cs_lease_df.empty:
                 edited_csl = st.data_editor(cs_lease_df, num_rows="fixed",
@@ -5969,10 +6004,11 @@ with tab7:
             st.markdown("#### 🔮 Call Scope — Monthly Services")
             st.caption("Per-user per-month charges. Buy = SY Comms wholesale cost. Sell = customer price.")
             cs_svc_cfg = st.session_state.active_config.get("call_scope_services", [
-                {"name": "AI Integration - Portal", "buy": 20.00, "sell": 29.00},
-                {"name": "AI Integration - CRM",    "buy": 25.00, "sell": 35.00},
-                {"name": "Manager Dashboard",        "buy": 40.00, "sell": 59.00},
-                {"name": "Call Score",               "buy": 20.00, "sell": 29.00},
+                {"name": "AI Integration - Portal", "buy": 5.00,  "sell": 32.00},
+                {"name": "AI Integration - CRM",    "buy": 5.00,  "sell": 35.00},
+                {"name": "Manager Dashboard",        "buy": 5.00,  "sell": 59.00},
+                {"name": "Call Score",               "buy": 20.00, "sell": 45.00},
+                {"name": "AI Receptionist",          "buy": 69.00, "sell": 89.00},
             ])
             cs_svc_cols = st.columns(4)
             cs_svc_new = []
@@ -5991,6 +6027,27 @@ with tab7:
             if st.button("💾 Save Call Scope Service Pricing", key="adm_cs_svc_save"):
                 st.session_state.active_config["call_scope_services"] = cs_svc_new
                 st.success("Call Scope service pricing saved"); st.rerun()
+
+            st.markdown("---")
+
+            # ── Call Scope — Minutes (per-minute pricing, separate from My PA) ──
+            st.markdown("#### ⏱️ Call Scope — Minutes")
+            st.caption("Per-minute price for the Call Scope 500 / 1000 / 1500 minute bundles on the AI Integration modules. "
+                       "Separate from the My PA bundles below.")
+            _mc1, _mc2 = st.columns(2)
+            with _mc1:
+                _cs_min_b = st.number_input("Buy £ per minute", value=float(cfg["constants"].get("cs_min_buy", 0.10)),
+                                            step=0.01, min_value=0.0, format="%.3f", key="adm_cs_min_buy")
+            with _mc2:
+                _cs_min_s = st.number_input("Sell £ per minute", value=float(cfg["constants"].get("cs_min_sell", 0.25)),
+                                            step=0.01, min_value=0.0, format="%.3f", key="adm_cs_min_sell")
+            _cs_min_margin = round((_cs_min_s - _cs_min_b) / _cs_min_s * 100, 1) if _cs_min_s > 0 else 0
+            st.caption("Bundles: " + " · ".join(f"{m} mins = £{m * _cs_min_s:,.2f}/mo sell (cost £{m * _cs_min_b:,.2f})"
+                                                 for m in (500, 1000, 1500)) + f"  ·  margin {_cs_min_margin:.1f}%")
+            if st.button("💾 Save Call Scope Minutes Pricing", key="adm_cs_min_save"):
+                st.session_state.active_config["constants"]["cs_min_buy"]  = _cs_min_b
+                st.session_state.active_config["constants"]["cs_min_sell"] = _cs_min_s
+                st.success("Call Scope minutes pricing saved"); st.rerun()
 
             st.markdown("---")
 
@@ -6026,7 +6083,7 @@ with tab7:
             # ── Call Scope — Lease Add-ons ─────────────────────────────────────
             st.markdown("#### 🏷️ Call Scope — Lease Add-ons")
             st.caption("One-off items added to the hardware lease (Website Widget, Platform Setup).")
-            _cs_lease_names = ("Website Widget", "Call Scope Platform Setup", "Call Scope AI Setup (one-off)")
+            _cs_lease_names = ("Website Widget", "Call Scope Platform Setup", "Call Scope AI Setup (one-off)", "Call Scope AI Receptionist Setup (one-off)")
             _cs_lease_items = [i for i in cfg.get("other_hardware", [])
                                 if i.get("name","") in _cs_lease_names]
             if _cs_lease_items:
