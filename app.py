@@ -698,7 +698,7 @@ PRODUCT_IMAGES = {
     "Call Scope AI Agent":               "images/crm_ai.jpg",
     "ACD Light Agent":               "images/acd_light.jpg",
     "Click to Dial":                 "images/teams_integration.jpg",
-    "HTML Wallboard":                "images/html_wallboard.jpg",
+    "Call Recording Dashboard":       "images/html_wallboard.jpg",
     # Ricoh printers - photos live in the repo's images/ folder
     "Ricoh IMC 401":                 "images/IMC 401.jpg",
     "Ricoh IMC 2010":                "images/IMC 2010.jpg",
@@ -1428,15 +1428,13 @@ with col_hw2:
         with _sw_col1:
             _sw_studio_on    = st.checkbox("SY Comms Studio  (£11.95/mo)", key="q_sw_studio")
             sw_studio_qty    = 1 if _sw_studio_on else 0
-            sw_callrec_qty   = st.number_input("Call Recording",    0, 50, 0, key="q_sw_callrec", help="sell £1.50/user")
         with _sw_col2:
             sw_ctd_qty       = st.number_input("Click to Dial",     0, 50, 0, key="q_sw_ctd",    help="sell £3.75/user")
-            sw_wallboard_qty = st.number_input("HTML Wallboard",    0, 10, 0, key="q_sw_wb",      help="sell £99.00/instance")
+            sw_wallboard_qty = st.number_input("Call Recording Dashboard", 0, 10, 0, key="q_sw_wb", help="sell £29.00/instance")
     SW_ADDONS = [
         ("SY Comms Studio",   sw_studio_qty,    4.50, 11.95),
-        ("Call Recording",    sw_callrec_qty,   0.01,  1.50),
         ("Click to Dial",     sw_ctd_qty,       0.75,  3.75),
-        ("HTML Wallboard",    sw_wallboard_qty, 5.00, 99.00),
+        ("Call Recording Dashboard", sw_wallboard_qty, 0.00, 29.00),
     ]
     sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
     sw_cost_total = sum(qty * cost for _, qty, cost, _ in SW_ADDONS if qty > 0)
@@ -5906,8 +5904,8 @@ with tab7:
                 [d["name"] for d in cfg.get("other_hardware", []) if d.get("name")] +
                 [f"Switch: {d['name']}" for d in cfg.get("switches", []) if d.get("name")] +
                 [d["name"] for d in cfg.get("routers", []) if d.get("name")] +
-                ["SY Comms Studio", "Call Recording", "Call Scope AI Agent",
-                 "ACD Light Agent", "Click to Dial", "HTML Wallboard"]
+                ["SY Comms Studio", "Call Scope AI Agent",
+                 "ACD Light Agent", "Click to Dial", "Call Recording Dashboard"]
             )
 
             img_col1, img_col2 = st.columns([2, 3])
