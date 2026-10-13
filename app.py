@@ -4136,6 +4136,7 @@ svc["total_sell"] = svc["total_sell"] + _cs_svc_sell + _sec_svc_sell + _it_svc_s
 # ── Consultant services discount (0-40% slider in Consultant tab) ─────────────
 # Applies to hosted user licences, software add-ons and broadband (broadband is capped
 # at wholesale cost). Mobiles are not discountable. Commission is reduced by the same %.
+_total_list_pre = float(svc["total_sell"])     # monthly services at list price, before any discount
 svc_disc_pct  = max(0.0, min(50.0, float(st.session_state.get("c_svc_disc", 0))))
 _svc_mult     = 1.0 - svc_disc_pct / 100.0
 bb_disc_pct   = max(0.0, min(10.0, float(st.session_state.get("c_bb_disc", 0))))   # separate broadband discount, up to 10%
@@ -4166,6 +4167,10 @@ if svc_disc_pct > 0 or bb_disc_pct > 0 or cs_disc_pct > 0:
     svc["total_sell"]  = (svc["bb_sell"] + svc["lic_monthly"] + svc.get("wallboard_mo", 0.0) +
                           svc.get("mobile_sell", 0.0) + sw_sell_total +
                           _cs_svc_sell + _sec_svc_sell + _it_svc_sell)
+# Commission lost = the share of the deal's monthly services that is given away. Each discount is weighted by
+# how big its category is, so 50% off a small Call Scope order costs far less than 50% off all the licences.
+_disc_given_mo  = max(0.0, _total_list_pre - float(svc["total_sell"]))
+comm_loss_pct   = min(100.0, 100.0 * _disc_given_mo / _total_list_pre) if _total_list_pre > 0 else 0.0
 pat_base   = compute_pat(svc)
 pl_data    = compute_pricebook_pl()  # full pricebook P&L breakdown
 
@@ -4287,7 +4292,7 @@ st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
 st.session_state["_prev_cos_full"]         = pl_data["cos_full"]
 # Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
 commission_full        = commission
-_comm_mult = max(0.0, 1.0 - (svc_disc_pct + bb_disc_pct + cs_disc_pct) / 100.0)     # 1% of discount = 1% of commission
+_comm_mult = max(0.0, 1.0 - comm_loss_pct / 100.0)
 if (svc_disc_pct > 0 or bb_disc_pct > 0 or cs_disc_pct > 0) and commission > 0:
     commission_units   = commission_units * _comm_mult
     commission         = round(commission * _comm_mult, 2)
@@ -5174,7 +5179,7 @@ with tab5:
         st.info(f"📋 Appointment type: **{_appt}** — commission rate £{_appt_rates.get(_appt, 1000):,}/unit")
         st.markdown("### 🏷️ Services Discount")
         st.caption("Discount user licences by up to 50%, Call Scope by up to 50% and broadband by up to 10% - each has its own slider. "
-                   "Every 1% of discount removes 1% of your commission.")
+                   "Commission is reduced by the share of the monthly services you give away, so bigger categories cost more.")
 
         def _sync_svc_disc():
             st.session_state["c_svc_disc"]    = st.session_state["c_svc_disc_w"]
@@ -5247,7 +5252,7 @@ with tab5:
                  border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
               <div style="font-size:0.72rem;color:{_cm_col};font-weight:700;text-transform:uppercase">Commission Impact</div>
               <div style="font-size:0.85rem;color:var(--muted);margin-top:0.3rem">Before discount: <strong>£{commission_full:.2f}</strong></div>
-              <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct + bb_disc_pct + cs_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
+              <div style="font-size:0.85rem;color:{_cm_col}">Discount (£{_disc_given_mo:.2f}/mo = {comm_loss_pct:.1f}% of services): <strong>-£{commission_lost:.2f}</strong></div>
               <div style="font-size:1.5rem;font-weight:800;color:var(--text);margin-top:0.3rem">£{commission:.2f}</div>
               <div style="font-size:0.75rem;color:var(--muted)">Services saving to customer: £{_svc_saving:.2f}/mo</div>
             </div>
@@ -6480,7 +6485,7 @@ if st.session_state.admin_unlocked:
 # Sidebar rental + units: exactly the numbers used in the Consultant view
 with _units_ph:
     _is_override = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
-    _disc_note = f"  ·  after {svc_disc_pct + bb_disc_pct + cs_disc_pct:.0f}% discount" if (svc_disc_pct + bb_disc_pct + cs_disc_pct) > 0 else ""
+    _disc_note = f"  ·  after discount" if (svc_disc_pct + bb_disc_pct + cs_disc_pct) > 0 else ""
     st.caption(f"{'Override' if _is_override else 'Calculated'}: £{_desired_rental:,.2f}/mo  ·  "
                f"{commission_units:.2f} units{_disc_note}")
     if is_spread and lease_value > 0:
