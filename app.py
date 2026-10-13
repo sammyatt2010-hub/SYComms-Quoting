@@ -1428,7 +1428,10 @@ with col_hw2:
     # total_voice_channels computed after this block - use desk phone count as proxy
     _desk_total = sum(desktop_quantities.values())
     _soft_total = st.session_state.get("standalone_softphones_key", 0)
-    _total_users_preview = _desk_total + _soft_total
+    # DECT / wireless handsets (DP720, DP735 etc.) are users too; base stations and repeaters are not
+    _dect_total = sum(q for n, q in cordless_quantities.items()
+                      if not any(k in str(n).lower() for k in ("base station", "repeater")))
+    _total_users_preview = _desk_total + _dect_total + _soft_total
     if _total_users_preview >= 5 and "PBX Unit" not in other_quantities:
         other_quantities["PBX Unit"] = 1
         st.info("🔧 PBX Unit auto-added (required for 5+ users)")
