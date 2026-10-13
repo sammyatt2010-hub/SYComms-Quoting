@@ -503,6 +503,8 @@ if "c_svc_disc" not in st.session_state:
     st.session_state.c_svc_disc = 0
 if "c_bb_disc" not in st.session_state:
     st.session_state.c_bb_disc = 0
+if "c_cs_disc" not in st.session_state:
+    st.session_state.c_cs_disc = 0
 if "c_svc_disc_w" not in st.session_state:
     st.session_state.c_svc_disc_w = 0
 if "uploaded_images" not in st.session_state:
@@ -589,7 +591,7 @@ QUOTE_KEYS = [
     "q_bb_provider","q_bb_package","q_bb_care","q_second_fttp","q_ll_cost","q_ll_sell","q_ll_install",
     "q_bank_name","q_acc_holder","q_acc_no","q_sort_code",
     "q_bogof","q_darkweb","q_proactive","q_ooh","q_moh","q_website",
-    "q_appt_type","q_svc_discount","c_svc_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_term_lease","q_term_services","xc_desc_0","xc_amt_0","xc_desc_1","xc_amt_1","xc_desc_2","xc_amt_2","xc_desc_3","xc_amt_3","xc_desc_4","xc_amt_4","xc_desc_5","xc_amt_5","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
+    "q_appt_type","q_svc_discount","q_bb_discount","q_cs_discount","c_svc_disc","c_bb_disc","c_cs_disc","cs_mypa","cs_website","cs_call_answer","cs_AI Integration - Portal","cs_AI Integration - CRM","cs_Manager Dashboard","cs_Call Score","cs_mins_AI Integration - Portal","cs_mins_AI Integration - CRM","sec_Bronze Security","sec_Silver Security","sec_Gold Security","q_term_lease","q_term_services","xc_desc_0","xc_amt_0","xc_desc_1","xc_amt_1","xc_desc_2","xc_amt_2","xc_desc_3","xc_amt_3","xc_desc_4","xc_amt_4","xc_desc_5","xc_amt_5","q_curr_calls","q_curr_lines","q_curr_bb","q_curr_system",
     "q_curr_support","q_curr_hosted","q_curr_onhold","q_curr_other",
     "q_rep_name","q_rep_position",
     "c_svc_disc",
@@ -599,7 +601,7 @@ QUOTE_KEYS = [
 _QUOTE_PREFIXES = ("q_", "desk_", "cord_", "hs_", "oth_", "bb_extra_", "rt_qty_", "sw_qty_",
                    "mob_", "it_", "sec_", "cs_", "cctv_", "xc_", "prn_")
 _QUOTE_EXTRA = {
-    "c_desired_rental", "c_svc_disc", "c_bb_disc", "c_notes_val",                       # consultant: target rental, discount, special conditions
+    "c_desired_rental", "c_svc_disc", "c_bb_disc", "c_cs_disc", "c_notes_val",                       # consultant: target rental, discount, special conditions
     "router_mode", "switch_mode", "add_wired_ports", "standalone_softphones_key",
     "cs_ai_portal_free",
     "adm_bb_override", "adm_override_upfront", "adm_override_install",  # manager per-deal overrides
@@ -1051,13 +1053,23 @@ with st.sidebar:
     st.markdown("### 💰 Pricing Controls")
     def _sync_sidebar_to_cons():
         st.session_state["c_svc_disc"] = st.session_state["q_svc_discount"]
+    def _sync_sidebar_bb():
+        st.session_state["c_bb_disc"] = st.session_state["q_bb_discount"]
+    def _sync_sidebar_cs():
+        st.session_state["c_cs_disc"] = st.session_state["q_cs_discount"]
     service_discount_pct = st.slider(
-        "Service Discount %", 0, 50,
+        "User licence discount %", 0, 50,
         value=int(st.session_state.get("c_svc_disc", 0)),
         step=5,
-        help="Syncs with Consultant tab. Floor protection keeps minimum 5% uplift on all items.",
+        help="Hosted user licences and software add-ons, up to 50%. Syncs with Consultant tab.",
         key="q_svc_discount", on_change=_sync_sidebar_to_cons
     )
+    st.session_state["q_bb_discount"] = int(st.session_state.get("c_bb_disc", 0))
+    st.slider("Broadband discount %", 0, 10, step=1, key="q_bb_discount", on_change=_sync_sidebar_bb,
+              help="Broadband sell prices, up to 10%. Never goes below wholesale cost. Syncs with Consultant tab.")
+    st.session_state["q_cs_discount"] = int(st.session_state.get("c_cs_disc", 0))
+    st.slider("Call Scope discount %", 0, 50, step=5, key="q_cs_discount", on_change=_sync_sidebar_cs,
+              help="Call Scope services, up to 50%. Syncs with Consultant tab.")
     # Silent floor: effective uplift never drops below 5% regardless of discount level
     service_uplift_pct = max(40 - service_discount_pct, 5)
     if any(int(st.session_state.get(f"prn_qty_{_pn}", 0) or 0) > 0 for _pn in PRINTERS):
@@ -4128,11 +4140,19 @@ svc_disc_pct  = max(0.0, min(50.0, float(st.session_state.get("c_svc_disc", 0)))
 _svc_mult     = 1.0 - svc_disc_pct / 100.0
 bb_disc_pct   = max(0.0, min(10.0, float(st.session_state.get("c_bb_disc", 0))))   # separate broadband discount, up to 10%
 _bb_mult      = 1.0 - bb_disc_pct / 100.0
+cs_disc_pct   = max(0.0, min(50.0, float(st.session_state.get("c_cs_disc", 0))))   # Call Scope services, up to 50%
+_cs_mult      = 1.0 - cs_disc_pct / 100.0
+_cs_list_total = float(_cs_svc_sell)
 lic_list_total = float(svc["lic_monthly"])          # undiscounted, for consultant display
 bb1_list       = float(svc["bb1_sell"])
 bb2_list       = float(svc["bb2_sell"])
 sw_list_total  = float(sw_sell_total)               # undiscounted, for consultant display
-if svc_disc_pct > 0 or bb_disc_pct > 0:
+if cs_disc_pct > 0:
+    for _r in cs_svc_rows:                       # discount the Call Scope rows themselves so every document agrees
+        _r["sell"] = round(_r["sell"] * _cs_mult, 2)
+    _cs_svc_sell = sum(r["sell"] * r["qty"] for r in cs_svc_rows)
+    svc["cs_sell"] = _cs_svc_sell
+if svc_disc_pct > 0 or bb_disc_pct > 0 or cs_disc_pct > 0:
     SW_ADDONS = [(n, q, c, round(sell * _svc_mult, 2)) for n, q, c, sell in SW_ADDONS]
     sw_sell_total = sum(qty * sell for _, qty, _, sell in SW_ADDONS if qty > 0)
     svc["sw_sell"]     = sw_sell_total
@@ -4267,8 +4287,8 @@ st.session_state["_prev_true_rate"]        = pl_data["true_rate"]
 st.session_state["_prev_cos_full"]         = pl_data["cos_full"]
 # Services discount removes the same % of commission (e.g. 10% discount = -10% commission)
 commission_full        = commission
-_comm_mult = max(0.0, 1.0 - (svc_disc_pct + bb_disc_pct) / 100.0)     # 1% of discount = 1% of commission
-if (svc_disc_pct > 0 or bb_disc_pct > 0) and commission > 0:
+_comm_mult = max(0.0, 1.0 - (svc_disc_pct + bb_disc_pct + cs_disc_pct) / 100.0)     # 1% of discount = 1% of commission
+if (svc_disc_pct > 0 or bb_disc_pct > 0 or cs_disc_pct > 0) and commission > 0:
     commission_units   = commission_units * _comm_mult
     commission         = round(commission * _comm_mult, 2)
 commission_lost        = round(commission_full - commission, 2)
@@ -5153,7 +5173,7 @@ with tab5:
         _appt_rates = {"Self Gen": 1000, "Base Deal": 600, "Acquisition": 500, "Telemarketer": 650}
         st.info(f"📋 Appointment type: **{_appt}** — commission rate £{_appt_rates.get(_appt, 1000):,}/unit")
         st.markdown("### 🏷️ Services Discount")
-        st.caption("Discount licences, software and other monthly services by up to 50%, and broadband separately by up to 10%. "
+        st.caption("Discount user licences by up to 50%, Call Scope by up to 50% and broadband by up to 10% - each has its own slider. "
                    "Every 1% of discount removes 1% of your commission.")
 
         def _sync_svc_disc():
@@ -5164,16 +5184,24 @@ with tab5:
         with _sd_col1:
             # Keep widget key in sync with c_svc_disc (allows sidebar to push value here)
             st.session_state["c_svc_disc_w"] = int(st.session_state.get("c_svc_disc", 0))
-            st.slider("Services discount (%)", min_value=0, max_value=50, step=5,
+            st.slider("User licence discount (%)", min_value=0, max_value=50, step=5,
                       key="c_svc_disc_w", on_change=_sync_svc_disc,
-                      help="Applies to hosted user licences and software add-ons (not broadband - that has its own slider). "
+                      help="Applies to hosted user licences and software add-ons. Broadband and Call Scope have their own sliders. "
                            "Mobiles are not discountable.")
             def _sync_bb_disc():
                 st.session_state["c_bb_disc"] = st.session_state["c_bb_disc_w"]
+                st.session_state["q_bb_discount"] = st.session_state["c_bb_disc_w"]
+            def _sync_cs_disc():
+                st.session_state["c_cs_disc"] = st.session_state["c_cs_disc_w"]
+                st.session_state["q_cs_discount"] = st.session_state["c_cs_disc_w"]
             st.session_state["c_bb_disc_w"] = int(st.session_state.get("c_bb_disc", 0))
             st.slider("Broadband discount (%)", min_value=0, max_value=10, step=1,
                       key="c_bb_disc_w", on_change=_sync_bb_disc,
                       help="Separate discount on broadband sell prices, up to 10%. Broadband can never go below wholesale cost.")
+            st.session_state["c_cs_disc_w"] = int(st.session_state.get("c_cs_disc", 0))
+            st.slider("Call Scope discount (%)", min_value=0, max_value=50, step=5,
+                      key="c_cs_disc_w", on_change=_sync_cs_disc,
+                      help="Discount on Call Scope services, up to 50%.")
 
             def _svc_row(label, list_price, new_price, note=""):
                 _chg = new_price < list_price - 0.005
@@ -5186,7 +5214,7 @@ with tab5:
                         f"<span>{_was}<strong style='color:var(--text)'>£{new_price:.2f}/mo</strong></span></div>")
 
             _svc_saving = ((lic_list_total - svc["lic_monthly"]) + (sw_list_total - sw_sell_total) +
-                           (bb1_list + bb2_list - svc["bb_sell"]))
+                           (bb1_list + bb2_list - svc["bb_sell"]) + (_cs_list_total - _cs_svc_sell))
             _rows = ""
             if lic_list_total > 0:
                 _rows += _svc_row(f"Hosted User Licences ({total_voice_channels} users)", lic_list_total, svc["lic_monthly"])
@@ -5200,6 +5228,8 @@ with tab5:
             if bb2_list > 0:
                 _rows += _svc_row(f"Broadband additional lines ({extra_bb_count})", bb2_list, svc["bb2_sell"],
                                   "(at wholesale floor)" if bb_disc_pct > 0 and svc["bb2_sell"] <= svc["bb2_floor"] + 0.005 else "")
+            if _cs_list_total > 0:
+                _rows += _svc_row("Call Scope services", _cs_list_total, _cs_svc_sell)
             if svc.get("mobile_sell", 0) > 0:
                 _rows += _svc_row("Mobiles", svc["mobile_sell"], svc["mobile_sell"], "(fixed)")
             if not _rows:
@@ -5217,7 +5247,7 @@ with tab5:
                  border-radius:0 8px 8px 0;padding:1rem 1.2rem;margin-top:1.6rem">
               <div style="font-size:0.72rem;color:{_cm_col};font-weight:700;text-transform:uppercase">Commission Impact</div>
               <div style="font-size:0.85rem;color:var(--muted);margin-top:0.3rem">Before discount: <strong>£{commission_full:.2f}</strong></div>
-              <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct + bb_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
+              <div style="font-size:0.85rem;color:{_cm_col}">Discount {svc_disc_pct + bb_disc_pct + cs_disc_pct:.0f}%: <strong>-£{commission_lost:.2f}</strong></div>
               <div style="font-size:1.5rem;font-weight:800;color:var(--text);margin-top:0.3rem">£{commission:.2f}</div>
               <div style="font-size:0.75rem;color:var(--muted)">Services saving to customer: £{_svc_saving:.2f}/mo</div>
             </div>
@@ -6450,7 +6480,7 @@ if st.session_state.admin_unlocked:
 # Sidebar rental + units: exactly the numbers used in the Consultant view
 with _units_ph:
     _is_override = (st.session_state.get("c_desired_rental", 0) or 0) > 0 and abs(_desired_rental - base_rental) > 0.01
-    _disc_note = f"  ·  after {svc_disc_pct + bb_disc_pct:.0f}% discount" if (svc_disc_pct + bb_disc_pct) > 0 else ""
+    _disc_note = f"  ·  after {svc_disc_pct + bb_disc_pct + cs_disc_pct:.0f}% discount" if (svc_disc_pct + bb_disc_pct + cs_disc_pct) > 0 else ""
     st.caption(f"{'Override' if _is_override else 'Calculated'}: £{_desired_rental:,.2f}/mo  ·  "
                f"{commission_units:.2f} units{_disc_note}")
     if is_spread and lease_value > 0:
