@@ -981,7 +981,8 @@ import time as _time
 
 def _zsec(key):
     """Zoho setting: a value pasted into the Admin -> Zoho tab this session wins over Streamlit Secrets."""
-    return (st.session_state.get("_zoho_over", {}) or {}).get(key) or _secret(key)
+    v = (st.session_state.get("_zoho_over", {}) or {}).get(key) or _secret(key)
+    return "".join(str(v).split()).strip("\"'")   # drop stray spaces / line breaks / quotes from pasted values
 
 def _zoho_dc():
     return (_zsec("ZOHO_DC") or "eu").strip().lower()
@@ -1000,7 +1001,11 @@ def _zoho_token():
     try:
         j = r.json()
     except Exception:
-        raise RuntimeError(f"Zoho sign-in gave an unexpected reply (status {r.status_code}, from accounts.zoho.{_zoho_dc()}): {r.text[:120]!r}")
+        _cid, _cs, _rt = _zsec("ZOHO_CLIENT_ID"), _zsec("ZOHO_CLIENT_SECRET"), _zsec("ZOHO_REFRESH_TOKEN")
+        raise RuntimeError(f"Zoho rejected the sign-in request (status {r.status_code}, accounts.zoho.{_zoho_dc()}). "
+                           f"Lengths seen - client ID {len(_cid)} (starts '{_cid[:6]}'), client secret {len(_cs)}, "
+                           f"refresh token {len(_rt)} (starts '{_rt[:5]}'). A normal client ID is about 38 characters starting '1000.', "
+                           f"a secret about 42, a refresh token about 70 starting '1000.'")
     if "access_token" not in j:
         raise RuntimeError(f"Zoho sign-in failed ({j.get('error', r.status_code)}) - the refresh token or client details may be wrong")
     st.session_state["_zoho_tok"] = (j["access_token"], _time.time() + 3000)
