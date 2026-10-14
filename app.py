@@ -1101,11 +1101,13 @@ def _zoho_setup_ui(kp="_zt"):
                "Set the time duration to 10 minutes - the code only works once and expires quickly.")
     _zcid = st.text_input("Client ID", value=_secret("ZOHO_CLIENT_ID"), key=f"{kp}_cid")
     _zcs  = st.text_input("Client Secret", value="", type="password", key=f"{kp}_cs",
-                          placeholder="(already in Secrets)" if _secret("ZOHO_CLIENT_SECRET") else "paste the client secret")
+                          placeholder=("(Secrets holds one - " + str(len(_secret("ZOHO_CLIENT_SECRET"))) + " characters; a real secret is about 42 - paste the full one here)") if _secret("ZOHO_CLIENT_SECRET") else "paste the client secret")
     st.markdown("**2. Paste the code Zoho gives you:**")
     _zcode = st.text_input("Grant code", key=f"{kp}_code", placeholder="1000.xxxxxxxx.xxxxxxxx")
     if st.button("Create refresh token", type="primary", key=f"{kp}_make"):
-        _use_cs = _zcs or _secret("ZOHO_CLIENT_SECRET")
+        _cl = lambda s: "".join(str(s).split()).strip("\"'")
+        _zcid = _cl(_zcid); _zcode = _cl(_zcode)
+        _use_cs = _cl(_zcs or _secret("ZOHO_CLIENT_SECRET"))
         if not (_zcid and _use_cs and _zcode.strip()):
             st.error("Fill in the Client ID, Client Secret and the grant code first.")
         else:
@@ -1113,8 +1115,17 @@ def _zoho_setup_ui(kp="_zt"):
                 _zr = _req.post(f"https://accounts.zoho.{_zdc}/oauth/v2/token", timeout=20, data={
                     "grant_type": "authorization_code", "client_id": _zcid.strip(),
                     "client_secret": _use_cs.strip(), "code": _zcode.strip()})
-                _zj = _zr.json()
-                if _zj.get("refresh_token"):
+                try:
+                    _zj = _zr.json()
+                except Exception:
+                    _zj = None
+                if _zj is None:
+                    st.session_state[f"{kp}_result"] = None
+                    st.error(f"Zoho rejected the request (status {_zr.status_code}). Lengths seen - client ID {len(_zcid)} "
+                             f"(should be ~35-38, starts '1000.'), client secret {len(_use_cs)} (should be ~42), "
+                             f"grant code {len(_zcode)}. Most likely the Client Secret is wrong or cut off - "
+                             f"paste the full secret into the box above (it currently {'uses the one in Secrets' if not _zcs else 'uses what you typed'}).")
+                elif _zj.get("refresh_token"):
                     st.session_state[f"{kp}_result"] = {"rt": _zj["refresh_token"], "cid": _zcid.strip(),
                                                       "cs": _use_cs.strip(), "dc": _zdc}
                 else:
