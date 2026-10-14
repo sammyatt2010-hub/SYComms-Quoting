@@ -2363,46 +2363,6 @@ def _build_pdf_core(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='
         pdf.set_font("Helvetica", style, size); pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 4.2 * max(_cs_k, 0.85), s(text))
 
-    def _fixed_prices_block(_cs_k=1.0):
-        # Price schedule in pounds and pence
-        _cs_bar("Your prices - fixed for the minimum term")
-        _cs_text("Your prices are fixed for your minimum term. They will not rise with inflation or by any percentage. "
-                 "The only changes are the fixed amounts shown below.", 8.3)
-        _years = max(1, -(-_cs_months // 12))
-        _bb_step  = _bb_yr1_saving if (bb_free_year and _bb_yr1_saving > 0) else 0.0
-        _rec_on   = any(("recording" in str(_n).lower()) and (_q or 0) > 0 for _n, _q, _c, _sv in SW_ADDONS)
-        _rec_fee  = 20.00 if _rec_on else 0.0
-        pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_fill_color(230, 233, 245)
-        pdf.cell(45, 6, "  Point in contract", fill=True); pdf.cell(55, 6, "Months", fill=True)
-        pdf.cell(0, 6, "Monthly charge (ex VAT)  ", fill=True, ln=True, align="R")
-        for _y in range(1, _years + 1):
-            _m0, _m1 = (_y - 1) * 12 + 1, min(_y * 12, _cs_months)
-            _val = (total_mo - (_bb_step if _y == 1 else 0.0) + (_rec_fee if _y >= 2 else 0.0)
-                    - (printer_monthly if (printer_rows and _m0 > printer_term) else 0.0))
-            pdf.set_font("Helvetica", "", 8.2); pdf.set_x(pdf.l_margin)
-            _fill = (_y % 2 == 1); pdf.set_fill_color(245, 247, 255)
-            pdf.cell(45, 5.6 * _cs_k, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6 * _cs_k, f"Months {_m0}-{_m1}", fill=_fill)
-            pdf.cell(0, 5.6 * _cs_k, f"£{_val:,.2f}  ", fill=_fill, ln=True, align="R")
-        _notes = []
-        if _bb_step:
-            _notes.append(f"Year 1 includes free broadband (saving £{_bb_step:,.2f}/mo); the normal broadband price of "
-                          f"£{_bb_full_sell:,.2f}/mo applies from month 13.")
-        if _rec_fee:
-            _notes.append("Call recording storage is included for 12 months, then £20.00/mo applies from month 13.")
-        if printer_rows:
-            _notes.append(f"Printer lease runs for {printer_term} months" +
-                          (f" - it ends after month {printer_term}, so it's not included after that." if printer_term < _cs_months else ".") +
-                          " Print charges are estimates; you pay the fixed per-print price for prints actually made.")
-        if st.session_state.get("cs_ai_portal_free", False):
-            _notes.append("The AI Portal is free for the first month only; its normal price is included above from month 1 "
-                          "and credited in month 1.")
-        for _n in _notes:
-            _cs_text("- " + _n, 7.6)
-        _cs_text("Other fixed charges that may apply (from our Terms & Conditions): engineer call-out £250 minimum then "
-                 "£75/hour; remote system changes £35; new or ported-in number £25 per number; late payment £25; "
-                 "Direct Debit cancellation £50.", 7.4, "I")
-
-
     _cs_months = int(lease_term)
     _cs_term_lbl = LEASE_TERM_LABELS.get(lease_term, f"{_cs_months} months")
     _cs_text(f"This summary sets out the main parts of your contract with {_CO_LEGAL}, as required by Ofcom. "
@@ -2899,7 +2859,6 @@ def _build_pdf_core(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='
     pdf.cell(130, 6, "  TOTAL MONTHLY SERVICE CHARGES", fill=True, ln=False)
     pdf.cell(60, 6, f"£{svc['total_sell']:.2f}/mo", fill=True, ln=True, align="C")
     pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
-    pdf.multi_cell(pdf.epw,3.5,"* Prices are fixed for the minimum term - they will not rise with inflation or by any percentage. Your full price schedule is at the end of the Network Services & Broadband Agreement.",align="L")
     pdf.set_text_color(0,0,0)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
@@ -2943,10 +2902,6 @@ def _build_pdf_core(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='
         pdf.ln(4)
         pdf.set_fill_color(255, 255, 255)
 
-    # Fixed-price schedule (moved here from the Contract Summary)
-    pdf.set_x(pdf.l_margin)
-    _fixed_prices_block(0.85)
-    pdf.ln(1)
 
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_font("Helvetica", "B", 9)
@@ -3580,7 +3535,7 @@ def _build_pdf_core(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='
         ("3. DURATION & AUTOMATIC RENEWAL", "This contract automatically extends for 12 months at the end of the Minimum Term and each Extended Term unless 90 days written notice is given. You may add Services at any time."),
         ("4. SERVICES", "We provide Services with reasonable skill and care. We do not warrant uninterrupted or error-free service. Service Failures must be reported via our Helpdesk."),
         ("6. USE OF SERVICES", "Services are for business use only and must comply with our Acceptable Use Policy. You must not use Services to breach any law, compromise network security, or degrade service to other customers."),
-        ("10. CHARGES AND PAYMENT", "All Charges exclude VAT. Invoices due within 14 days. Late payment fee £25 after 7 days. DD cancellation fee £50. Prices are fixed for the minimum term - no inflation-linked or percentage increases (see Contract Summary). Rental invoiced in advance; calls in arrears. Port/activation: £25+VAT per CLI. Engineer callout: min £250+VAT. Remote changes: £35+VAT. Call recording: included 12 months then £20/month+VAT."),
+        ("10. CHARGES AND PAYMENT", "All Charges exclude VAT. Invoices due within 14 days. Late payment fee £25 after 7 days. DD cancellation fee £50. Rental invoiced in advance; calls in arrears. Port/activation: £25+VAT per CLI. Engineer callout: min £250+VAT. Remote changes: £35+VAT. Call recording: included 12 months then £20/month+VAT."),
         ("12. LIABILITY", "No liability for loss of profits, business opportunity, goodwill or indirect loss. Total liability capped at Charges paid in prior 12 months. Nothing limits liability for death or fraud."),
         ("13. CANCELLATION", "90 days notice required. Cancellation during term incurs Cancellation Charge. Introductory credits repayable on early exit. Subsidised early termination charges repayable pro-rata."),
         ("15. TERMINATION FEES", "On termination all invoices become immediately due; Equipment must be returned. Cancellation fee: £299+VAT per CLI. Port-away: £15+VAT per number. Account closure: £250+VAT. We may terminate for non-payment (7+ days), unremedied breach, or insolvency."),
