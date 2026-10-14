@@ -3765,7 +3765,7 @@ def _build_pdf_core(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='
         pdf.set_xy(lx + 135, y_row + 10)
         pdf.cell(0, 5, f"Signed: {_signed_at}", ln=True)
 
-        pdf.set_y(y_row + 1)
+        pdf.set_y(y_row + 5.5)        # below the signer's name (was overlapping the email)
         pdf.set_x(lx)
         pdf.set_font("Helvetica", "", 8)
         pdf.cell(65, 5, _signer_email, ln=True)
@@ -3886,7 +3886,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                 w.add_page(pg)
         out = io.BytesIO(); w.write(out)
         return out.getvalue()
-    except Exception:
+    except Exception as _merge_err:
+        st.session_state["_pack_merge_error"] = str(_merge_err)[:200]
         return core      # never block the pack if the merge fails
 
 
@@ -4754,7 +4755,11 @@ with tab3:
     if not pdf_ready:
         st.markdown('<div class="warning-box">⚠️ Add a company name in the sidebar to enable PDF generation.</div>', unsafe_allow_html=True)
     else:
+        st.session_state.pop("_pack_merge_error", None)
         pdf_bytes = build_pdf()
+        if st.session_state.get("_pack_merge_error"):
+            st.warning("⚠️ The Proposal Summary could not be added to the front of the pack "
+                       f"({st.session_state['_pack_merge_error']}). Add `pypdf` to requirements.txt in GitHub and reboot the app.")
         safe_name = s(comp_name).replace(" ", "_").replace("/", "-")
         st.download_button(
             label=f"📥 Download Full Proposal Pack - {comp_name}",
