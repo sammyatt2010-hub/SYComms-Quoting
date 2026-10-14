@@ -1112,7 +1112,11 @@ with st.sidebar:
                     st.session_state["_zoho_msg"] = "" if st.session_state["_zoho_results"] else "No matching accounts found."
                 except Exception as _ze:
                     st.session_state["_zoho_results"] = []
-                    st.session_state["_zoho_msg"] = f"Couldn't reach Zoho: {_ze}"
+                    _zm = str(_ze)
+                    st.session_state["_zoho_msg"] = (
+                        "Zoho connected, but this refresh token doesn't have permission to read Accounts (it was made with a different scope). "
+                        "Make a new one in Admin -> the last tab, '🔗 Zoho' (you may need to scroll the tab row to the right), "
+                        "using the scope ZohoCRM.modules.READ." if "scope" in _zm.lower() else f"Couldn't reach Zoho: {_zm}")
             if st.session_state.get("_zoho_msg"):
                 st.caption(st.session_state["_zoho_msg"])
             _zres = st.session_state.get("_zoho_results") or []
