@@ -1808,7 +1808,7 @@ def s(text):
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
-def build_proposal_pdf():
+def build_proposal_pdf(sign=None):
     """Two-page proposal in the app's dark style, using the logged-in brand's accent.
     Page 1: headline saving / daily investment + full cost comparison.
     Page 2: new system, monthly services, agreement terms, why us, call to action."""
@@ -2129,6 +2129,45 @@ def build_proposal_pdf():
         p.multi_cell(vw - 8, 3.6, _ps(d), align="L")
     p.set_y(vy + 27)
 
+    # Agreement to go ahead (full pack only): replaces the call to action with a sign-off block
+    if sign is not None:
+        ay_ = p.get_y()
+        ah_ = 44
+        if ay_ + ah_ > PH - 18:           # keep it on page 2 by tightening up if needed
+            ay_ = PH - 18 - ah_
+        card(M, ay_, CW, ah_, fill=SURF2, border=ACC, r=4)
+        p.set_xy(M + 8, ay_ + 4); p.set_font("Helvetica", "B", 12); p.set_text_color(*TEXT)
+        p.cell(CW - 16, 6, "Agreement to go ahead")
+        p.set_xy(M + 8, ay_ + 10.5); p.set_font("Helvetica", "", 7.8); p.set_text_color(*MUTED)
+        p.multi_cell(CW - 16, 3.8, _ps(
+            f"I confirm that I would like {_CO} to go ahead with the services and equipment in this proposal, "
+            "subject to the Order Form, Network Services & Broadband Agreement and Terms & Conditions in this pack."),
+            align="L")
+        by_ = ay_ + 22
+        p.set_fill_color(*STAGE); p.rect(M + 8, by_, 78, 17, "F")          # light panel for the signature
+        _sb = sign.get("sig_bytes")
+        if _sb and len(_sb) > 100:
+            try:
+                import tempfile, os as _o
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _tf:
+                    _tf.write(_sb); _tp = _tf.name
+                try:
+                    p.image(_tp, x=M + 10, y=by_ + 1, w=40, h=15)
+                finally:
+                    _o.unlink(_tp)
+            except Exception:
+                pass
+        else:
+            p.set_draw_color(120, 128, 150); p.set_line_width(0.3)
+            p.line(M + 12, by_ + 13, M + 82, by_ + 13)
+        p.set_font("Helvetica", "", 7); p.set_text_color(*MUTED)
+        p.set_xy(M + 8, by_ + 17.5); p.cell(78, 4, "Customer signature")
+        p.set_font("Helvetica", "B", 8.5); p.set_text_color(*TEXT)
+        p.set_xy(M + 92, by_ + 1.5); p.cell(CW - 100, 5, _ps(f"Name: {sign.get('name') or ''}"))
+        p.set_xy(M + 92, by_ + 7.5); p.cell(CW - 100, 5, _ps(f"Company: {sign.get('company') or comp_name or ''}"))
+        p.set_xy(M + 92, by_ + 13.5); p.cell(CW - 100, 5, _ps(f"Date: {str(sign.get('timestamp') or '')[:10]}"))
+        return bytes(p.output())
+
     # Call to action
     if p.get_y() > PH - 45:
         p.add_page(); p.set_y(topbar(comp_name or "") + 9)
@@ -2144,7 +2183,7 @@ def build_proposal_pdf():
     return bytes(p.output())
 
 
-def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip='',
+def _build_pdf_core(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip='',
               curr_total=0.0, curr_bb=0.0, curr_system=0.0, curr_calls=0.0,
               curr_mobile=0.0, curr_support=0.0, curr_other=0.0):
     pdf = FPDF()
@@ -2324,6 +2363,46 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.set_font("Helvetica", style, size); pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 4.2 * max(_cs_k, 0.85), s(text))
 
+    def _fixed_prices_block(_cs_k=1.0):
+        # Price schedule in pounds and pence
+        _cs_bar("Your prices - fixed for the minimum term")
+        _cs_text("Your prices are fixed for your minimum term. They will not rise with inflation or by any percentage. "
+                 "The only changes are the fixed amounts shown below.", 8.3)
+        _years = max(1, -(-_cs_months // 12))
+        _bb_step  = _bb_yr1_saving if (bb_free_year and _bb_yr1_saving > 0) else 0.0
+        _rec_on   = any(("recording" in str(_n).lower()) and (_q or 0) > 0 for _n, _q, _c, _sv in SW_ADDONS)
+        _rec_fee  = 20.00 if _rec_on else 0.0
+        pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_fill_color(230, 233, 245)
+        pdf.cell(45, 6, "  Point in contract", fill=True); pdf.cell(55, 6, "Months", fill=True)
+        pdf.cell(0, 6, "Monthly charge (ex VAT)  ", fill=True, ln=True, align="R")
+        for _y in range(1, _years + 1):
+            _m0, _m1 = (_y - 1) * 12 + 1, min(_y * 12, _cs_months)
+            _val = (total_mo - (_bb_step if _y == 1 else 0.0) + (_rec_fee if _y >= 2 else 0.0)
+                    - (printer_monthly if (printer_rows and _m0 > printer_term) else 0.0))
+            pdf.set_font("Helvetica", "", 8.2); pdf.set_x(pdf.l_margin)
+            _fill = (_y % 2 == 1); pdf.set_fill_color(245, 247, 255)
+            pdf.cell(45, 5.6 * _cs_k, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6 * _cs_k, f"Months {_m0}-{_m1}", fill=_fill)
+            pdf.cell(0, 5.6 * _cs_k, f"£{_val:,.2f}  ", fill=_fill, ln=True, align="R")
+        _notes = []
+        if _bb_step:
+            _notes.append(f"Year 1 includes free broadband (saving £{_bb_step:,.2f}/mo); the normal broadband price of "
+                          f"£{_bb_full_sell:,.2f}/mo applies from month 13.")
+        if _rec_fee:
+            _notes.append("Call recording storage is included for 12 months, then £20.00/mo applies from month 13.")
+        if printer_rows:
+            _notes.append(f"Printer lease runs for {printer_term} months" +
+                          (f" - it ends after month {printer_term}, so it's not included after that." if printer_term < _cs_months else ".") +
+                          " Print charges are estimates; you pay the fixed per-print price for prints actually made.")
+        if st.session_state.get("cs_ai_portal_free", False):
+            _notes.append("The AI Portal is free for the first month only; its normal price is included above from month 1 "
+                          "and credited in month 1.")
+        for _n in _notes:
+            _cs_text("- " + _n, 7.6)
+        _cs_text("Other fixed charges that may apply (from our Terms & Conditions): engineer call-out £250 minimum then "
+                 "£75/hour; remote system changes £35; new or ported-in number £25 per number; late payment £25; "
+                 "Direct Debit cancellation £50.", 7.4, "I")
+
+
     _cs_months = int(lease_term)
     _cs_term_lbl = LEASE_TERM_LABELS.get(lease_term, f"{_cs_months} months")
     _cs_text(f"This summary sets out the main parts of your contract with {_CO_LEGAL}, as required by Ofcom. "
@@ -2371,46 +2450,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         _cs_row("Hardware - one-off payment", f"£{upfront:,.2f}")
     _cs_text("Broadband speeds are estimates and depend on the network - see the Network Services & Broadband Agreement.", 7.5, "I")
 
-    # Price schedule in pounds and pence
-    _cs_bar("2. Your prices - fixed for the minimum term")
-    _cs_text("Your prices are fixed for your minimum term. They will not rise with inflation or by any percentage. "
-             "The only changes are the fixed amounts shown below.", 8.3)
-    _years = max(1, -(-_cs_months // 12))
-    _bb_step  = _bb_yr1_saving if (bb_free_year and _bb_yr1_saving > 0) else 0.0
-    _rec_on   = any(("recording" in str(_n).lower()) and (_q or 0) > 0 for _n, _q, _c, _sv in SW_ADDONS)
-    _rec_fee  = 20.00 if _rec_on else 0.0
-    pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_fill_color(230, 233, 245)
-    pdf.cell(45, 6, "  Point in contract", fill=True); pdf.cell(55, 6, "Months", fill=True)
-    pdf.cell(0, 6, "Monthly charge (ex VAT)  ", fill=True, ln=True, align="R")
-    for _y in range(1, _years + 1):
-        _m0, _m1 = (_y - 1) * 12 + 1, min(_y * 12, _cs_months)
-        _val = (total_mo - (_bb_step if _y == 1 else 0.0) + (_rec_fee if _y >= 2 else 0.0)
-                - (printer_monthly if (printer_rows and _m0 > printer_term) else 0.0))
-        pdf.set_font("Helvetica", "", 8.2); pdf.set_x(pdf.l_margin)
-        _fill = (_y % 2 == 1); pdf.set_fill_color(245, 247, 255)
-        pdf.cell(45, 5.6 * _cs_k, f"  Year {_y}", fill=_fill); pdf.cell(55, 5.6 * _cs_k, f"Months {_m0}-{_m1}", fill=_fill)
-        pdf.cell(0, 5.6 * _cs_k, f"£{_val:,.2f}  ", fill=_fill, ln=True, align="R")
-    _notes = []
-    if _bb_step:
-        _notes.append(f"Year 1 includes free broadband (saving £{_bb_step:,.2f}/mo); the normal broadband price of "
-                      f"£{_bb_full_sell:,.2f}/mo applies from month 13.")
-    if _rec_fee:
-        _notes.append("Call recording storage is included for 12 months, then £20.00/mo applies from month 13.")
-    if printer_rows:
-        _notes.append(f"Printer lease runs for {printer_term} months" +
-                      (f" - it ends after month {printer_term}, so it's not included after that." if printer_term < _cs_months else ".") +
-                      " Print charges are estimates; you pay the fixed per-print price for prints actually made.")
-    if st.session_state.get("cs_ai_portal_free", False):
-        _notes.append("The AI Portal is free for the first month only; its normal price is included above from month 1 "
-                      "and credited in month 1.")
-    for _n in _notes:
-        _cs_text("- " + _n, 7.6)
-    _cs_text("Other fixed charges that may apply (from our Terms & Conditions): engineer call-out £250 minimum then "
-             "£75/hour; remote system changes £35; new or ported-in number £25 per number; late payment £25; "
-             "Direct Debit cancellation £50.", 7.4, "I")
-
     # Term, leaving early, after the minimum term
-    _cs_bar("3. How long your contract lasts")
+    _cs_bar("2. How long your contract lasts")
     _cs_text(f"Minimum term: {_cs_term_lbl} ({_cs_months} months) from the date your services go live.", 8.3, "B")
     _cs_text("Leaving early: if you cancel during the minimum term, a Cancellation Charge applies as set out in our "
              "Terms & Conditions (broadly, the charges remaining to the end of the minimum term)."
@@ -2422,7 +2463,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                    "Terms & Conditions for notice periods."), 8)
 
     # Important information
-    _cs_bar("4. Important information")
+    _cs_bar("3. Important information")
     _cs_text("Emergency calls (999/112): our phone services use your broadband. If there is a power cut or your "
              "broadband goes down, you may not be able to make calls, including emergency calls. Keep a mobile "
              "phone or traditional line available for emergencies. Emergency call location may be limited.", 8)
@@ -2749,11 +2790,32 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.multi_cell(pdf.epw - 6, 4.2, s(
             f"If your business has fewer than {_small_limit + 1} employees, or is a not-for-profit, Ofcom's rules give you "
             f"the right to a maximum contract length of 24 months. The minimum term of this contract is {int(lease_term)} "
-            "months, which is longer than 24 months. By initialling here, you separately and expressly confirm that you "
+            "months, which is longer than 24 months. By initialling or signing here, you separately and expressly confirm that you "
             "understand this right, and that you choose to waive it in order to enter into this longer contract term."),
             fill=True)
         pdf.set_x(pdf.l_margin + 3); pdf.set_font("Helvetica", "B", 8.5)
-        pdf.cell(pdf.epw - 6, 8, "Customer initials:  ____________        Date:  ____________", fill=True, ln=True)
+        _wsig_ok = bool(sig_bytes) and len(sig_bytes) > 100
+        if _wsig_ok:
+            # Signed: put the captured signature and date in the box
+            _sy = pdf.get_y()
+            pdf.cell(pdf.epw - 6, 14, "", fill=True, ln=True)
+            pdf.set_xy(pdf.l_margin + 5, _sy + 4.5)
+            pdf.cell(38, 5, "Customer signature:")
+            try:
+                import tempfile, os as _os2
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _wtf:
+                    _wtf.write(sig_bytes); _wsp = _wtf.name
+                try:
+                    pdf.image(_wsp, x=pdf.l_margin + 44, y=_sy + 0.8, w=34, h=12.4)
+                finally:
+                    _os2.unlink(_wsp)
+            except Exception:
+                pass
+            pdf.set_xy(pdf.l_margin + 90, _sy + 4.5)
+            pdf.cell(pdf.epw - 96, 5, s(f"Date:  {str(sig_timestamp or date.today())[:10]}"))
+            pdf.set_y(_sy + 14)
+        else:
+            pdf.cell(pdf.epw - 6, 8, "Customer initials:  ____________        Date:  ____________", fill=True, ln=True)
         pdf.rect(pdf.l_margin + 1.5, _wy - 1, pdf.epw - 3, pdf.get_y() - _wy + 2)
         pdf.set_draw_color(0, 0, 0); pdf.set_line_width(0.2); pdf.ln(3)
 
@@ -2837,7 +2899,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
     pdf.cell(130, 6, "  TOTAL MONTHLY SERVICE CHARGES", fill=True, ln=False)
     pdf.cell(60, 6, f"£{svc['total_sell']:.2f}/mo", fill=True, ln=True, align="C")
     pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
-    pdf.multi_cell(pdf.epw,3.5,"* Prices are fixed for the minimum term - they will not rise with inflation or by any percentage. Your full price schedule is in the Contract Summary.",align="L")
+    pdf.multi_cell(pdf.epw,3.5,"* Prices are fixed for the minimum term - they will not rise with inflation or by any percentage. Your full price schedule is at the end of the Network Services & Broadband Agreement.",align="L")
     pdf.set_text_color(0,0,0)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
@@ -2865,7 +2927,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                                    "a mobile phone or traditional line available for emergencies. Emergency call location "
                                    "information may be limited."), border="LBR", fill=True)
     pdf.set_draw_color(0, 0, 0); pdf.set_line_width(0.2)
-    pdf.ln(6)
+    pdf.ln(3)
 
     # ── Special Conditions (from consultant notes) ───────────────────────────
     _special_conds = str(st.session_state.get("c_notes_val", "") or "").strip()
@@ -2880,6 +2942,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
         pdf.multi_cell(pdf.epw, 4.5, s(_special_conds.replace("-", "-").replace("-", "-")), fill=True, align="J")
         pdf.ln(4)
         pdf.set_fill_color(255, 255, 255)
+
+    # Fixed-price schedule (moved here from the Contract Summary)
+    pdf.set_x(pdf.l_margin)
+    _fixed_prices_block(0.85)
+    pdf.ln(1)
 
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_font("Helvetica", "B", 9)
@@ -3194,10 +3261,8 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
             "the terms of the Commercial Proposal, Service Agreement or Finance Agreement. "
             "We confirm this document, together with the Commercial Proposal, Service Agreement and Finance Agreement, "
             f"accurately reflects the transaction we have chosen to enter into. We authorise {_CO_LEGAL.upper()} to proceed.", align="J")
-        pdf.ln(3)
-        _eca_hdr("Signatures")
         pdf.ln(1)
-        pdf.set_font("Helvetica","B",9)
+        _eca_hdr("Signatures")
         pdf.set_font("Helvetica","B",9)
         pdf.cell(0,5,"Customer Signature",ln=True)
         pdf.set_font("Helvetica","",9)
@@ -3212,12 +3277,11 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                     pdf.image(_stf_path, x=pdf.l_margin, y=pdf.get_y(), h=14)
                 finally:
                     _os2.unlink(_stf_path)
-                pdf.ln(16)
+                pdf.ln(15)
             except Exception: pdf.cell(0,14,"Signature: ________________",ln=True)
         else:
             pdf.cell(0,14,"Signature: ________________",ln=True)
         pdf.cell(0,5,f"Date: {date.today().strftime('%d/%m/%Y')}",ln=True)
-        pdf.ln(2)
         pdf.set_font("Helvetica","I",7); pdf.set_text_color(128,128,128)
         pdf.multi_cell(pdf.epw,3.5,"I confirm that I am authorised to sign this agreement on behalf of the Customer.",align="C")
         pdf.set_text_color(0,0,0)
@@ -3806,6 +3870,24 @@ def _embed_sig(pdf_obj, sig_bytes, x=15, w=65, h=20,
     except Exception:
         pass
 
+
+
+def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig_ip='', **kw):
+    """Full pack = signed 2-page Proposal Summary first, then the paperwork."""
+    core = _build_pdf_core(sig_bytes=sig_bytes, sig_name=sig_name, sig_company=sig_company,
+                           sig_timestamp=sig_timestamp, sig_ip=sig_ip, **kw)
+    try:
+        from pypdf import PdfReader, PdfWriter
+        prop = build_proposal_pdf(sign={"sig_bytes": sig_bytes, "name": sig_name,
+                                        "company": sig_company, "timestamp": sig_timestamp})
+        w = PdfWriter()
+        for src in (prop, core):
+            for pg in PdfReader(io.BytesIO(src)).pages:
+                w.add_page(pg)
+        out = io.BytesIO(); w.write(out)
+        return out.getvalue()
+    except Exception:
+        return core      # never block the pack if the merge fails
 
 
 # ─── EMAIL SEND HELPER ───────────────────────────────────────────────────────
@@ -4681,7 +4763,7 @@ with tab3:
             mime="application/pdf",
             use_container_width=True
         )
-        st.markdown('<div class="success-box">✅ PDF ready - 4 sections: Proposal, Order Form, Network Agreement, Mandate & Checklist.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="success-box">✅ PDF ready - Proposal Summary (with agreement to go ahead), Order Form, Network Agreement, Mandate & Checklist.</div>', unsafe_allow_html=True)
         st.markdown("")
         st.markdown("---")
         st.markdown("#### 📋 One-Page Proposal")
@@ -6508,6 +6590,17 @@ if st.session_state.admin_unlocked:
               <div class="metric-value">£{printer_print_margin_mo:,.2f}/mo</div>
               <div class="metric-sub">Device uplift {PRN_UPLIFT:.0f}% · print uplift {PRN_CPC_UPLIFT:.0f}%</div>
             </div>''', unsafe_allow_html=True)
+    # Finance viability - admin only (consultants no longer see this)
+    if fin_band != "none":
+        _fb = {"good":    ("Likely to pass",     "var(--good)"),
+               "stretch": ("Possible (stretch)", "var(--warn)"),
+               "unlikely":("Unlikely to pass",   "var(--bad, #F87171)")}[fin_band]
+        st.markdown(f'''<div class="metric-card" style="border-left:4px solid {_fb[1]}">
+          <div class="metric-label">Finance Viability</div>
+          <div class="metric-value" style="color:{_fb[1]}">{_fb[0]}</div>
+          <div class="metric-sub">Funded £{fin_funded:,.0f} across {fin_handsets} handset(s) = £{fin_per_handset:,.0f} per handset
+          (comfortable up to £{FIN_OK_PER_HANDSET:,.0f}, stretch up to £{FIN_MAX_PER_HANDSET:,.0f})</div>
+        </div>''', unsafe_allow_html=True)
     pb1, pb2, pb3   = st.columns(3)
     with pb1:
         st.markdown(f'''<div class="metric-card" style="border-left:4px solid var(--border-strong)">
@@ -6557,12 +6650,6 @@ with _units_ph:
                        f"(£{_rental_to_cover:,.2f}/mo) - we're absorbing it]")
         if lease_profit_negative:
             st.caption(f":orange[Lease profit is -£{abs(_adjusted_gp):,.0f} at this rental and buyout]")
-    if fin_band != "none":
-        # Status only - no figures on screen, so nothing is exposed to the customer
-        _fin_status = {"good": ":green[Finance - Likely to pass]",
-                       "stretch": ":orange[Finance - Possible (stretch)]",
-                       "unlikely": ":red[Finance - Unlikely to pass]"}[fin_band]
-        st.caption(_fin_status)
 try:
     _n_handsets = sum(desktop_quantities.values()) + sum(q for n, q in cordless_quantities.items() if _is_user_handset(n))
     _n_hw = (_n_handsets + sum(headset_quantities.values())
