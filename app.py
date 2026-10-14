@@ -1110,6 +1110,10 @@ def _zoho_setup_ui(kp="_zt"):
         _use_cs = _cl(_zcs or _secret("ZOHO_CLIENT_SECRET"))
         if not (_zcid and _use_cs and _zcode.strip()):
             st.error("Fill in the Client ID, Client Secret and the grant code first.")
+        elif len(_use_cs) < 30:
+            st.error(f"The Client Secret looks wrong - it is only {len(_use_cs)} characters and a real one is about 42. "
+                     "I haven't sent anything to Zoho, so your grant code is still unused. Paste the full secret into the "
+                     "Client Secret box (it is blank now, so the short one stored in Secrets was being used), then try again.")
         else:
             try:
                 _zr = _req.post(f"https://accounts.zoho.{_zdc}/oauth/v2/token", timeout=20, data={
