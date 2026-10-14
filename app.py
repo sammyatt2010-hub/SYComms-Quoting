@@ -3878,7 +3878,7 @@ def build_pdf(sig_bytes=None, sig_name='', sig_company='', sig_timestamp='', sig
                            sig_timestamp=sig_timestamp, sig_ip=sig_ip, **kw)
     try:
         from pypdf import PdfReader, PdfWriter
-        prop = build_proposal_pdf(sign={"sig_bytes": sig_bytes, "name": sig_name,
+        prop = build_proposal_pdf(sign={"sig_bytes": None, "name": sig_name,      # always blank: this box is signed in Zoho Sign
                                         "company": sig_company, "timestamp": sig_timestamp})
         w = PdfWriter()
         for src in (prop, core):
