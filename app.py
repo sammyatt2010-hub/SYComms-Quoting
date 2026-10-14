@@ -1079,6 +1079,70 @@ def _zoho_fill_values(acct, contact):
         if not out.get("q_phone") and contact.get("Phone"): out["q_phone"] = str(contact["Phone"]).strip()
     return {k: v for k, v in out.items() if v not in ("", None)}
 
+def _zoho_setup_ui(kp="_zt"):
+    st.markdown("**Zoho connection** - makes a refresh token for the 'Pull customer from Zoho' feature")
+    _zdc_opts = ["eu", "com", "in", "com.au", "jp"]
+    _zdc = st.selectbox("Zoho data centre", _zdc_opts, index=_zdc_opts.index(_zoho_dc()) if _zoho_dc() in _zdc_opts else 0,
+                        key=f"{kp}_dc", help="You use the EU one (accounts.zoho.eu).")
+    st.markdown("**1. In the Zoho API Console (api-console.zoho." + _zdc + ") - Self Client - Generate Code, use this scope:**")
+    st.code("ZohoCRM.modules.READ", language=None)
+    st.caption("Read-only: the app can look up accounts and contacts but can never change anything in Zoho. "
+               "Set the time duration to 10 minutes - the code only works once and expires quickly.")
+    _zcid = st.text_input("Client ID", value=_secret("ZOHO_CLIENT_ID"), key=f"{kp}_cid")
+    _zcs  = st.text_input("Client Secret", value="", type="password", key=f"{kp}_cs",
+                          placeholder="(already in Secrets)" if _secret("ZOHO_CLIENT_SECRET") else "paste the client secret")
+    st.markdown("**2. Paste the code Zoho gives you:**")
+    _zcode = st.text_input("Grant code", key=f"{kp}_code", placeholder="1000.xxxxxxxx.xxxxxxxx")
+    if st.button("Create refresh token", type="primary", key=f"{kp}_make"):
+        _use_cs = _zcs or _secret("ZOHO_CLIENT_SECRET")
+        if not (_zcid and _use_cs and _zcode.strip()):
+            st.error("Fill in the Client ID, Client Secret and the grant code first.")
+        else:
+            try:
+                _zr = _req.post(f"https://accounts.zoho.{_zdc}/oauth/v2/token", timeout=20, data={
+                    "grant_type": "authorization_code", "client_id": _zcid.strip(),
+                    "client_secret": _use_cs.strip(), "code": _zcode.strip()})
+                _zj = _zr.json()
+                if _zj.get("refresh_token"):
+                    st.session_state[f"{kp}_result"] = {"rt": _zj["refresh_token"], "cid": _zcid.strip(),
+                                                      "cs": _use_cs.strip(), "dc": _zdc}
+                else:
+                    st.session_state[f"{kp}_result"] = None
+                    st.error(f"Zoho said: {_zj.get('error', _zr.status_code)} - the code is probably used or expired. "
+                             "Generate a fresh one and paste it straight away.")
+            except Exception as _zte:
+                st.error(f"Couldn't reach Zoho: {_zte}")
+    _ztr = st.session_state.get(f"{kp}_result")
+    if _ztr:
+        st.success("Refresh token created. Copy it into the app's Secrets as ZOHO_REFRESH_TOKEN:")
+        st.code(_ztr["rt"], language=None)
+        st.code('ZOHO_CLIENT_ID = "' + _ztr["cid"] + '"\nZOHO_CLIENT_SECRET = "(your client secret)"\n'
+                'ZOHO_REFRESH_TOKEN = "' + _ztr["rt"] + '"' + ('\nZOHO_DC = "' + _ztr["dc"] + '"' if _ztr["dc"] != "eu" else ""),
+                language="toml")
+        _zb1, _zb2 = st.columns(2)
+        with _zb1:
+            if st.button("Use it now (this session only)", key=f"{kp}_use"):
+                st.session_state["_zoho_over"] = {"ZOHO_CLIENT_ID": _ztr["cid"], "ZOHO_CLIENT_SECRET": _ztr["cs"],
+                                                  "ZOHO_REFRESH_TOKEN": _ztr["rt"], "ZOHO_DC": _ztr["dc"]}
+                st.session_state.pop("_zoho_tok", None)
+                st.session_state[f"{kp}_used"] = True
+                st.rerun()
+            if st.session_state.get(f"{kp}_used"):
+                st.success("Active for this session - try 'Pull customer from Zoho' in the left panel.")
+        with _zb2:
+            st.caption("To keep it for everyone, paste the lines above into Streamlit -> Settings -> Secrets and save.")
+    st.markdown("---")
+    if st.button("Test the current Zoho connection", key=f"{kp}_test"):
+        if not _zoho_configured():
+            st.warning("Not connected yet - no refresh token in Secrets or created above.")
+        else:
+            try:
+                st.session_state.pop("_zoho_tok", None)
+                _zoho_token()
+                st.success("Connected to Zoho - sign-in works.")
+            except Exception as _zte:
+                st.error(str(_zte))
+
 # Apply a pending "fill from Zoho" before the customer widgets are drawn
 if "_zoho_fill" in st.session_state:
     for _k, _v in st.session_state.pop("_zoho_fill").items():
@@ -1102,9 +1166,19 @@ with st.sidebar:
     _appt_rate = APPT_RATES[appt_type]
     st.markdown("---")
     with st.expander("🔎 Pull customer from Zoho", expanded=False):
-        if not _zoho_configured():
-            st.caption("Zoho isn't connected yet - add ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET and ZOHO_REFRESH_TOKEN to the app's Secrets.")
-        else:
+        _zsetup = st.checkbox("🔧 Connect / reconnect Zoho (admin)", key="_zs_open",
+                              value=not _zoho_configured())
+        if _zsetup:
+            _zadm_ok = st.session_state.get("admin_unlocked", False)
+            if not _zadm_ok:
+                _zpw = st.text_input("Admin password", type="password", key="_zs_pw")
+                _zreal = _secret("ADMIN_PASSWORD")
+                _zadm_ok = bool(_zreal) and hmac.compare_digest(_zpw.encode(), _zreal.encode())
+                if _zpw and not _zadm_ok:
+                    st.caption("Wrong password.")
+            if _zadm_ok:
+                _zoho_setup_ui("_zs")
+        if _zoho_configured():
             _zq = st.text_input("Company name", key="_zoho_q", placeholder="Start of the company name")
             if st.button("Search Zoho", key="_zoho_search", use_container_width=True) and _zq.strip():
                 try:
@@ -1115,8 +1189,7 @@ with st.sidebar:
                     _zm = str(_ze)
                     st.session_state["_zoho_msg"] = (
                         "Zoho connected, but this refresh token doesn't have permission to read Accounts (it was made with a different scope). "
-                        "Make a new one in Admin -> the last tab, '🔗 Zoho' (you may need to scroll the tab row to the right), "
-                        "using the scope ZohoCRM.modules.READ." if "scope" in _zm.lower() else f"Couldn't reach Zoho: {_zm}")
+                        "Tick 'Connect / reconnect Zoho (admin)' just above, and make a new one using the scope ZohoCRM.modules.READ." if "scope" in _zm.lower() else f"Couldn't reach Zoho: {_zm}")
             if st.session_state.get("_zoho_msg"):
                 st.caption(st.session_state["_zoho_msg"])
             _zres = st.session_state.get("_zoho_results") or []
@@ -6556,68 +6629,7 @@ with tab7:
 
         # ── TAB 6: Security ───────────────────────────────────────────────────
         with panel_tabs[9]:
-            st.markdown("**Zoho connection** - makes a refresh token for the 'Pull customer from Zoho' feature")
-            _zdc_opts = ["eu", "com", "in", "com.au", "jp"]
-            _zdc = st.selectbox("Zoho data centre", _zdc_opts, index=_zdc_opts.index(_zoho_dc()) if _zoho_dc() in _zdc_opts else 0,
-                                key="_zt_dc", help="You use the EU one (accounts.zoho.eu).")
-            st.markdown("**1. In the Zoho API Console (api-console.zoho." + _zdc + ") - Self Client - Generate Code, use this scope:**")
-            st.code("ZohoCRM.modules.READ", language=None)
-            st.caption("Read-only: the app can look up accounts and contacts but can never change anything in Zoho. "
-                       "Set the time duration to 10 minutes - the code only works once and expires quickly.")
-            _zcid = st.text_input("Client ID", value=_secret("ZOHO_CLIENT_ID"), key="_zt_cid")
-            _zcs  = st.text_input("Client Secret", value="", type="password", key="_zt_cs",
-                                  placeholder="(already in Secrets)" if _secret("ZOHO_CLIENT_SECRET") else "paste the client secret")
-            st.markdown("**2. Paste the code Zoho gives you:**")
-            _zcode = st.text_input("Grant code", key="_zt_code", placeholder="1000.xxxxxxxx.xxxxxxxx")
-            if st.button("Create refresh token", type="primary", key="_zt_make"):
-                _use_cs = _zcs or _secret("ZOHO_CLIENT_SECRET")
-                if not (_zcid and _use_cs and _zcode.strip()):
-                    st.error("Fill in the Client ID, Client Secret and the grant code first.")
-                else:
-                    try:
-                        _zr = _req.post(f"https://accounts.zoho.{_zdc}/oauth/v2/token", timeout=20, data={
-                            "grant_type": "authorization_code", "client_id": _zcid.strip(),
-                            "client_secret": _use_cs.strip(), "code": _zcode.strip()})
-                        _zj = _zr.json()
-                        if _zj.get("refresh_token"):
-                            st.session_state["_zt_result"] = {"rt": _zj["refresh_token"], "cid": _zcid.strip(),
-                                                              "cs": _use_cs.strip(), "dc": _zdc}
-                        else:
-                            st.session_state["_zt_result"] = None
-                            st.error(f"Zoho said: {_zj.get('error', _zr.status_code)} - the code is probably used or expired. "
-                                     "Generate a fresh one and paste it straight away.")
-                    except Exception as _zte:
-                        st.error(f"Couldn't reach Zoho: {_zte}")
-            _ztr = st.session_state.get("_zt_result")
-            if _ztr:
-                st.success("Refresh token created. Copy it into the app's Secrets as ZOHO_REFRESH_TOKEN:")
-                st.code(_ztr["rt"], language=None)
-                st.code('ZOHO_CLIENT_ID = "' + _ztr["cid"] + '"\nZOHO_CLIENT_SECRET = "(your client secret)"\n'
-                        'ZOHO_REFRESH_TOKEN = "' + _ztr["rt"] + '"' + ('\nZOHO_DC = "' + _ztr["dc"] + '"' if _ztr["dc"] != "eu" else ""),
-                        language="toml")
-                _zb1, _zb2 = st.columns(2)
-                with _zb1:
-                    if st.button("Use it now (this session only)", key="_zt_use"):
-                        st.session_state["_zoho_over"] = {"ZOHO_CLIENT_ID": _ztr["cid"], "ZOHO_CLIENT_SECRET": _ztr["cs"],
-                                                          "ZOHO_REFRESH_TOKEN": _ztr["rt"], "ZOHO_DC": _ztr["dc"]}
-                        st.session_state.pop("_zoho_tok", None)
-                        st.session_state["_zt_used"] = True
-                        st.rerun()
-                    if st.session_state.get("_zt_used"):
-                        st.success("Active for this session - try 'Pull customer from Zoho' in the left panel.")
-                with _zb2:
-                    st.caption("To keep it for everyone, paste the lines above into Streamlit -> Settings -> Secrets and save.")
-            st.markdown("---")
-            if st.button("Test the current Zoho connection", key="_zt_test"):
-                if not _zoho_configured():
-                    st.warning("Not connected yet - no refresh token in Secrets or created above.")
-                else:
-                    try:
-                        st.session_state.pop("_zoho_tok", None)
-                        _zoho_token()
-                        st.success("Connected to Zoho - sign-in works.")
-                    except Exception as _zte:
-                        st.error(str(_zte))
+            _zoho_setup_ui("_zt")
 
         with panel_tabs[8]:
             st.markdown("**Change Admin Password**")
