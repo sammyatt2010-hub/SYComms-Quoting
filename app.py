@@ -997,9 +997,12 @@ def _zoho_token():
     r = _req.post(f"https://accounts.zoho.{_zoho_dc()}/oauth/v2/token", timeout=15, data={
         "grant_type": "refresh_token", "client_id": _zsec("ZOHO_CLIENT_ID"),
         "client_secret": _zsec("ZOHO_CLIENT_SECRET"), "refresh_token": _zsec("ZOHO_REFRESH_TOKEN")})
-    j = r.json()
+    try:
+        j = r.json()
+    except Exception:
+        raise RuntimeError(f"Zoho sign-in gave an unexpected reply (status {r.status_code}, from accounts.zoho.{_zoho_dc()}): {r.text[:120]!r}")
     if "access_token" not in j:
-        raise RuntimeError(f"Zoho sign-in failed ({j.get('error', r.status_code)})")
+        raise RuntimeError(f"Zoho sign-in failed ({j.get('error', r.status_code)}) - the refresh token or client details may be wrong")
     st.session_state["_zoho_tok"] = (j["access_token"], _time.time() + 3000)
     return j["access_token"]
 
@@ -1008,14 +1011,17 @@ def _zoho_get(path, params=None):
                  headers={"Authorization": f"Zoho-oauthtoken {_zoho_token()}"})
     if r.status_code == 204 or not r.content:
         return {}
-    return r.json()
+    try:
+        return r.json()
+    except Exception:
+        raise RuntimeError(f"Zoho gave an unexpected reply (status {r.status_code}, from zohoapis.{_zoho_dc()}): {r.text[:120]!r}")
 
 def zoho_search_accounts(text):
     """Accounts whose name matches the text -> list of dicts (empty list if none)."""
     reg = _secret("ZOHO_REG_FIELD")
     fields = ["Account_Name", "Phone", "Website", "Employees", "Billing_Street", "Billing_City",
               "Billing_State", "Billing_Code", "Billing_Country"] + ([reg] if reg else [])
-    j = _zoho_get("Accounts/search", {"word": text, "per_page": 10, "fields": ",".join(fields)})
+    j = _zoho_get("Accounts/search", {"word": text, "per_page": 10})
     if j.get("code") and "data" not in j:
         raise RuntimeError(f"Zoho: {j.get('message') or j.get('code')}")
     return j.get("data", []) or []
