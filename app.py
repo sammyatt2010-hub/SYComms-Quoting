@@ -3,6 +3,7 @@ import pandas as pd
 import math
 import os
 import json
+import re
 import hashlib
 import hmac
 import html as html_lib
@@ -972,6 +973,117 @@ if "_pending_termination" in st.session_state:
         st.session_state["q_term_lease"]    = round(float(_pt), 2)
         st.session_state["q_term_services"] = 0.0
 
+# ─── ZOHO CRM: look up a customer and fill in the basics (read-only) ──────────
+# Secrets needed (Streamlit -> Settings -> Secrets):
+#   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN   (EU data centre unless ZOHO_DC is set)
+#   Optional: ZOHO_REG_FIELD = API name of the Companies House number field on the Account
+import time as _time
+
+def _zsec(key):
+    """Zoho setting: a value pasted into the Admin -> Zoho tab this session wins over Streamlit Secrets."""
+    return (st.session_state.get("_zoho_over", {}) or {}).get(key) or _secret(key)
+
+def _zoho_dc():
+    return (_zsec("ZOHO_DC") or "eu").strip().lower()
+
+def _zoho_configured():
+    return bool(_zsec("ZOHO_CLIENT_ID") and _zsec("ZOHO_CLIENT_SECRET") and _zsec("ZOHO_REFRESH_TOKEN"))
+
+def _zoho_token():
+    """Short-lived access token from the refresh token (cached for ~50 minutes)."""
+    tok = st.session_state.get("_zoho_tok")
+    if tok and tok[1] > _time.time():
+        return tok[0]
+    r = _req.post(f"https://accounts.zoho.{_zoho_dc()}/oauth/v2/token", timeout=15, data={
+        "grant_type": "refresh_token", "client_id": _zsec("ZOHO_CLIENT_ID"),
+        "client_secret": _zsec("ZOHO_CLIENT_SECRET"), "refresh_token": _zsec("ZOHO_REFRESH_TOKEN")})
+    j = r.json()
+    if "access_token" not in j:
+        raise RuntimeError(f"Zoho sign-in failed ({j.get('error', r.status_code)})")
+    st.session_state["_zoho_tok"] = (j["access_token"], _time.time() + 3000)
+    return j["access_token"]
+
+def _zoho_get(path, params=None):
+    r = _req.get(f"https://www.zohoapis.{_zoho_dc()}/crm/v6/{path}", timeout=20, params=params or {},
+                 headers={"Authorization": f"Zoho-oauthtoken {_zoho_token()}"})
+    if r.status_code == 204 or not r.content:
+        return {}
+    return r.json()
+
+def zoho_search_accounts(text):
+    """Accounts whose name matches the text -> list of dicts (empty list if none)."""
+    reg = _secret("ZOHO_REG_FIELD")
+    fields = ["Account_Name", "Phone", "Website", "Employees", "Billing_Street", "Billing_City",
+              "Billing_State", "Billing_Code", "Billing_Country"] + ([reg] if reg else [])
+    j = _zoho_get("Accounts/search", {"word": text, "per_page": 10, "fields": ",".join(fields)})
+    if j.get("code") and "data" not in j:
+        raise RuntimeError(f"Zoho: {j.get('message') or j.get('code')}")
+    return j.get("data", []) or []
+
+def zoho_load_account(account_id):
+    """Full Account record + its contacts. The account's own 'main contact' fields (if it has any) come first."""
+    j = _zoho_get(f"Accounts/{account_id}")
+    rec = (j.get("data") or [{}])[0]
+    contacts = []
+    # Main contact held on the account page itself (custom fields - found by name)
+    def _find(*pats, need_at=False):
+        for k, v in rec.items():
+            kl = k.lower()
+            if isinstance(v, (str, int, float)) and str(v).strip() and all(re.search(pt, kl) for pt in pats):
+                if need_at and "@" not in str(v): continue
+                return str(v).strip()
+        return ""
+    _mn, _me, _mp = _find("contact", "name"), _find("contact", "mail", need_at=True), _find("contact", "phone|mobile|number|tel")
+    if _mn or _me:
+        contacts.append({"Full_Name": _mn, "Email": _me, "Phone": _mp, "Title": "", "_src": "Account"})
+    try:
+        cj = _zoho_get(f"Accounts/{account_id}/Contacts", {"fields": "First_Name,Last_Name,Email,Title,Phone,Mobile", "per_page": 20})
+        for c in (cj.get("data") or []):
+            nm = f"{c.get('First_Name') or ''} {c.get('Last_Name') or ''}".strip()
+            contacts.append({"Full_Name": nm, "Email": c.get("Email") or "", "Phone": c.get("Phone") or c.get("Mobile") or "",
+                             "Title": c.get("Title") or "", "_src": "Contact"})
+    except Exception:
+        pass
+    return rec, contacts
+
+def _zoho_fill_values(acct, contact):
+    """Map a Zoho Account (+ optional contact) onto the quote's customer fields. Only non-empty values."""
+    street = [str(acct.get(k) or "").strip() for k in ("Billing_Street", "Billing_City", "Billing_State", "Billing_Code")]
+    out = {
+        "q_comp_name": str(acct.get("Account_Name") or "").strip(),
+        "q_phone":     str(acct.get("Phone") or "").strip(),
+        "q_address":   "\n".join(x for x in street if x),
+    }
+    try:
+        emp = int(float(acct.get("Employees") or 0))
+        if emp >= 1: out["q_employees"] = emp
+    except Exception:
+        pass
+    def _find(*pats, need_at=False):
+        for k, v in acct.items():
+            kl = k.lower()
+            if isinstance(v, (str, int, float)) and str(v).strip() and all(re.search(pt, kl) for pt in pats):
+                if need_at and "@" not in str(v): continue
+                return str(v).strip()
+        return ""
+    bill = (acct.get(_secret("ZOHO_BILLING_EMAIL_FIELD")) if _secret("ZOHO_BILLING_EMAIL_FIELD") else "") \
+           or _find("bill", "mail", need_at=True)
+    if bill: out["q_bill_email"] = str(bill).strip()
+    reg = acct.get(_secret("ZOHO_REG_FIELD")) if _secret("ZOHO_REG_FIELD") else ""
+    reg = reg or _find("companies.?house|company.?(no|num|reg)|reg.?(no|num)")
+    if reg: out["q_comp_reg"] = str(reg).strip()
+    if contact:
+        nm, ttl = str(contact.get("Full_Name") or "").strip(), str(contact.get("Title") or "").strip()
+        if nm: out["q_contact"] = f"{nm} - {ttl}" if ttl else nm
+        if contact.get("Email"): out["q_dir_email"] = str(contact["Email"]).strip()
+        if not out.get("q_phone") and contact.get("Phone"): out["q_phone"] = str(contact["Phone"]).strip()
+    return {k: v for k, v in out.items() if v not in ("", None)}
+
+# Apply a pending "fill from Zoho" before the customer widgets are drawn
+if "_zoho_fill" in st.session_state:
+    for _k, _v in st.session_state.pop("_zoho_fill").items():
+        st.session_state[_k] = _v
+
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -988,6 +1100,50 @@ with st.sidebar:
         help="Sets commission rate per unit for this deal"
     )
     _appt_rate = APPT_RATES[appt_type]
+    st.markdown("---")
+    with st.expander("🔎 Pull customer from Zoho", expanded=False):
+        if not _zoho_configured():
+            st.caption("Zoho isn't connected yet - add ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET and ZOHO_REFRESH_TOKEN to the app's Secrets.")
+        else:
+            _zq = st.text_input("Company name", key="_zoho_q", placeholder="Start of the company name")
+            if st.button("Search Zoho", key="_zoho_search", use_container_width=True) and _zq.strip():
+                try:
+                    st.session_state["_zoho_results"] = zoho_search_accounts(_zq.strip())
+                    st.session_state["_zoho_msg"] = "" if st.session_state["_zoho_results"] else "No matching accounts found."
+                except Exception as _ze:
+                    st.session_state["_zoho_results"] = []
+                    st.session_state["_zoho_msg"] = f"Couldn't reach Zoho: {_ze}"
+            if st.session_state.get("_zoho_msg"):
+                st.caption(st.session_state["_zoho_msg"])
+            _zres = st.session_state.get("_zoho_results") or []
+            if _zres:
+                _zi = st.selectbox("Matches", range(len(_zres)), key="_zoho_pick",
+                                   format_func=lambda i: f"{_zres[i].get('Account_Name', '?')}"
+                                                         + (f" - {_zres[i].get('Billing_City')}" if _zres[i].get("Billing_City") else ""))
+                _za = _zres[_zi]
+                _cache = st.session_state.setdefault("_zoho_cache", {})
+                if _za["id"] not in _cache:
+                    try:
+                        _cache[_za["id"]] = zoho_load_account(_za["id"])
+                    except Exception as _ze:
+                        _cache[_za["id"]] = (dict(_za), [])
+                        st.caption(f"Couldn't load the full account: {_ze}")
+                _zrec, _zcons = _cache[_za["id"]]
+                _zc = None
+                if _zcons:
+                    _ci = st.selectbox("Contact", range(len(_zcons)), key="_zoho_contact",
+                                       format_func=lambda i: " - ".join(x for x in [_zcons[i].get("Full_Name") or "(no name)",
+                                                                                   _zcons[i].get("Email") or ""] if x))
+                    _zc = _zcons[_ci]
+                else:
+                    st.caption("No contact found on this account.")
+                if st.button("Fill the quote from this account", key="_zoho_fill_btn", type="primary", use_container_width=True):
+                    st.session_state["_zoho_fill"] = _zoho_fill_values(_zrec, _zc)
+                    st.session_state["_zoho_msg"] = f"Filled from {_za.get('Account_Name', 'Zoho')} - check the details below."
+                    st.rerun()
+                if st.checkbox("Show what Zoho holds for this account", key="_zoho_debug"):
+                    st.caption("\n".join(f"{k}: {str(v)[:60]}" for k, v in _zrec.items()
+                                          if isinstance(v, (str, int, float)) and str(v).strip())[:3000])
     st.markdown("---")
     st.markdown("### 🏢 Customer Details")
     comp_name       = st.text_input("Company Name", placeholder="Acme Ltd", key="q_comp_name")
@@ -5838,7 +5994,7 @@ with tab7:
         with info_col:
             st.markdown('<span class="override-badge">🔓 Admin Unlocked</span>', unsafe_allow_html=True)
 
-        panel_tabs = st.tabs(["📋 Per-Deal Overrides", "🖥️ Hardware", "💳 Service Pricing", "🌐 Broadband & Rates", "💰 Costs & Fees", "🎨 Branding", "📧 Email", "📸 Images", "🔒 Security"])
+        panel_tabs = st.tabs(["📋 Per-Deal Overrides", "🖥️ Hardware", "💳 Service Pricing", "🌐 Broadband & Rates", "💰 Costs & Fees", "🎨 Branding", "📧 Email", "📸 Images", "🔒 Security", "🔗 Zoho"])
 
         # ── TAB 1: Per-Deal Overrides (existing functionality) ────────────────
         with panel_tabs[0]:
@@ -6395,6 +6551,70 @@ with tab7:
                     st.rerun()
 
         # ── TAB 6: Security ───────────────────────────────────────────────────
+        with panel_tabs[9]:
+            st.markdown("**Zoho connection** - makes a refresh token for the 'Pull customer from Zoho' feature")
+            _zdc_opts = ["eu", "com", "in", "com.au", "jp"]
+            _zdc = st.selectbox("Zoho data centre", _zdc_opts, index=_zdc_opts.index(_zoho_dc()) if _zoho_dc() in _zdc_opts else 0,
+                                key="_zt_dc", help="You use the EU one (accounts.zoho.eu).")
+            st.markdown("**1. In the Zoho API Console (api-console.zoho." + _zdc + ") - Self Client - Generate Code, use this scope:**")
+            st.code("ZohoCRM.modules.READ", language=None)
+            st.caption("Read-only: the app can look up accounts and contacts but can never change anything in Zoho. "
+                       "Set the time duration to 10 minutes - the code only works once and expires quickly.")
+            _zcid = st.text_input("Client ID", value=_secret("ZOHO_CLIENT_ID"), key="_zt_cid")
+            _zcs  = st.text_input("Client Secret", value="", type="password", key="_zt_cs",
+                                  placeholder="(already in Secrets)" if _secret("ZOHO_CLIENT_SECRET") else "paste the client secret")
+            st.markdown("**2. Paste the code Zoho gives you:**")
+            _zcode = st.text_input("Grant code", key="_zt_code", placeholder="1000.xxxxxxxx.xxxxxxxx")
+            if st.button("Create refresh token", type="primary", key="_zt_make"):
+                _use_cs = _zcs or _secret("ZOHO_CLIENT_SECRET")
+                if not (_zcid and _use_cs and _zcode.strip()):
+                    st.error("Fill in the Client ID, Client Secret and the grant code first.")
+                else:
+                    try:
+                        _zr = _req.post(f"https://accounts.zoho.{_zdc}/oauth/v2/token", timeout=20, data={
+                            "grant_type": "authorization_code", "client_id": _zcid.strip(),
+                            "client_secret": _use_cs.strip(), "code": _zcode.strip()})
+                        _zj = _zr.json()
+                        if _zj.get("refresh_token"):
+                            st.session_state["_zt_result"] = {"rt": _zj["refresh_token"], "cid": _zcid.strip(),
+                                                              "cs": _use_cs.strip(), "dc": _zdc}
+                        else:
+                            st.session_state["_zt_result"] = None
+                            st.error(f"Zoho said: {_zj.get('error', _zr.status_code)} - the code is probably used or expired. "
+                                     "Generate a fresh one and paste it straight away.")
+                    except Exception as _zte:
+                        st.error(f"Couldn't reach Zoho: {_zte}")
+            _ztr = st.session_state.get("_zt_result")
+            if _ztr:
+                st.success("Refresh token created. Copy it into the app's Secrets as ZOHO_REFRESH_TOKEN:")
+                st.code(_ztr["rt"], language=None)
+                st.code('ZOHO_CLIENT_ID = "' + _ztr["cid"] + '"\nZOHO_CLIENT_SECRET = "(your client secret)"\n'
+                        'ZOHO_REFRESH_TOKEN = "' + _ztr["rt"] + '"' + ('\nZOHO_DC = "' + _ztr["dc"] + '"' if _ztr["dc"] != "eu" else ""),
+                        language="toml")
+                _zb1, _zb2 = st.columns(2)
+                with _zb1:
+                    if st.button("Use it now (this session only)", key="_zt_use"):
+                        st.session_state["_zoho_over"] = {"ZOHO_CLIENT_ID": _ztr["cid"], "ZOHO_CLIENT_SECRET": _ztr["cs"],
+                                                          "ZOHO_REFRESH_TOKEN": _ztr["rt"], "ZOHO_DC": _ztr["dc"]}
+                        st.session_state.pop("_zoho_tok", None)
+                        st.session_state["_zt_used"] = True
+                        st.rerun()
+                    if st.session_state.get("_zt_used"):
+                        st.success("Active for this session - try 'Pull customer from Zoho' in the left panel.")
+                with _zb2:
+                    st.caption("To keep it for everyone, paste the lines above into Streamlit -> Settings -> Secrets and save.")
+            st.markdown("---")
+            if st.button("Test the current Zoho connection", key="_zt_test"):
+                if not _zoho_configured():
+                    st.warning("Not connected yet - no refresh token in Secrets or created above.")
+                else:
+                    try:
+                        st.session_state.pop("_zoho_tok", None)
+                        _zoho_token()
+                        st.success("Connected to Zoho - sign-in works.")
+                    except Exception as _zte:
+                        st.error(str(_zte))
+
         with panel_tabs[8]:
             st.markdown("**Change Admin Password**")
             pw1 = st.text_input("New password", type="password", key="new_pw1")
