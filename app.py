@@ -1114,11 +1114,20 @@ def _contract_is_live_monthly(c):
     except Exception:
         return True
 
+def _contract_months_left(c):
+    """Whole months from today to the contract end date (0 if none / already ended)."""
+    import datetime as _dt
+    try:
+        d = _dt.date.fromisoformat((c.get("end") or "")[:10])
+    except Exception:
+        return 0
+    return max(0, int(round((d - _dt.date.today()).days / 30.4375)))
+
 def _contract_amt(c):
     try: return float(re.sub(r"[^0-9.\-]", "", str(c.get("amount") or "")) or 0)
     except Exception: return 0.0
 
-def _zoho_fill_values(acct, contact, contract_rental=0.0):
+def _zoho_fill_values(acct, contact, contract_rental=0.0, contract_settle=0.0):
     """Map a Zoho Account (+ optional contact) onto the quote's customer fields. Only non-empty values."""
     street = [str(acct.get(k) or "").strip() for k in ("Billing_Street", "Billing_City", "Billing_State", "Billing_Code")]
     out = {
@@ -1152,6 +1161,7 @@ def _zoho_fill_values(acct, contact, contract_rental=0.0):
     elif contract_rental and contract_rental > 0: out["q_curr_system"] = round(float(contract_rental), 2)
     _st = _by_name(["settlement", "settlementfigure", "settlementamount"], r"^settlement", r"date|status|requested")
     if _st > 0: out["q_term_lease"] = round(_st, 2)
+    elif contract_settle and contract_settle > 0: out["q_term_lease"] = round(float(contract_settle), 2)
     def _find(*pats, need_at=False):
         for k, v in acct.items():
             kl = k.lower()
@@ -1435,16 +1445,20 @@ with st.sidebar:
                     except Exception as _zce:
                         _zcc[_za["id"]] = ([], f"error: {_zce}")
                 _zcl, _zcn = _zcc[_za["id"]]
-                _zrent = 0.0
+                _zrent = 0.0; _zsettle = 0.0
                 if _zcl:
                     _live = [i for i, c in enumerate(_zcl) if _contract_is_live_monthly(c)]
                     st.caption("Legal contracts on this account:")
                     _zsel = st.multiselect("Count as current phone-system rental (£/mo)", range(len(_zcl)), default=_live, key="_zoho_cpick",
                                            format_func=lambda i: f"{_zcl[i]['name'] or 'Contract'} - £{_contract_amt(_zcl[i]):,.2f} {_zcl[i]['period'] or ''} (ends {_zcl[i]['end'] or '?'})")
                     _zrent = sum(_contract_amt(_zcl[i]) for i in _zsel)
+                    _zsettle = sum(_contract_amt(_zcl[i]) * _contract_months_left(_zcl[i]) for i in _zsel)
                     st.caption(f"Rental from contracts: £{_zrent:,.2f}/mo (only used if the account page itself has no Monthly Rental)")
+                    if _zsettle > 0:
+                        st.caption(f"Estimated settlement: £{_zsettle:,.2f} = monthly amount x months left to the end date "
+                                   "(only used if the account page has no Settlement figure - you can edit it afterwards)")
                 if st.button("Fill the quote from this account", key="_zoho_fill_btn", type="primary", use_container_width=True):
-                    st.session_state["_zoho_fill"] = _zoho_fill_values(_zrec, _zc, _zrent)
+                    st.session_state["_zoho_fill"] = _zoho_fill_values(_zrec, _zc, _zrent, _zsettle)
                     _zf = st.session_state["_zoho_fill"]
                     _zx = [n for k, n in (("q_employees", "system users"), ("q_curr_system", "monthly rental"), ("q_term_lease", "settlement")) if k in _zf]
                     st.session_state["_zoho_msg"] = (f"Filled from {_za.get('Account_Name', 'Zoho')}"
