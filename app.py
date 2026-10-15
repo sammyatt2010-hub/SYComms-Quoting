@@ -1070,6 +1070,26 @@ def _zoho_fill_values(acct, contact):
         if emp >= 1: out["q_employees"] = emp
     except Exception:
         pass
+    # Extra account fields (found by name, ignoring spaces / underscores / capitals)
+    def _num(v):
+        try:
+            return float(re.sub(r"[^0-9.\-]", "", str(v)) or 0)
+        except Exception:
+            return 0.0
+    def _by_name(exact, fallback=None, skip=None):
+        norm = {re.sub(r"[^a-z0-9]", "", k.lower()): v for k, v in acct.items() if isinstance(v, (str, int, float))}
+        for e in exact:
+            if e in norm and _num(norm[e]) > 0: return _num(norm[e])
+        if fallback:
+            for k, v in norm.items():
+                if re.search(fallback, k) and not (skip and re.search(skip, k)) and _num(v) > 0: return _num(v)
+        return 0.0
+    _su = _by_name(["noofsystemusers", "numberofsystemusers", "systemusers"], r"system.?users|no.?of.?users")
+    if _su >= 1: out["q_employees"] = int(round(_su))
+    _mr = _by_name(["monthlyrental"], r"monthly.?rent")
+    if _mr > 0: out["q_curr_system"] = round(_mr, 2)
+    _st = _by_name(["settlement", "settlementfigure", "settlementamount"], r"^settlement", r"date|status|requested")
+    if _st > 0: out["q_term_lease"] = round(_st, 2)
     def _find(*pats, need_at=False):
         for k, v in acct.items():
             kl = k.lower()
@@ -1242,7 +1262,10 @@ with st.sidebar:
                     st.caption("No contact found on this account.")
                 if st.button("Fill the quote from this account", key="_zoho_fill_btn", type="primary", use_container_width=True):
                     st.session_state["_zoho_fill"] = _zoho_fill_values(_zrec, _zc)
-                    st.session_state["_zoho_msg"] = f"Filled from {_za.get('Account_Name', 'Zoho')} - check the details below."
+                    _zf = st.session_state["_zoho_fill"]
+                    _zx = [n for k, n in (("q_employees", "system users"), ("q_curr_system", "monthly rental"), ("q_term_lease", "settlement")) if k in _zf]
+                    st.session_state["_zoho_msg"] = (f"Filled from {_za.get('Account_Name', 'Zoho')}"
+                                                     + (f" (incl. {', '.join(_zx)})" if _zx else "") + " - check the details below.")
                     st.rerun()
                 if st.checkbox("Show what Zoho holds for this account", key="_zoho_debug"):
                     st.caption("\n".join(f"{k}: {str(v)[:60]}" for k, v in _zrec.items()
