@@ -1057,7 +1057,68 @@ def zoho_load_account(account_id):
         pass
     return rec, contacts
 
-def _zoho_fill_values(acct, contact):
+def zoho_load_contracts(account_id):
+    """Legal Contracts (custom module) linked to the account -> (list of dicts, note for the debug view)."""
+    notes, mod = [], "CustomModule4"
+    fmap = {}
+    try:   # find the field names by their on-screen labels (needs the settings scope)
+        fj = _zoho_get("settings/fields", {"module": mod})
+        for f in (fj.get("fields") or []):
+            lab = (f.get("field_label") or "").lower(); api = f.get("api_name")
+            if not api: continue
+            for key, pat in (("name", r"contract.?name|^name$"), ("amount", r"^amount|value"), ("period", r"billing.?period"),
+                             ("end", r"end.?date"), ("type", r"^type")):
+                if key not in fmap and re.search(pat, lab): fmap[key] = api
+        if not fmap: notes.append("couldn't read field names (" + str(fj.get("code") or "empty") + ")")
+    except Exception as e:
+        notes.append(f"field lookup: {e}")
+    guess = {"name": "Name", "amount": "Amount", "period": "Billing_Period", "end": "End_Date", "type": "Type"}
+    cand_rel = []
+    try:
+        rj = _zoho_get("settings/related_lists", {"module": "Accounts"})
+        for r in (rj.get("related_lists") or []):
+            mm = r.get("module") or {}
+            if (mm.get("api_name") == mod) or re.search(r"legal.?contract", str(r.get("display_label") or r.get("name") or ""), re.I):
+                cand_rel.append(r.get("api_name"))
+    except Exception as e:
+        notes.append(f"related list lookup: {e}")
+    cand_rel += [x for x in (mod, "Legal_Contracts") if x not in cand_rel]
+    for rel in [c for c in cand_rel if c]:
+        for fl in (list((fmap or guess).values()), [(fmap or guess).get("name", "Name")]):
+            try:
+                j = _zoho_get(f"Accounts/{account_id}/{rel}", {"fields": ",".join(fl), "per_page": 50})
+            except Exception as e:
+                notes.append(f"{rel}: {e}"); continue
+            if "data" in j or not j:
+                rows = []
+                fm = fmap or guess
+                for rec in (j.get("data") or []):
+                    rows.append({"name": str(rec.get(fm.get("name", "Name")) or ""), "amount": rec.get(fm.get("amount", "Amount")),
+                                 "period": str(rec.get(fm.get("period", "Billing_Period")) or ""),
+                                 "end": str(rec.get(fm.get("end", "End_Date")) or ""), "type": str(rec.get(fm.get("type", "Type")) or "")})
+                notes.append(f"read via {rel}, {len(rows)} contract(s)")
+                return rows, "; ".join(notes)
+            notes.append(f"{rel}: {j.get('code') or j.get('message') or 'no data'}")
+    return [], "; ".join(notes)
+
+def _contract_is_live_monthly(c):
+    import datetime as _dt
+    if "month" not in (c.get("period") or "").lower(): return False
+    try:
+        if float(re.sub(r"[^0-9.\-]", "", str(c.get("amount") or "")) or 0) <= 0: return False
+    except Exception:
+        return False
+    e = c.get("end") or ""
+    try:
+        return _dt.date.fromisoformat(e[:10]) >= _dt.date.today() if e else True
+    except Exception:
+        return True
+
+def _contract_amt(c):
+    try: return float(re.sub(r"[^0-9.\-]", "", str(c.get("amount") or "")) or 0)
+    except Exception: return 0.0
+
+def _zoho_fill_values(acct, contact, contract_rental=0.0):
     """Map a Zoho Account (+ optional contact) onto the quote's customer fields. Only non-empty values."""
     street = [str(acct.get(k) or "").strip() for k in ("Billing_Street", "Billing_City", "Billing_State", "Billing_Code")]
     out = {
@@ -1088,6 +1149,7 @@ def _zoho_fill_values(acct, contact):
     if _su >= 1: out["q_employees"] = int(round(_su))
     _mr = _by_name(["monthlyrental"], r"monthly.?rent")
     if _mr > 0: out["q_curr_system"] = round(_mr, 2)
+    elif contract_rental and contract_rental > 0: out["q_curr_system"] = round(float(contract_rental), 2)
     _st = _by_name(["settlement", "settlementfigure", "settlementamount"], r"^settlement", r"date|status|requested")
     if _st > 0: out["q_term_lease"] = round(_st, 2)
     def _find(*pats, need_at=False):
@@ -1116,8 +1178,8 @@ def _zoho_setup_ui(kp="_zt"):
     _zdc = st.selectbox("Zoho data centre", _zdc_opts, index=_zdc_opts.index(_zoho_dc()) if _zoho_dc() in _zdc_opts else 0,
                         key=f"{kp}_dc", help="You use the EU one (accounts.zoho.eu).")
     st.markdown("**1. In the Zoho API Console (api-console.zoho." + _zdc + ") - Self Client - Generate Code, use this scope:**")
-    st.code("ZohoCRM.modules.READ", language=None)
-    st.caption("Read-only: the app can look up accounts and contacts but can never change anything in Zoho. "
+    st.code("ZohoCRM.modules.READ,ZohoCRM.settings.READ", language=None)
+    st.caption("Read-only: the app can look up accounts, contacts and contracts but can never change anything in Zoho. "
                "Set the time duration to 10 minutes - the code only works once and expires quickly.")
     _zcid = st.text_input("Client ID", value=_secret("ZOHO_CLIENT_ID"), key=f"{kp}_cid")
     _zcs  = st.text_input("Client Secret", value="", type="password", key=f"{kp}_cs",
@@ -1341,7 +1403,7 @@ with st.sidebar:
                     _zm = str(_ze)
                     st.session_state["_zoho_msg"] = (
                         "Zoho connected, but this refresh token doesn't have permission to read Accounts (it was made with a different scope). "
-                        "Tick 'Connect / reconnect Zoho (admin)' just above, and make a new one using the scope ZohoCRM.modules.READ." if "scope" in _zm.lower() else f"Couldn't reach Zoho: {_zm}")
+                        "Tick 'Connect / reconnect Zoho (admin)' just above, and make a new one using the scope ZohoCRM.modules.READ,ZohoCRM.settings.READ." if "scope" in _zm.lower() else f"Couldn't reach Zoho: {_zm}")
             if st.session_state.get("_zoho_msg"):
                 st.caption(st.session_state["_zoho_msg"])
             _zres = st.session_state.get("_zoho_results") or []
@@ -1366,14 +1428,30 @@ with st.sidebar:
                     _zc = _zcons[_ci]
                 else:
                     st.caption("No contact found on this account.")
+                _zcc = st.session_state.setdefault("_zoho_contracts", {})
+                if _za["id"] not in _zcc:
+                    try:
+                        _zcc[_za["id"]] = zoho_load_contracts(_za["id"])
+                    except Exception as _zce:
+                        _zcc[_za["id"]] = ([], f"error: {_zce}")
+                _zcl, _zcn = _zcc[_za["id"]]
+                _zrent = 0.0
+                if _zcl:
+                    _live = [i for i, c in enumerate(_zcl) if _contract_is_live_monthly(c)]
+                    st.caption("Legal contracts on this account:")
+                    _zsel = st.multiselect("Count as current phone-system rental (£/mo)", range(len(_zcl)), default=_live, key="_zoho_cpick",
+                                           format_func=lambda i: f"{_zcl[i]['name'] or 'Contract'} - £{_contract_amt(_zcl[i]):,.2f} {_zcl[i]['period'] or ''} (ends {_zcl[i]['end'] or '?'})")
+                    _zrent = sum(_contract_amt(_zcl[i]) for i in _zsel)
+                    st.caption(f"Rental from contracts: £{_zrent:,.2f}/mo (only used if the account page itself has no Monthly Rental)")
                 if st.button("Fill the quote from this account", key="_zoho_fill_btn", type="primary", use_container_width=True):
-                    st.session_state["_zoho_fill"] = _zoho_fill_values(_zrec, _zc)
+                    st.session_state["_zoho_fill"] = _zoho_fill_values(_zrec, _zc, _zrent)
                     _zf = st.session_state["_zoho_fill"]
                     _zx = [n for k, n in (("q_employees", "system users"), ("q_curr_system", "monthly rental"), ("q_term_lease", "settlement")) if k in _zf]
                     st.session_state["_zoho_msg"] = (f"Filled from {_za.get('Account_Name', 'Zoho')}"
                                                      + (f" (incl. {', '.join(_zx)})" if _zx else "") + " - check the details below.")
                     st.rerun()
                 if st.checkbox("Show what Zoho holds for this account", key="_zoho_debug"):
+                    st.caption("Contracts lookup: " + (_zcn or "-"))
                     st.caption("\n".join(f"{k}: {str(v)[:60]}" for k, v in _zrec.items()
                                           if isinstance(v, (str, int, float)) and str(v).strip())[:3000])
     with st.expander("🔍 Company credit check (internal)", expanded=False):
