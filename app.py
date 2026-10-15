@@ -1105,7 +1105,7 @@ def _zoho_fill_values(acct, contact):
     if reg: out["q_comp_reg"] = str(reg).strip()
     if contact:
         nm, ttl = str(contact.get("Full_Name") or "").strip(), str(contact.get("Title") or "").strip()
-        if nm: out["q_contact"] = f"{nm} - {ttl}" if ttl else nm
+        if nm: out["q_contact"] = f"{nm} - {ttl or 'Director'}"
         if contact.get("Email"): out["q_dir_email"] = str(contact["Email"]).strip()
         if not out.get("q_phone") and contact.get("Phone"): out["q_phone"] = str(contact["Phone"]).strip()
     return {k: v for k, v in out.items() if v not in ("", None)}
