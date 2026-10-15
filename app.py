@@ -1376,17 +1376,6 @@ with st.sidebar:
                 if st.checkbox("Show what Zoho holds for this account", key="_zoho_debug"):
                     st.caption("\n".join(f"{k}: {str(v)[:60]}" for k, v in _zrec.items()
                                           if isinstance(v, (str, int, float)) and str(v).strip())[:3000])
-    st.markdown("---")
-    st.markdown("### 🏢 Customer Details")
-    comp_name       = st.text_input("Company Name", placeholder="Acme Ltd", key="q_comp_name")
-    comp_reg        = st.text_input("Company Reg. No.", placeholder="12345678", key="q_comp_reg")
-    biz_type        = st.selectbox("Entity Type", ["Limited Company", "Sole Trader", "Partnership", "Other"], key="q_biz_type")
-    contact_name    = st.text_input("Signatory Name & Position", placeholder="Jane Smith - Director", key="q_contact")
-    company_phone   = st.text_input("Company Phone Number", key="q_phone")
-    director_email  = st.text_input("Director's Email", key="q_dir_email")
-    billing_email   = st.text_input("Billing Email", key="q_bill_email")
-    install_address = st.text_area("Installation Address", height=80, key="q_address")
-    num_employees   = st.number_input("No. of Employees", min_value=1, value=5, step=1, key="q_employees")
     with st.expander("🔍 Company credit check (internal)", expanded=False):
         st.caption("Public Companies House records only - indicative, not a credit score. Never shown to the customer or printed in the paperwork.")
         if not _secret("COMPANIES_HOUSE_KEY"):
@@ -1436,6 +1425,17 @@ with st.sidebar:
                             f"<ul style='margin:6px 0 4px 16px;padding:0'>{_lines}</ul></div>", unsafe_allow_html=True)
                 st.caption(" | ".join(_chr["facts"]))
                 st.markdown(f"**Suggested approach:** {_chr['advice']}")
+    st.markdown("---")
+    st.markdown("### 🏢 Customer Details")
+    comp_name       = st.text_input("Company Name", placeholder="Acme Ltd", key="q_comp_name")
+    comp_reg        = st.text_input("Company Reg. No.", placeholder="12345678", key="q_comp_reg")
+    biz_type        = st.selectbox("Entity Type", ["Limited Company", "Sole Trader", "Partnership", "Other"], key="q_biz_type")
+    contact_name    = st.text_input("Signatory Name & Position", placeholder="Jane Smith - Director", key="q_contact")
+    company_phone   = st.text_input("Company Phone Number", key="q_phone")
+    director_email  = st.text_input("Director's Email", key="q_dir_email")
+    billing_email   = st.text_input("Billing Email", key="q_bill_email")
+    install_address = st.text_area("Installation Address", height=80, key="q_address")
+    num_employees   = st.number_input("No. of Employees", min_value=1, value=5, step=1, key="q_employees")
 
     st.markdown("### 📋 Deal Configuration")
     # Deal type derived from payment model selection below
