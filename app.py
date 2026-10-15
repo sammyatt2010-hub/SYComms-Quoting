@@ -1194,6 +1194,112 @@ if "_zoho_fill" in st.session_state:
     for _k, _v in st.session_state.pop("_zoho_fill").items():
         st.session_state[_k] = _v
 
+# ─── COMPANIES HOUSE CREDIT CHECK (internal, read-only, public records) ───────
+def _ch_get(path, params=None):
+    key = _secret("COMPANIES_HOUSE_KEY")
+    if not key:
+        raise RuntimeError("COMPANIES_HOUSE_KEY isn't set in Streamlit Secrets yet.")
+    r = _req.get("https://api.company-information.service.gov.uk" + path, params=params or {}, auth=(key, ""), timeout=20)
+    if r.status_code == 404:
+        return None
+    if r.status_code in (401, 403):
+        raise RuntimeError("Companies House refused the key - check COMPANIES_HOUSE_KEY in Secrets.")
+    if r.status_code == 429:
+        raise RuntimeError("Companies House is rate-limiting us - wait a minute and try again.")
+    try:
+        return r.json()
+    except Exception:
+        raise RuntimeError(f"Companies House gave an unexpected reply (status {r.status_code}).")
+
+def ch_search(text):
+    j = _ch_get("/search/companies", {"q": text, "items_per_page": 8}) or {}
+    return [{"number": i.get("company_number", ""), "name": i.get("title", ""), "status": i.get("company_status", ""),
+             "address": i.get("address_snippet", ""), "created": i.get("date_of_creation", "")} for i in j.get("items", [])]
+
+def _ch_norm_number(s):
+    s = re.sub(r"\s", "", str(s or "")).upper()
+    return s.zfill(8) if s.isdigit() else s
+
+def ch_assess(number):
+    """Company profile + charges + officers -> {'level','headline','flags','facts'} (indicative only)."""
+    import datetime as _dt
+    n = _ch_norm_number(number)
+    prof = _ch_get(f"/company/{n}")
+    if not prof:
+        raise RuntimeError(f"No company found with number {n}.")
+    chg = _ch_get(f"/company/{n}/charges") or {}
+    off = _ch_get(f"/company/{n}/officers", {"items_per_page": 50}) or {}
+    today = _dt.date.today()
+    red, amber, good, facts = [], [], [], []
+    status = (prof.get("company_status") or "").lower()
+    detail = (prof.get("company_status_detail") or "").lower()
+    if status != "active":
+        red.append(f"Company status is '{status.replace('-', ' ')}'")
+    if "strike" in detail or "strike" in status:
+        red.append("Strike-off action is in progress")
+    if prof.get("has_insolvency_history"):
+        red.append("Has an insolvency history on record")
+    created = prof.get("date_of_creation")
+    age_y = None
+    if created:
+        try:
+            d = _dt.date.fromisoformat(created)
+            age_y = (today - d).days / 365.25
+            facts.append(f"Incorporated {d.strftime('%d %b %Y')} ({age_y:.1f} years)")
+            if age_y < 1: amber.append("Less than 1 year old - very short track record")
+            elif age_y < 3: amber.append("Under 3 years old - limited track record")
+            else: good.append(f"Established ({age_y:.0f} years)")
+        except Exception:
+            pass
+    acc = prof.get("accounts") or {}
+    cs = prof.get("confirmation_statement") or {}
+    la = (acc.get("last_accounts") or {})
+    if acc.get("overdue"): amber.append("Annual accounts are OVERDUE at Companies House")
+    if cs.get("overdue"): amber.append("Confirmation statement is OVERDUE")
+    if acc.get("overdue") and cs.get("overdue"): red.append("Both accounts and confirmation statement are overdue")
+    if not acc.get("overdue") and not cs.get("overdue"): good.append("Filings up to date")
+    at = (la.get("type") or "").lower()
+    if la.get("made_up_to"): facts.append(f"Last accounts made up to {la['made_up_to']} ({at.replace('-', ' ') or 'type unknown'})")
+    if at == "dormant": amber.append("Last accounts were DORMANT - little or no trading shown")
+    elif at in ("micro-entity", "total-exemption-small", "unaudited-abridged"):
+        facts.append("Small-company accounts: balance sheet detail is limited")
+    elif not la: amber.append("No accounts filed yet")
+    items = chg.get("items", []) or []
+    outst = [c for c in items if (c.get("status") or "").lower() == "outstanding"]
+    if outst:
+        lenders = []
+        for c in outst:
+            for pe in c.get("persons_entitled", []) or []:
+                if pe.get("name") and pe["name"] not in lenders: lenders.append(pe["name"])
+        amber.append(f"{len(outst)} outstanding charge(s) / secured borrowing" + (f" - e.g. {', '.join(lenders[:2])}" if lenders else ""))
+    elif items:
+        facts.append(f"{len(items)} charge(s) on record, all satisfied")
+    if prof.get("registered_office_is_in_dispute"): amber.append("Registered office is in dispute")
+    if prof.get("undeliverable_registered_office_address"): amber.append("Registered office address is undeliverable")
+    offs = off.get("items", []) or []
+    act = [o for o in offs if not o.get("resigned_on")]
+    recent_res = 0
+    for o in offs:
+        ro = o.get("resigned_on")
+        if ro:
+            try:
+                if (today - _dt.date.fromisoformat(ro)).days <= 365: recent_res += 1
+            except Exception:
+                pass
+    facts.append(f"{len(act)} current officer(s)")
+    if recent_res >= 2: amber.append(f"{recent_res} officers resigned in the last 12 months")
+    if not act and status == "active": amber.append("No current officers listed")
+    level = "red" if red else ("amber" if amber else "green")
+    head = {"green": "No red flags in the public record",
+            "amber": "Some cautions - worth a closer look before committing",
+            "red": "Serious warning signs in the public record"}[level]
+    return {"level": level, "headline": head, "red": red, "amber": amber, "good": good, "facts": facts,
+            "name": prof.get("company_name", ""), "number": n, "age": age_y,
+            "advice": {"green": "Standard terms look reasonable. This is a public-record check only, so still rely on the funder's own checks.",
+                       "amber": "Consider first month upfront or a deposit, and a personal guarantee from the director(s) if the deal includes a lease.",
+                       "red": "Do not proceed without a manager's sign-off. If it goes ahead, ask for payment upfront rather than credit."}[level]}
+
+
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -1281,6 +1387,55 @@ with st.sidebar:
     billing_email   = st.text_input("Billing Email", key="q_bill_email")
     install_address = st.text_area("Installation Address", height=80, key="q_address")
     num_employees   = st.number_input("No. of Employees", min_value=1, value=5, step=1, key="q_employees")
+    with st.expander("🔍 Company credit check (internal)", expanded=False):
+        st.caption("Public Companies House records only - indicative, not a credit score. Never shown to the customer or printed in the paperwork.")
+        if not _secret("COMPANIES_HOUSE_KEY"):
+            st.info("Add COMPANIES_HOUSE_KEY to Streamlit Secrets (same key as the Prospect Engine) to switch this on.")
+        else:
+            _chreg = _ch_norm_number(st.session_state.get("q_comp_reg", ""))
+            _chname = (st.session_state.get("q_comp_name", "") or "").strip()
+            _chn = _chreg if re.fullmatch(r"[A-Z]{0,2}\d{6,8}", _chreg or "") else ""
+            if _chn:
+                _chgo = st.button(f"Check company {_chn}", key="_ch_go", type="primary", use_container_width=True)
+                if _chgo:
+                    try:
+                        st.session_state["_ch_report"] = ch_assess(_chn)
+                    except Exception as _che:
+                        st.session_state["_ch_report"] = None
+                        st.error(f"Couldn't run the check: {_che}")
+            elif _chname:
+                if st.button("Find this company at Companies House", key="_ch_find", use_container_width=True):
+                    try:
+                        st.session_state["_ch_res"] = ch_search(_chname)
+                        if not st.session_state["_ch_res"]: st.warning("No matching companies found.")
+                    except Exception as _che:
+                        st.error(f"Couldn't search: {_che}")
+                _chres = st.session_state.get("_ch_res") or []
+                if _chres:
+                    _chi = st.selectbox("Which one?", range(len(_chres)), key="_ch_pick",
+                                        format_func=lambda i: f"{_chres[i]['name']} ({_chres[i]['number']}, {_chres[i]['status']})")
+                    if st.button("Check this company", key="_ch_go2", type="primary", use_container_width=True):
+                        try:
+                            st.session_state["_ch_report"] = ch_assess(_chres[_chi]["number"])
+                            st.session_state["_zoho_fill"] = {"q_comp_reg": _chres[_chi]["number"]}
+                            st.rerun()
+                        except Exception as _che:
+                            st.session_state["_ch_report"] = None
+                            st.error(f"Couldn't run the check: {_che}")
+            else:
+                st.caption("Enter a company name or registration number above first.")
+            _chr = st.session_state.get("_ch_report")
+            if _chr:
+                _col = {"green": "#1a9e5c", "amber": "#e0a100", "red": "#d93636"}[_chr["level"]]
+                _lines = "".join(f"<li style='color:#d93636'>{esc(x)}</li>" for x in _chr["red"]) \
+                       + "".join(f"<li style='color:#b07d00'>{esc(x)}</li>" for x in _chr["amber"]) \
+                       + "".join(f"<li style='color:#1a9e5c'>{esc(x)}</li>" for x in _chr["good"])
+                st.markdown(f"<div style='border-left:6px solid {_col};padding:8px 12px;border-radius:6px;background:rgba(128,128,128,.08)'>"
+                            f"<b>{esc(_chr['name'])}</b> ({esc(_chr['number'])})<br>"
+                            f"<span style='color:{_col};font-weight:700'>{'●'} {esc(_chr['level'].upper())}</span> - {esc(_chr['headline'])}"
+                            f"<ul style='margin:6px 0 4px 16px;padding:0'>{_lines}</ul></div>", unsafe_allow_html=True)
+                st.caption(" | ".join(_chr["facts"]))
+                st.markdown(f"**Suggested approach:** {_chr['advice']}")
 
     st.markdown("### 📋 Deal Configuration")
     # Deal type derived from payment model selection below
