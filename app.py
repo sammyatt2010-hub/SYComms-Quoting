@@ -1130,6 +1130,14 @@ def _contract_amt(c):
 def _zoho_fill_values(acct, contact, contract_rental=0.0, contract_settle=0.0):
     """Map a Zoho Account (+ optional contact) onto the quote's customer fields. Only non-empty values."""
     street = [str(acct.get(k) or "").strip() for k in ("Billing_Street", "Billing_City", "Billing_State", "Billing_Code")]
+    _pcre = re.compile(r"\b[A-Z]{1,2}[0-9][A-Z0-9]?\s*[0-9][A-Z]{2}\b", re.I)
+    if not _pcre.search(" ".join(street)):       # no postcode in the billing address - look for one elsewhere on the account
+        _pcs = [str(acct.get(k) or "") for k in ("Shipping_Code", "Mailing_Zip", "Zip_Code", "Postcode", "Post_Code")]
+        _pcs += [str(v) for k, v in acct.items() if isinstance(v, str) and re.search(r"post|zip|code", k, re.I) and k not in ("Billing_Code",)]
+        _pcs += [str(v) for v in acct.values() if isinstance(v, str)]
+        for _c in _pcs:
+            _m = _pcre.search(_c)
+            if _m: street.append(_m.group(0).upper()); break
     out = {
         "q_comp_name": str(acct.get("Account_Name") or "").strip(),
         "q_phone":     str(acct.get("Phone") or "").strip(),
@@ -1421,15 +1429,23 @@ def bb_lookup(postcode):
     return None
 
 def bb_summary(d):
-    """Plain-English assessment from the Ofcom figures."""
+    """Plain-English assessment + recommendation from the Ofcom figures."""
     g, s = d.get("gig", -1), d.get("sfbb", -1)
     def band(x):
         return ("almost all premises" if x >= 90 else "most premises" if x >= 60 else "some premises" if x >= 25
                 else "a few premises" if x >= 5 else "very few / none")
-    if g >= 60:   level, col, head = "green", "#1a9e5c", "Gigabit-capable broadband is likely available"
-    elif g >= 25 or s >= 85: level, col, head = "amber", "#e0a100", "Superfast broadband is likely; gigabit only in parts"
-    elif s >= 25: level, col, head = "amber", "#e0a100", "Superfast is patchy - check the exact address"
-    else: level, col, head = "red", "#d93636", "Limited fixed broadband coverage indicated - check the exact address"
+    if g >= 90:
+        level, col, head = "green", "#1a9e5c", "Gigabit / full fibre is very likely available"
+        rec = "Full fibre (FTTP / gigabit). Confirm the exact address on the Openreach or Gamma checker."
+    elif s >= 90:
+        level, col, head = "green", "#1a9e5c", "Superfast (FTTC) is almost certainly available"
+        rec = "FTTC, ordered as SOGEA (no phone line needed)." + (" Full fibre is available at some premises here, so check the exact address in case FTTP can be offered." if g >= 25 else "")
+    elif s >= 25 or g >= 25:
+        level, col, head = "amber", "#e0a100", "Availability is patchy - check the exact address"
+        rec = "SOGEA as the standard offer - but confirm on the Openreach or Gamma checker first, because not every premises here can get it."
+    else:
+        level, col, head = "red", "#d93636", "Very limited fixed broadband indicated"
+        rec = "Check the exact address on the Openreach or Gamma checker" + (" and consider fixed wireless (4G/5G) broadband." if d.get("fwa", -1) >= 25 else ".")
     lines = []
     if g >= 0: lines.append(f"Gigabit-capable (full fibre or cable): {band(g)} ({g}%)")
     if s >= 0: lines.append(f"Superfast, 30 Mbit/s+ (FTTC / fibre / cable): {band(s)} ({s}%)")
@@ -1439,7 +1455,7 @@ def bb_summary(d):
     if d.get("max_dl", -1) > 0: sp.append(f"fastest seen {d['max_dl']} Mbit/s down / {d['max_ul']} up" if d.get("max_ul", -1) > 0 else f"fastest seen {d['max_dl']} Mbit/s down")
     if sp: lines.append("Speeds on this postcode (existing lines): " + ", ".join(sp))
     if d.get("fwa", -1) > 0: lines.append(f"Fixed wireless (4G/5G home broadband) possible for about {d['fwa']}% of premises")
-    return level, col, head, lines
+    return level, col, head, lines, rec
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
@@ -1601,11 +1617,12 @@ with st.sidebar:
                 if not _bbd:
                     st.warning("Postcode not recognised or not in the Ofcom data. Check the format, or use the Openreach / Gamma checker.")
                 else:
-                    _lv, _col, _hd, _ls = bb_summary(_bbd)
+                    _lv, _col, _hd, _ls, _rec = bb_summary(_bbd)
                     st.markdown(f"<div style='border-left:6px solid {_col};padding:8px 12px;border-radius:6px;background:rgba(128,128,128,.08)'>"
                                 f"<b>{esc(_bbd['pc'][:-3] + ' ' + _bbd['pc'][-3:])}</b><br>"
                                 f"<span style='color:{_col};font-weight:700'>●</span> {esc(_hd)}"
-                                f"<ul style='margin:6px 0 4px 16px;padding:0'>{''.join('<li>' + esc(x) + '</li>' for x in _ls)}</ul></div>",
+                                f"<ul style='margin:6px 0 4px 16px;padding:0'>{''.join('<li>' + esc(x) + '</li>' for x in _ls)}</ul>"
+                                f"<b>Recommended:</b> {esc(_rec)}</div>",
                                 unsafe_allow_html=True)
                     if _bbd.get("area"):
                         st.caption("This exact postcode isn't in the Ofcom data (probably new), so this shows the average for nearby postcodes.")
