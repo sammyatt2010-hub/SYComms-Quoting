@@ -1372,6 +1372,75 @@ def ch_assess(number):
                        "red": "Do not proceed without a manager's sign-off. If it goes ahead, ask for payment upfront rather than credit."}[level]}
 
 
+# ─── BROADBAND AVAILABILITY (indicative, from Ofcom open postcode data in the bbdata/ folder) ──
+import gzip as _gzip
+_BB_DIR = Path(__file__).resolve().parent / "bbdata"
+_PC_RE = re.compile(r"\b([A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})\b", re.I)
+
+def bb_find_postcode(text):
+    m = _PC_RE.search(str(text or "").upper())
+    return f"{m.group(1)} {m.group(2)}" if m else ""
+
+def bb_meta():
+    try:
+        return json.loads((_BB_DIR / "meta.json").read_text())
+    except Exception:
+        return None
+
+def bb_lookup(postcode):
+    """-> dict of Ofcom figures for the postcode, or the average of its neighbours (flag 'area'), or None."""
+    pc = re.sub(r"\s", "", str(postcode or "")).upper()
+    if not re.fullmatch(r"[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}", pc):
+        return None
+    f = _BB_DIR / f"{pc[0]}.csv.gz"
+    if not f.exists():
+        return None
+    sector = pc[:-2]
+    rows, exact = [], None
+    with _gzip.open(f, "rt") as fh:
+        head = fh.readline().strip().split(",")
+        for line in fh:
+            if line.startswith(pc + ","):
+                exact = line.strip().split(","); break
+            if line.startswith(sector):
+                rows.append(line.strip().split(","))
+    def conv(r):
+        d = {}
+        for k, v in zip(head[1:], r[1:]):
+            try: d[k] = int(v)
+            except Exception: d[k] = -1
+        return d
+    if exact:
+        d = conv(exact); d["area"] = False; d["pc"] = pc; return d
+    if rows:
+        ds = [conv(r) for r in rows]; d = {}
+        for k in head[1:]:
+            vals = [x[k] for x in ds if x[k] >= 0]
+            d[k] = int(round(sum(vals) / len(vals))) if vals else -1
+        d["area"] = True; d["pc"] = pc; d["n"] = len(ds); return d
+    return None
+
+def bb_summary(d):
+    """Plain-English assessment from the Ofcom figures."""
+    g, s = d.get("gig", -1), d.get("sfbb", -1)
+    def band(x):
+        return ("almost all premises" if x >= 90 else "most premises" if x >= 60 else "some premises" if x >= 25
+                else "a few premises" if x >= 5 else "very few / none")
+    if g >= 60:   level, col, head = "green", "#1a9e5c", "Gigabit-capable broadband is likely available"
+    elif g >= 25 or s >= 85: level, col, head = "amber", "#e0a100", "Superfast broadband is likely; gigabit only in parts"
+    elif s >= 25: level, col, head = "amber", "#e0a100", "Superfast is patchy - check the exact address"
+    else: level, col, head = "red", "#d93636", "Limited fixed broadband coverage indicated - check the exact address"
+    lines = []
+    if g >= 0: lines.append(f"Gigabit-capable (full fibre or cable): {band(g)} ({g}%)")
+    if s >= 0: lines.append(f"Superfast, 30 Mbit/s+ (FTTC / fibre / cable): {band(s)} ({s}%)")
+    if d.get("ufbb100", -1) >= 0: lines.append(f"100 Mbit/s+ ultrafast: {d['ufbb100']}% of premises")
+    sp = []
+    if d.get("med_dl", -1) > 0: sp.append(f"median download about {d['med_dl']} Mbit/s")
+    if d.get("max_dl", -1) > 0: sp.append(f"fastest seen {d['max_dl']} Mbit/s down / {d['max_ul']} up" if d.get("max_ul", -1) > 0 else f"fastest seen {d['max_dl']} Mbit/s down")
+    if sp: lines.append("Speeds on this postcode (existing lines): " + ", ".join(sp))
+    if d.get("fwa", -1) > 0: lines.append(f"Fixed wireless (4G/5G home broadband) possible for about {d['fwa']}% of premises")
+    return level, col, head, lines
+
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -1517,6 +1586,32 @@ with st.sidebar:
                             f"<ul style='margin:6px 0 4px 16px;padding:0'>{_lines}</ul></div>", unsafe_allow_html=True)
                 st.caption(" | ".join(_chr["facts"]))
                 st.markdown(f"**Suggested approach:** {_chr['advice']}")
+    with st.expander("📡 Broadband availability (indicative)", expanded=False):
+        _bbm = bb_meta()
+        if not _bbm:
+            st.info("The broadband data folder (bbdata) isn't in the app yet - add it to GitHub next to app.py.")
+        else:
+            _apc = bb_find_postcode(st.session_state.get("q_address", ""))
+            if _apc and st.session_state.get("_bb_pc_src") != _apc:       # pre-fill from the installation address
+                st.session_state["_bb_pc"] = _apc
+                st.session_state["_bb_pc_src"] = _apc
+            _bbpc = st.text_input("Installation postcode", key="_bb_pc", placeholder="e.g. CF10 1AA")
+            if _bbpc.strip():
+                _bbd = bb_lookup(_bbpc)
+                if not _bbd:
+                    st.warning("Postcode not recognised or not in the Ofcom data. Check the format, or use the Openreach / Gamma checker.")
+                else:
+                    _lv, _col, _hd, _ls = bb_summary(_bbd)
+                    st.markdown(f"<div style='border-left:6px solid {_col};padding:8px 12px;border-radius:6px;background:rgba(128,128,128,.08)'>"
+                                f"<b>{esc(_bbd['pc'][:-3] + ' ' + _bbd['pc'][-3:])}</b><br>"
+                                f"<span style='color:{_col};font-weight:700'>●</span> {esc(_hd)}"
+                                f"<ul style='margin:6px 0 4px 16px;padding:0'>{''.join('<li>' + esc(x) + '</li>' for x in _ls)}</ul></div>",
+                                unsafe_allow_html=True)
+                    if _bbd.get("area"):
+                        st.caption("This exact postcode isn't in the Ofcom data (probably new), so this shows the average for nearby postcodes.")
+            st.caption(f"Indicative only - not a guarantee for this address. Source: {_bbm.get('label', 'Ofcom')}. "
+                       "Shows the share of premises on the postcode that can get each service, so confirm the exact address "
+                       "on the Openreach / Gamma checker before promising a service or install date.")
     st.markdown("---")
     st.markdown("### 🏢 Customer Details")
     comp_name       = st.text_input("Company Name", placeholder="Acme Ltd", key="q_comp_name")
